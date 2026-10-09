@@ -73,8 +73,29 @@ export function addDays(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 }
 
-// Display estimate only: use the clinician-confirmed EDD, with 40 weeks as the anchor.
-// Calendar convention follows the repository's 40-week pregnancy specification.
+// Keep the existing due-date anchor so older profiles remain compatible.
+// This is a calendar estimate using the project's 40-week convention.
+export function dueDateFromGestation(
+  weeks: number,
+  days: number,
+  referenceDate: string,
+): string | null {
+  if (
+    !Number.isInteger(weeks) ||
+    weeks < 0 ||
+    weeks > 42 ||
+    !Number.isInteger(days) ||
+    days < 0 ||
+    days > 6 ||
+    !isDate(referenceDate)
+  ) {
+    return null;
+  }
+
+  return addDays(referenceDate, 280 - (weeks * 7 + days));
+}
+
+// Display estimate only: the date anchor may come from gestational age or an older profile.
 export function pregnancyProgress(dueDate: string, today: string) {
   if (!isDate(dueDate) || !isDate(today)) {
     return null;

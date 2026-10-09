@@ -81,7 +81,7 @@ const progress = computed(() =>
           <span>旅程开始</span>
           <span>预产期 {{ profile.dueDate }}</span>
         </div>
-        <small>按预产期估算，仅作日历参考，不替代临床评估。</small>
+        <small>按档案日期推算，仅作日历参考，不替代临床评估。</small>
       </template>
       <template v-else>
         <span class="journey-tag">
@@ -105,7 +105,7 @@ const progress = computed(() =>
           to="/family"
           class="button button-primary"
         >
-          {{ profile ? '检查预产期' : '建立我的家庭档案' }}
+          {{ profile ? '检查怀孕时期' : '建立我的家庭档案' }}
           <AppIcon
             name="arrow"
             :size="17"

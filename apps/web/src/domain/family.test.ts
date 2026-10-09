@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   decodeFamily,
+  dueDateFromGestation,
   emptyFamily,
   isDate,
   parseMoney,
@@ -12,6 +13,26 @@ import {
 } from './family';
 
 describe('日历与每日计划', () => {
+  it('从孕周和天数推算日期，支持闰日与超过 40 周的记录', () => {
+    expect(dueDateFromGestation(24, 3, '2026-10-09')).toBe('2027-01-26');
+    expect(dueDateFromGestation(0, 0, '2026-10-09')).toBe(addDays('2026-10-09', 280));
+    expect(dueDateFromGestation(40, 0, '2026-10-09')).toBe('2026-10-09');
+    expect(dueDateFromGestation(42, 6, '2026-10-09')).toBe('2026-09-19');
+    expect(dueDateFromGestation(39, 6, '2024-02-28')).toBe('2024-02-29');
+  });
+
+  it('拒绝负数、小数、超出范围的孕周天数和无效日期', () => {
+    for (const weeks of [-1, 24.5, 43, NaN, Infinity]) {
+      expect(dueDateFromGestation(weeks, 0, '2026-10-09')).toBeNull();
+    }
+
+    for (const days of [-1, 1.5, 7, NaN, Infinity]) {
+      expect(dueDateFromGestation(24, days, '2026-10-09')).toBeNull();
+    }
+
+    expect(dueDateFromGestation(24, 3, '2026-02-30')).toBeNull();
+  });
+
   it('按日历计算孕周，兼容闰年和预产期当天/之后', () => {
     expect(pregnancyProgress('2027-01-26', '2026-10-09')).toMatchObject({
       weeks: 24,

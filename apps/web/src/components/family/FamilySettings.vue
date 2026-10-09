@@ -1,17 +1,30 @@
 <script setup lang="ts">
-import { reactive, shallowRef } from 'vue';
+import { computed, reactive, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
-import { addDays, dayDifference, isDate, localDate } from '@/domain/family';
+import { dueDateFromGestation, localDate, pregnancyProgress } from '@/domain/family';
 import AppIcon from '@/components/AppIcon.vue';
 
 const { data, saveProfile, exportBackup, locked } = useFamily();
 
+// Anchor the draft to the displayed date; saving after midnight must not shift it.
+const referenceDate = localDate();
+const initialProgress = data.value.profile
+  ? pregnancyProgress(data.value.profile.dueDate, referenceDate)
+  : null;
+
 const form = reactive({
   name: data.value.profile?.name ?? '',
   nickname: data.value.profile?.nickname ?? '',
-  dueDate: data.value.profile?.dueDate ?? '',
+  weeks: initialProgress?.weeks ?? ('' as number | ''),
+  days: initialProgress?.days ?? 0,
   quietMode: data.value.profile?.quietMode ?? false,
 });
+
+const estimatedDueDate = computed(() =>
+  typeof form.weeks === 'number'
+    ? dueDateFromGestation(form.weeks, form.days, referenceDate)
+    : null,
+);
 
 const error = shallowRef('');
 const saved = shallowRef(false);
@@ -26,16 +39,17 @@ function submit() {
     return;
   }
 
-  if (!isDate(form.dueDate) || dayDifference(form.dueDate, localDate()) > 280) {
-    error.value = '请填写有效预产期，且不晚于今天之后 280 天。';
+  if (!estimatedDueDate.value) {
+    error.value = '请填写有效怀孕时期：孕周为 0–42 的整数，天数为 0–6。';
 
     return;
   }
 
   saved.value = saveProfile({
-    ...form,
     name: form.name.trim(),
     nickname: form.nickname.trim(),
+    dueDate: estimatedDueDate.value,
+    quietMode: form.quietMode,
   });
 }
 </script>
@@ -72,18 +86,53 @@ function submit() {
             autocomplete="nickname"
           />
         </label>
-        <div class="field">
-          <label for="due-date">预产期</label>
-          <input
-            id="due-date"
-            v-model="form.dueDate"
-            type="date"
-            :max="addDays(localDate(), 280)"
-            aria-describedby="due-date-help"
-            required
-          />
-          <small id="due-date-help">填写医生确认的日期。首页孕周仅作日历参考。</small>
-        </div>
+        <fieldset class="gestation-fields">
+          <legend>怀孕时期</legend>
+          <p
+            id="gestation-help"
+            class="gestation-help"
+          >
+            按 {{ referenceDate }} 已满的孕周填写，例如 24 周 3 天。
+          </p>
+          <div class="form-row">
+            <div class="field">
+              <label for="gestation-weeks">孕周（周）</label>
+              <input
+                id="gestation-weeks"
+                v-model.number="form.weeks"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                max="42"
+                step="1"
+                placeholder="例如：24"
+                aria-describedby="gestation-help"
+                required
+              />
+            </div>
+            <div class="field">
+              <label for="gestation-days">天数（天）</label>
+              <select
+                id="gestation-days"
+                v-model.number="form.days"
+              >
+                <option
+                  v-for="day in 7"
+                  :key="day"
+                  :value="day - 1"
+                >
+                  {{ day - 1 }} 天
+                </option>
+              </select>
+            </div>
+          </div>
+          <p
+            v-if="estimatedDueDate"
+            class="gestation-help"
+          >
+            预计预产期：{{ estimatedDueDate }}。按 40 周估算，仅作日历参考，以医生评估为准。
+          </p>
+        </fieldset>
         <label class="quiet-option">
           <input
             v-model="form.quietMode"
@@ -154,6 +203,26 @@ function submit() {
   grid-template-columns: minmax(0, 1.3fr) minmax(280px, 1fr);
   gap: 26px;
   align-items: start;
+}
+
+.gestation-fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.gestation-fields legend {
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.gestation-help {
+  margin: 10px 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-secondary);
 }
 
 .quiet-option {
