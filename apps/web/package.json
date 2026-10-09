@@ -19,6 +19,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:api": "node --test server/*.test.ts",
+    "db:backup": "node server/backup-cli.ts backup",
+    "db:verify": "node server/backup-cli.ts verify",
+    "db:restore": "node server/backup-cli.ts restore",
     "test:e2e": "playwright test"
   },
   "dependencies": {

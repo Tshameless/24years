@@ -1,0 +1,22 @@
+[Unit]
+Description=24Years family web service
+After=network.target
+
+[Service]
+Type=simple
+User=24years
+Group=24years
+WorkingDirectory=/opt/24years/apps/web
+EnvironmentFile=/etc/24years.env
+ExecStart=/usr/bin/node server/index.ts
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/24years
+
+[Install]
+WantedBy=multi-user.target

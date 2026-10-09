@@ -24,8 +24,17 @@ import {
 } from '@/domain/family';
 import { useCollaboration } from './useCollaboration';
 import type { FamilyChange, FamilyMode, FamilyParentRole } from '@/domain/collaboration';
+import { downloadBackup, readFamilyBackup } from '@/domain/backup';
 
 export const STORAGE_KEY = '24years.family.v1';
+export const BEFORE_IMPORT_KEY = `${STORAGE_KEY}.before-import`;
+
+export interface ImportTarget {
+  identity: string;
+  localRaw: string | null;
+  familyId: string | null;
+  revision: number | null;
+}
 
 export function createFamilyStore(options: { connect?: boolean } = {}) {
   const localData = ref<FamilyData>(emptyFamily());
@@ -207,16 +216,78 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
         localLocked.value && !cloud.active.value
           ? localStorage.getItem(STORAGE_KEY)
           : JSON.stringify(data.value, null, 2);
-      const url = URL.createObjectURL(new Blob([raw ?? '{}'], { type: 'application/json' }));
-      const link = document.createElement('a');
-
-      link.href = url;
-      link.download = `24years-backup-${localDate()}.json`;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadBackup(raw ?? '{}', `24years-backup-${localDate()}.json`);
     } catch {
       localError.value = '暂时无法导出，请检查浏览器下载与存储权限。';
     }
+  }
+
+  function importTarget(): ImportTarget {
+    return {
+      identity: identity.value,
+      localRaw: lastSaved,
+      familyId: cloud.state.value.family?.id ?? null,
+      revision: cloud.state.value.family?.revision ?? null,
+    };
+  }
+
+  async function importBackup(raw: string, target: ImportTarget, operationId: string) {
+    const next = readFamilyBackup(raw);
+
+    if (!cloud.ready.value || target.identity !== identity.value) {
+      throw new Error('当前账号或家庭已变化，请重新选择备份。');
+    }
+
+    if (cloud.active.value) {
+      if (
+        cloud.expired.value ||
+        cloud.role.value !== 'owner' ||
+        !target.familyId ||
+        target.revision === null
+      ) {
+        throw new Error('请由当前家庭管理员登录后导入；也可以退出账号，恢复到本机。');
+      }
+
+      return cloud.importData(next, target.familyId, target.revision, operationId);
+    }
+
+    if (localStorage.getItem(STORAGE_KEY) !== target.localRaw || lastSaved !== target.localRaw) {
+      throw new Error('预览后本机记录已变化，请刷新并重新选择备份。');
+    }
+
+    // Save the original bytes first, including damaged archives, before replacing anything.
+    localStorage.setItem(BEFORE_IMPORT_KEY, target.localRaw ?? JSON.stringify(emptyFamily()));
+    const serialized = JSON.stringify(next);
+    localStorage.setItem(STORAGE_KEY, serialized);
+    lastSaved = serialized;
+    localData.value = next;
+    localLocked.value = false;
+    localError.value = '';
+
+    return true;
+  }
+
+  async function exportBeforeImport() {
+    if (cloud.active.value) {
+      if (!(await cloud.manage('import-backup'))) {
+        return false;
+      }
+
+      downloadBackup(
+        JSON.stringify(cloud.backupData.value, null, 2),
+        `24years-before-import-${localDate()}.json`,
+      );
+    } else {
+      const raw = localStorage.getItem(BEFORE_IMPORT_KEY);
+
+      if (raw === null) {
+        throw new Error('还没有导入前备份。');
+      }
+
+      downloadBackup(raw, `24years-before-import-${localDate()}.json`);
+    }
+
+    return true;
   }
 
   const refreshDate = () => {
@@ -269,6 +340,9 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     updateTask,
     updateExpense,
     exportBackup,
+    importTarget,
+    importBackup,
+    exportBeforeImport,
     removeTask: (id: string) =>
       changeRecords(
         {

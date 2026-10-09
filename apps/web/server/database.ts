@@ -18,7 +18,8 @@ export function openDatabase(path: string) {
       username TEXT UNIQUE NOT NULL,
       nickname TEXT NOT NULL,
       password_hash TEXT NOT NULL,
-      salt TEXT NOT NULL
+      salt TEXT NOT NULL,
+      recovery_hash TEXT
     );
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY,
@@ -51,11 +52,24 @@ export function openDatabase(path: string) {
       payload_hash TEXT NOT NULL,
       PRIMARY KEY(user_id, operation_id)
     );
+    CREATE TABLE IF NOT EXISTS import_backups (
+      family_id TEXT PRIMARY KEY REFERENCES families(id),
+      data TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // The first collaboration release only stored permission roles. Keep existing
   // databases usable while adding the family position selected during onboarding.
   const columns = db.prepare('PRAGMA table_info(members)').all() as Array<{ name: string }>;
+
+  const accountColumns = db.prepare('PRAGMA table_info(accounts)').all() as Array<{
+    name: string;
+  }>;
+
+  if (!accountColumns.some((column) => column.name === 'recovery_hash')) {
+    db.exec('ALTER TABLE accounts ADD COLUMN recovery_hash TEXT');
+  }
 
   if (!columns.some((column) => column.name === 'family_role')) {
     db.exec(`

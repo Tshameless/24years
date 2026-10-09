@@ -1,7 +1,8 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createFamilyStore, STORAGE_KEY, type FamilyStore } from './useFamily';
+import { BEFORE_IMPORT_KEY, createFamilyStore, STORAGE_KEY, type FamilyStore } from './useFamily';
+import { emptyFamily } from '@/domain/family';
 
 const wrappers: ReturnType<typeof mount>[] = [];
 
@@ -37,6 +38,47 @@ const profile = {
 };
 
 describe('本地存档', () => {
+  it('预览不写入，确认恢复保留原副本，支持损坏存档恢复', async () => {
+    localStorage.setItem(STORAGE_KEY, '{broken');
+    const store = setup();
+    const target = store.importTarget();
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('{broken');
+    expect(
+      await store.importBackup(
+        JSON.stringify({ ...emptyFamily(), profile }),
+        target,
+        'import-operation',
+      ),
+    ).toBe(true);
+    expect(localStorage.getItem(BEFORE_IMPORT_KEY)).toBe('{broken');
+    expect(store.locked.value).toBe(false);
+    expect(setup().data.value.profile).toEqual(profile);
+  });
+
+  it('无效备份、过时预览和存储失败都不覆盖记录', async () => {
+    const store = setup();
+    store.saveProfile(profile);
+    const before = localStorage.getItem(STORAGE_KEY);
+    const target = store.importTarget();
+    await expect(store.importBackup('{invalid', target, 'operation')).rejects.toThrow(
+      '备份格式无效',
+    );
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(before);
+    const next = JSON.stringify(emptyFamily());
+    store.saveProfile({ ...profile, name: '已更新' });
+    await expect(store.importBackup(next, target, 'operation')).rejects.toThrow('本机记录已变化');
+    const updated = localStorage.getItem(STORAGE_KEY);
+    const latest = store.importTarget();
+    vi.stubGlobal('localStorage', {
+      getItem: localStorage.getItem.bind(localStorage),
+      setItem: () => {
+        throw new Error('Quota exceeded');
+      },
+    });
+    await expect(store.importBackup(next, latest, 'operation')).rejects.toThrow('Quota exceeded');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(updated);
+    expect(store.data.value.profile?.name).toBe('已更新');
+  });
   it('家庭、账本与打卡可在新实例恢复，每日打卡相互独立', () => {
     const store = setup();
     expect(store.saveProfile(profile)).toBe(true);

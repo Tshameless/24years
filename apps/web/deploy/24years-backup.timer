@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up 24Years every six hours
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:00:00
+RandomizedDelaySec=120
+Persistent=true
+Unit=24years-backup.service
+
+[Install]
+WantedBy=timers.target

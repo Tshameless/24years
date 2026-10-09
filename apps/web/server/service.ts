@@ -8,7 +8,13 @@ import {
 } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { DatabaseSync } from 'node:sqlite';
-import { decodeFamily, validExpense, validProfile, validTask } from '../src/domain/family.ts';
+import {
+  decodeFamily,
+  validExpense,
+  validProfile,
+  validTask,
+  type FamilyData,
+} from '../src/domain/family.ts';
 import type {
   Account,
   FamilyParentRole,
@@ -165,6 +171,7 @@ export function createService(db: DatabaseSync) {
       | { id: string; salt: string; password_hash: string }
       | undefined;
     let userId: string;
+    let recoveryKey: string | undefined;
 
     if (register) {
       requireValue(
@@ -185,13 +192,10 @@ export function createService(db: DatabaseSync) {
         409,
         '这个账号已被使用。',
       );
-      db.prepare('INSERT INTO accounts VALUES (?, ?, ?, ?, ?)').run(
-        userId,
-        username,
-        body.nickname.trim(),
-        key.toString('hex'),
-        salt,
-      );
+      recoveryKey = randomBytes(32).toString('base64url');
+      db.prepare(
+        'INSERT INTO accounts(id, username, nickname, password_hash, salt, recovery_hash) VALUES (?, ?, ?, ?, ?, ?)',
+      ).run(userId, username, body.nickname.trim(), key.toString('hex'), salt, hash(recoveryKey));
     } else {
       const key = await passwordHash(
         body.password,
@@ -203,6 +207,13 @@ export function createService(db: DatabaseSync) {
         '账号或密码不正确。',
       );
       userId = String(existing.id);
+      requireValue(
+        db
+          .prepare('SELECT id FROM accounts WHERE id = ? AND password_hash = ?')
+          .get(userId, existing.password_hash),
+        401,
+        '密码已更新，请使用新密码登录。',
+      );
     }
 
     const token = randomBytes(32).toString('base64url');
@@ -213,7 +224,156 @@ export function createService(db: DatabaseSync) {
       Date.now() + 30 * 86400000,
     );
 
-    return { token, state: snapshot(userId) };
+    return { token, state: { ...snapshot(userId), ...(recoveryKey ? { recoveryKey } : {}) } };
+  }
+
+  async function verifyPassword(userId: string, password: unknown) {
+    requireValue(
+      typeof password === 'string' && password.length >= 10 && password.length <= 128,
+      400,
+      '请填写当前密码。',
+    );
+    const row = db.prepare('SELECT salt, password_hash FROM accounts WHERE id = ?').get(userId) as
+      | { salt: string; password_hash: string }
+      | undefined;
+    const key = await passwordHash(password, row?.salt ?? '24years-invalid-account');
+    requireValue(
+      row && timingSafeEqual(key, Buffer.from(row.password_hash, 'hex')),
+      400,
+      '当前密码不正确。',
+    );
+    requireValue(
+      db
+        .prepare('SELECT id FROM accounts WHERE id = ? AND password_hash = ?')
+        .get(userId, row.password_hash),
+      401,
+      '账号已发生变更，请重新登录。',
+    );
+
+    return row.password_hash;
+  }
+
+  async function rotateRecovery(userId: string, body: Body) {
+    const verifiedHash = await verifyPassword(userId, body.password);
+    const recoveryKey = randomBytes(32).toString('base64url');
+    const result = db
+      .prepare('UPDATE accounts SET recovery_hash = ? WHERE id = ? AND password_hash = ?')
+      .run(hash(recoveryKey), userId, verifiedHash);
+    requireValue(result.changes === 1, 401, '账号已发生变更，请重新登录。');
+
+    return { ...snapshot(userId), recoveryKey };
+  }
+
+  async function recover(body: Body) {
+    requireValue(
+      typeof body.username === 'string' && /^[a-zA-Z0-9_]{3,32}$/.test(body.username),
+      400,
+      '请填写有效账号。',
+    );
+    requireValue(
+      typeof body.recoveryKey === 'string' && /^[\w-]{43}$/.test(body.recoveryKey),
+      400,
+      '请填写完整的恢复密钥。',
+    );
+    requireValue(
+      typeof body.password === 'string' &&
+        body.password.length >= 10 &&
+        body.password.length <= 128,
+      400,
+      '新密码需为 10–128 个字符。',
+    );
+    const row = db
+      .prepare('SELECT id, recovery_hash FROM accounts WHERE username = ?')
+      .get(body.username.toLowerCase()) as { id: string; recovery_hash: string | null } | undefined;
+    const suppliedHash = hash(body.recoveryKey);
+    const valid = timingSafeEqual(
+      Buffer.from(suppliedHash, 'hex'),
+      Buffer.from(row?.recovery_hash ?? hash('invalid'), 'hex'),
+    );
+    requireValue(row && row.recovery_hash && valid, 400, '账号或恢复密钥不正确。');
+    const salt = randomBytes(16).toString('hex');
+    const key = await passwordHash(body.password, salt);
+
+    transaction(db, () => {
+      // Consume once after hashing; simultaneous recovery attempts cannot both succeed.
+      const result = db
+        .prepare(
+          'UPDATE accounts SET password_hash = ?, salt = ?, recovery_hash = NULL WHERE id = ? AND recovery_hash = ?',
+        )
+        .run(key.toString('hex'), salt, row.id, suppliedHash);
+      requireValue(result.changes === 1, 400, '恢复密钥已使用或已更新，请重新核对。');
+      db.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.id);
+    });
+
+    return { user: null, family: null };
+  }
+
+  async function deleteAccount(userId: string, body: Body) {
+    const verifiedHash = await verifyPassword(userId, body.password);
+
+    return transaction(db, () => {
+      requireValue(
+        db
+          .prepare('SELECT id FROM accounts WHERE id = ? AND password_hash = ?')
+          .get(userId, verifiedHash),
+        401,
+        '账号已发生变更，请重新登录。',
+      );
+      requireValue(
+        body.confirmation === account(userId).username,
+        400,
+        '请输入完整账号以确认注销。',
+      );
+      const family = snapshot(userId).family;
+      requireValue(
+        (family?.id ?? null) === body.familyId && (family?.revision ?? null) === body.revision,
+        409,
+        '家庭状态已变化，请核对后重新确认注销。',
+      );
+
+      if (family) {
+        const member = family.members.find((item) => item.id === userId)!;
+        const remaining = family.members.find((item) => item.id !== userId);
+        db.prepare('DELETE FROM invites WHERE family_id = ?').run(family.id);
+        db.prepare('DELETE FROM members WHERE user_id = ?').run(userId);
+
+        if (!remaining) {
+          db.prepare('DELETE FROM receipts WHERE family_id = ?').run(family.id);
+          db.prepare('DELETE FROM import_backups WHERE family_id = ?').run(family.id);
+          db.prepare('DELETE FROM families WHERE id = ?').run(family.id);
+        } else {
+          if (member.role === 'owner') {
+            db.prepare("UPDATE members SET role = 'owner' WHERE user_id = ?").run(remaining.id);
+
+            if (family.data.profile) {
+              family.data.profile.nickname = remaining.nickname;
+
+              if (remaining.familyRole) {
+                family.data.profile.parentRole = remaining.familyRole;
+              } else {
+                delete family.data.profile.parentRole;
+                delete family.data.profile.familyMode;
+              }
+
+              db.prepare('UPDATE families SET data = ? WHERE id = ?').run(
+                JSON.stringify(family.data),
+                family.id,
+              );
+            }
+          }
+
+          db.prepare(
+            'UPDATE families SET revision = revision + 1, updated_at = ?, updated_by = ? WHERE id = ?',
+          ).run(new Date().toISOString(), '已注销成员', family.id);
+        }
+      }
+
+      db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+      db.prepare('DELETE FROM receipts WHERE user_id = ?').run(userId);
+      db.prepare('DELETE FROM accounts WHERE id = ?').run(userId);
+
+      return { user: null, family: null };
+    });
   }
 
   function userForToken(token: string) {
@@ -239,6 +399,8 @@ export function createService(db: DatabaseSync) {
     if (data.profile) {
       data.profile = { ...data.profile, familyMode: body.mode, parentRole: selectedFamilyRole };
     }
+
+    requireValue(Buffer.byteLength(JSON.stringify(data)) < 800000, 413, '档案超过当前容量上限。');
 
     const familyId = randomUUID();
     db.prepare('INSERT INTO families VALUES (?, ?, ?, 1, ?, ?)').run(
@@ -486,9 +648,26 @@ export function createService(db: DatabaseSync) {
     touch(familyId, userId);
   }
 
-  function mutate(userId: string, action: string, body: Body) {
+  function mutate(
+    userId: string,
+    action: string,
+    body: Body,
+  ): SessionState & {
+    invitation?: { code: string; expiresAt: string };
+    backupData?: FamilyData;
+  } {
     return transaction(db, () => {
       let invitation;
+
+      if (action === 'import-backup') {
+        authorize(userId, body, 'owner');
+        const row = db
+          .prepare('SELECT data FROM import_backups WHERE family_id = ?')
+          .get(String(body.familyId)) as { data: string } | undefined;
+        requireValue(row, 404, '还没有导入前备份。');
+
+        return { ...snapshot(userId), backupData: decodeFamily(row.data) };
+      }
 
       if (action === 'create') {
         createFamily(userId, body);
@@ -496,6 +675,8 @@ export function createService(db: DatabaseSync) {
         join(userId, body);
       } else if (action === 'records') {
         changeRecords(userId, body);
+      } else if (action === 'import') {
+        importFamily(userId, body);
       } else {
         invitation = manage(userId, action, body);
       }
@@ -504,8 +685,72 @@ export function createService(db: DatabaseSync) {
     });
   }
 
+  function importFamily(userId: string, body: Body) {
+    authorize(userId, body, 'owner');
+    requireValue(
+      typeof body.operationId === 'string' && /^[\w-]{10,100}$/.test(body.operationId),
+      400,
+      '缺少有效操作编号。',
+    );
+    const payloadHash = hash(
+      JSON.stringify({
+        action: 'import',
+        familyId: body.familyId,
+        data: body.data,
+        revision: body.revision,
+      }),
+    );
+    const receipt = db
+      .prepare('SELECT payload_hash FROM receipts WHERE user_id = ? AND operation_id = ?')
+      .get(userId, body.operationId) as { payload_hash: string } | undefined;
+
+    if (receipt) {
+      requireValue(receipt.payload_hash === payloadHash, 409, '操作编号已被使用，请重新选择文件。');
+
+      return;
+    }
+
+    const family = snapshot(userId).family!;
+    requireValue(
+      body.revision === family.revision,
+      409,
+      '预览后家庭已有更新，请重新选择文件并核对。',
+    );
+    let data;
+
+    try {
+      data = decodeFamily(JSON.stringify(body.data));
+    } catch {
+      throw new ApiError(400, '备份格式无效，未修改任何记录。');
+    }
+
+    // A backup contains records, not membership or permission changes.
+    if (data.profile) {
+      const role = family.members.find((item) => item.id === userId)!.familyRole;
+      requireValue(role, 400, '请先补选家庭身份再导入。');
+      data.profile = { ...data.profile, familyMode: family.mode, parentRole: role };
+    }
+
+    data.theme = family.data.theme;
+    requireValue(Buffer.byteLength(JSON.stringify(data)) < 800000, 413, '备份超过当前容量上限。');
+    db.prepare(
+      'INSERT INTO import_backups VALUES (?, ?, ?) ON CONFLICT(family_id) DO UPDATE SET data = excluded.data, created_at = excluded.created_at',
+    ).run(family.id, JSON.stringify(family.data), new Date().toISOString());
+    db.prepare('UPDATE families SET data = ? WHERE id = ?').run(JSON.stringify(data), family.id);
+    touch(family.id, userId);
+    db.prepare('INSERT INTO receipts VALUES (?, ?, ?, ?)').run(
+      userId,
+      body.operationId,
+      family.id,
+      payloadHash,
+    );
+  }
+
   return {
     authenticate,
+    rotateRecovery,
+    recover,
+    deleteAccount,
     userForToken,
     snapshot,
     mutate,

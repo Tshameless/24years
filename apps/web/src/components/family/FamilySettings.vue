@@ -2,13 +2,13 @@
 import { computed, reactive, shallowRef, watch } from 'vue';
 import { useFamily } from '@/composables/useFamily';
 import { dueDateFromGestation, localDate, pregnancyProgress } from '@/domain/family';
-import AppIcon from '@/components/AppIcon.vue';
 import AccountPanel from './AccountPanel.vue';
 import FamilyPairing from './FamilyPairing.vue';
 import FamilySetupChoice from './FamilySetupChoice.vue';
+import DataBackupPanel from './DataBackupPanel.vue';
 import type { FamilyMode, FamilyParentRole } from '@/domain/collaboration';
 
-const { data, saveProfile, exportBackup, profileLocked, canManage, cloud } = useFamily();
+const { data, saveProfile, profileLocked, canManage, cloud } = useFamily();
 const { active, state } = cloud;
 const currentMember = computed(() =>
   state.value.family?.members.find((member) => member.id === state.value.user?.id),
@@ -287,36 +287,7 @@ async function submit() {
     <aside class="settings-aside">
       <AccountPanel />
       <FamilyPairing />
-      <section class="panel data-note">
-        <span class="empty-icon">
-          <AppIcon
-            name="shield"
-            :size="26"
-          />
-        </span>
-        <h2>你的记录，由你掌握</h2>
-        <p class="muted">
-          {{
-            active
-              ? '同步模式的记录保存在服务端；家庭内成员按权限共同访问。退出账号不会删除已同步记录。'
-              : '本机模式的数据保存在当前浏览器。开启同步并上传后，才会存入服务端。'
-          }}
-        </p>
-        <p class="muted">
-          可导出当前档案的 JSON 备份。未提交的表单不会自动同步，离开前请保存；本版尚不支持 JSON
-          导入。
-        </p>
-        <button
-          class="button button-secondary"
-          @click="exportBackup"
-        >
-          <AppIcon
-            name="download"
-            :size="17"
-          />
-          导出我的数据
-        </button>
-      </section>
+      <DataBackupPanel />
     </aside>
   </div>
 </template>
@@ -381,18 +352,6 @@ async function submit() {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.8;
-}
-
-.data-note .empty-icon {
-  margin: 0 0 22px;
-}
-
-.data-note h2 {
-  margin-bottom: 18px;
-}
-
-.data-note .muted {
-  font-size: 13px;
 }
 
 @media (max-width: 1000px) {

@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { reactive, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
+import AccountRecovery from './AccountRecovery.vue';
+import AccountSecurity from './AccountSecurity.vue';
 
 const { cloud } = useFamily();
-const { state, busy, expired, active } = cloud;
-const register = shallowRef(true);
+const { state, busy, expired, active, accountNotice } = cloud;
+const register = shallowRef(!accountNotice.value);
 const credentials = reactive({ username: '', password: '', nickname: '' });
+const recovering = shallowRef(false);
 
 async function submit() {
   if (await cloud.authenticate(register.value && !expired.value, credentials)) {
@@ -39,13 +42,33 @@ function logout() {
       >
         退出账号
       </button>
+      <AccountSecurity />
     </template>
+    <AccountRecovery
+      v-else-if="recovering"
+      @cancel="
+        recovering = false;
+        register = false;
+        cloud.clearError();
+      "
+      @recovered="
+        recovering = false;
+        register = false;
+      "
+    />
     <form
       v-else
       class="form-grid"
       @submit.prevent="submit"
     >
       <p class="muted">本机记录无需账号。开启同步后，可以独立使用，也可以邀请伴侣加入。</p>
+      <p
+        v-if="accountNotice"
+        class="success-message"
+        role="status"
+      >
+        {{ accountNotice }}
+      </p>
       <label class="field">
         同步账号
         <input
@@ -87,7 +110,7 @@ function logout() {
         v-if="register && !expired"
         class="muted"
       >
-        请妥善保存账号和密码，当前版本尚未提供密码找回。
+        注册后请保存恢复密钥，忘记密码时可凭密钥找回账号。
       </p>
       <button
         class="button button-primary"
@@ -106,6 +129,18 @@ function logout() {
         "
       >
         {{ register ? '已有账号，去登录' : '还没有账号，去注册' }}
+      </button>
+      <button
+        type="button"
+        class="text-button"
+        :disabled="busy"
+        @click="
+          recovering = true;
+          credentials.password = '';
+          cloud.clearError();
+        "
+      >
+        忘记密码，使用恢复密钥
       </button>
     </form>
   </section>

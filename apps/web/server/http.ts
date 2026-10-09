@@ -88,6 +88,7 @@ export function createApplication(options: {
       userId = service.userForToken(token);
 
       if (path === '/api/health' && request.method === 'GET') {
+        db.prepare('SELECT 1').get();
         json(response, 200, { ok: true });
 
         return;
@@ -117,6 +118,20 @@ export function createApplication(options: {
         const body = await readBody(request);
         const ip = request.socket.remoteAddress ?? 'unknown';
 
+        if (path === '/api/recover') {
+          limit(`recovery-ip:${ip}`, 30);
+          limit(`recovery-account:${String(body.username).toLowerCase()}`, 6);
+          const result = await service.recover(body);
+          service.logout(token);
+          response.setHeader(
+            'Set-Cookie',
+            `family_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${options.secureCookie ? '; Secure' : ''}`,
+          );
+          json(response, 200, result);
+
+          return;
+        }
+
         if (path === '/api/register' || path === '/api/login') {
           limit(`auth-ip:${ip}`, 100);
           limit(`auth-account:${String(body.username).toLowerCase()}`, 12);
@@ -142,6 +157,24 @@ export function createApplication(options: {
             `family_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${options.secureCookie ? '; Secure' : ''}`,
           );
           json(response, 200, { user: null, family: null });
+
+          return;
+        }
+
+        if (path === '/api/account/recovery' || path === '/api/account/delete') {
+          limit(`security:${userId}`, 6);
+          const result = path.endsWith('/recovery')
+            ? await service.rotateRecovery(userId, body)
+            : await service.deleteAccount(userId, body);
+
+          if (path.endsWith('/delete')) {
+            response.setHeader(
+              'Set-Cookie',
+              `family_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${options.secureCookie ? '; Secure' : ''}`,
+            );
+          }
+
+          json(response, 200, result);
 
           return;
         }

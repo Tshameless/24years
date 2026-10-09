@@ -23,7 +23,13 @@ class RequestError extends Error {
 async function request(
   path: string,
   body?: unknown,
-): Promise<SessionState & { invitation?: { code: string; expiresAt: string } }> {
+): Promise<
+  SessionState & {
+    invitation?: { code: string; expiresAt: string };
+    recoveryKey?: string;
+    backupData?: FamilyData;
+  }
+> {
   const response = await fetch(`/api/${path}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers:
@@ -50,6 +56,9 @@ export function useCollaboration(enabled = true) {
   const expired = shallowRef(false);
   const error = shallowRef('');
   const invitation = shallowRef<{ code: string; expiresAt: string } | null>(null);
+  const recoveryKey = shallowRef('');
+  const backupData = shallowRef<FamilyData | null>(null);
+  const accountNotice = shallowRef('');
   const lastSynced = shallowRef('');
   let fetching = false;
   let generation = 0;
@@ -106,6 +115,11 @@ export function useCollaboration(enabled = true) {
     if (next.user?.id !== state.value.user?.id || next.family?.id !== current?.id) {
       invitation.value = null;
       pendingOperations.clear();
+      backupData.value = null;
+
+      if (next.user?.id !== state.value.user?.id) {
+        recoveryKey.value = '';
+      }
     }
 
     state.value = { user: next.user, family: next.family };
@@ -130,6 +144,9 @@ export function useCollaboration(enabled = true) {
 
       if (reason.status === 401 && active.value) {
         expired.value = true;
+        state.value = { user: null, family: null };
+        recoveryKey.value = '';
+        backupData.value = null;
       }
 
       error.value =
@@ -160,7 +177,10 @@ export function useCollaboration(enabled = true) {
 
       if (!next.user && active.value) {
         expired.value = true;
-        error.value = '登录已过期，请在「我的家庭」重新登录。未保存的输入仍在当前页面。';
+        state.value = { user: null, family: null };
+        recoveryKey.value = '';
+        backupData.value = null;
+        error.value = '登录已过期或已撤销，请在「我的家庭」重新登录。';
       } else {
         receive(next);
       }
@@ -182,10 +202,19 @@ export function useCollaboration(enabled = true) {
     busy.value = true;
     generation += 1;
     error.value = '';
+    accountNotice.value = '';
 
     try {
       const next = await request(path, body);
       receive(next);
+
+      if (next.recoveryKey) {
+        recoveryKey.value = next.recoveryKey;
+      }
+
+      if (next.backupData) {
+        backupData.value = next.backupData;
+      }
 
       if (next.invitation) {
         invitation.value = next.invitation;
@@ -228,6 +257,22 @@ export function useCollaboration(enabled = true) {
     return false;
   }
 
+  async function endAccountAction(path: string, body: unknown) {
+    if (!(await run(path, body))) {
+      return false;
+    }
+
+    rememberActive(false);
+    expired.value = false;
+    recoveryKey.value = '';
+    accountNotice.value =
+      path === 'recover'
+        ? '密码已重置，请用新密码登录，并重新生成恢复密钥。'
+        : '账号已注销，本机记录仍保留在此浏览器中。';
+
+    return true;
+  }
+
   onMounted(() => {
     if (enabled) {
       void refresh();
@@ -254,11 +299,28 @@ export function useCollaboration(enabled = true) {
     error: readonly(error),
     invitation: readonly(invitation),
     lastSynced: readonly(lastSynced),
+    recoveryKey: readonly(recoveryKey),
+    backupData: readonly(backupData),
+    accountNotice: readonly(accountNotice),
     role,
     label,
     refresh,
     applyChange,
     logout,
+    dismissRecoveryKey: () => {
+      recoveryKey.value = '';
+    },
+    rotateRecovery: (password: string) => run('account/recovery', { password }),
+    recover: (credentials: { username: string; recoveryKey: string; password: string }) =>
+      endAccountAction('recover', credentials),
+    deleteAccount: (
+      password: string,
+      confirmation: string,
+      familyId: string | null,
+      revision: number | null,
+    ) => endAccountAction('account/delete', { password, confirmation, familyId, revision }),
+    importData: (data: FamilyData, familyId: string, revision: number, operationId: string) =>
+      run('family/import', { data, familyId, revision, operationId }),
     authenticate: (
       register: boolean,
       credentials: { username: string; password: string; nickname: string },
