@@ -1,0 +1,109 @@
+import { describe, expect, it } from 'vitest';
+import {
+  addDays,
+  decodeFamily,
+  emptyFamily,
+  isDate,
+  parseMoney,
+  pregnancyProgress,
+  summarizeExpenses,
+  taskIsDue,
+  type Expense,
+} from './family';
+
+describe('日历与每日计划', () => {
+  it('按日历计算孕周，兼容闰年和预产期当天/之后', () => {
+    expect(pregnancyProgress('2027-01-26', '2026-10-09')).toMatchObject({
+      weeks: 24,
+      days: 3,
+      remaining: 109,
+    });
+    expect(pregnancyProgress('2026-10-09', '2026-10-09')).toMatchObject({
+      weeks: 40,
+      days: 0,
+      remaining: 0,
+      percent: 100,
+    });
+    expect(pregnancyProgress('2026-10-08', '2026-10-09')).toMatchObject({
+      weeks: 40,
+      days: 1,
+      remaining: -1,
+      percent: 100,
+    });
+    expect(addDays('2024-02-28', 1)).toBe('2024-02-29');
+    expect(addDays('2026-03-08', 1)).toBe('2026-03-09');
+  });
+  it('拒绝自动归一化的无效日期，不显示负孕周', () => {
+    expect(isDate('2026-02-30')).toBe(false);
+    expect(pregnancyProgress('bad', '2026-10-09')).toBeNull();
+    expect(pregnancyProgress('2028-01-01', '2026-10-09')).toBeNull();
+  });
+  it('每日计划从开始日期生效，一次性计划仅在指定日期出现', () => {
+    expect(taskIsDue({ repeat: 'daily', date: '2026-10-09' }, '2026-10-08')).toBe(false);
+    expect(taskIsDue({ repeat: 'daily', date: '2026-10-09' }, '2026-10-10')).toBe(true);
+    expect(taskIsDue({ repeat: 'once', date: '2026-10-09' }, '2026-10-10')).toBe(false);
+  });
+});
+
+describe('账目金额', () => {
+  it('按分计算，不丢失小数精度', () => {
+    expect(parseMoney('0.1')).toBe(10);
+    expect(parseMoney(' 1.01 ')).toBe(101);
+    expect(parseMoney('99999999.99')).toBe(9999999999);
+    for (const value of ['-1', '1.001', '1e2', '', 'NaN', 'Infinity', '100000000']) {
+      expect(parseMoney(value)).toBeNull();
+    }
+  });
+  it('津贴和医保只扣减一次，允许负净支出', () => {
+    const expense: Expense = {
+      id: '1',
+      title: '产检',
+      date: '2026-10-09',
+      kind: 'expense',
+      category: '产检医疗',
+      amountCents: 10010,
+      reimbursedCents: 2000,
+    };
+    const allowance: Expense = {
+      ...expense,
+      id: '2',
+      kind: 'allowance',
+      amountCents: 20000,
+      reimbursedCents: 0,
+    };
+    expect(summarizeExpenses([expense, allowance])).toEqual({
+      total: 10010,
+      reimbursed: 2000,
+      allowance: 20000,
+      net: -11990,
+    });
+    expect(summarizeExpenses([]).net).toBe(0);
+  });
+});
+
+describe('存档校验', () => {
+  it('接受正确版本的空档案', () =>
+    expect(decodeFamily(JSON.stringify(emptyFamily()))).toEqual(emptyFamily()));
+  it('拒绝损坏、未知版本及非法金额的档案', () => {
+    expect(() => decodeFamily('{')).toThrow();
+    expect(() => decodeFamily(JSON.stringify({ ...emptyFamily(), version: 2 }))).toThrow();
+    expect(() =>
+      decodeFamily(
+        JSON.stringify({
+          ...emptyFamily(),
+          expenses: [
+            {
+              id: 'x',
+              title: '账目',
+              date: '2026-10-09',
+              category: '其他',
+              kind: 'expense',
+              amountCents: 100,
+              reimbursedCents: 101,
+            },
+          ],
+        }),
+      ),
+    ).toThrow();
+  });
+});
