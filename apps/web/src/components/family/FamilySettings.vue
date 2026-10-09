@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { computed, reactive, shallowRef } from 'vue';
+import { computed, reactive, shallowRef, watch } from 'vue';
 import { useFamily } from '@/composables/useFamily';
 import { dueDateFromGestation, localDate, pregnancyProgress } from '@/domain/family';
 import AppIcon from '@/components/AppIcon.vue';
+import AccountPanel from './AccountPanel.vue';
+import FamilyPairing from './FamilyPairing.vue';
 
-const { data, saveProfile, exportBackup, locked } = useFamily();
+const { data, saveProfile, exportBackup, locked, canManage, cloud } = useFamily();
+const { active, state } = cloud;
+const before = shallowRef(data.value.profile);
+const dirty = shallowRef(false);
 
 // Anchor the draft to the displayed date; saving after midnight must not shift it.
-const referenceDate = localDate();
+const referenceDate = shallowRef(localDate());
 const initialProgress = data.value.profile
-  ? pregnancyProgress(data.value.profile.dueDate, referenceDate)
+  ? pregnancyProgress(data.value.profile.dueDate, referenceDate.value)
   : null;
 
 const form = reactive({
@@ -22,14 +27,43 @@ const form = reactive({
 
 const estimatedDueDate = computed(() =>
   typeof form.weeks === 'number'
-    ? dueDateFromGestation(form.weeks, form.days, referenceDate)
+    ? dueDateFromGestation(form.weeks, form.days, referenceDate.value)
     : null,
 );
 
 const error = shallowRef('');
 const saved = shallowRef(false);
 
-function submit() {
+const stale = computed(() => JSON.stringify(before.value) !== JSON.stringify(data.value.profile));
+
+function reloadProfile() {
+  before.value = data.value.profile;
+  referenceDate.value = localDate();
+  const progress = before.value
+    ? pregnancyProgress(before.value.dueDate, referenceDate.value)
+    : null;
+  Object.assign(form, {
+    name: before.value?.name ?? '',
+    nickname: before.value?.nickname ?? '',
+    weeks: progress?.weeks ?? '',
+    days: progress?.days ?? 0,
+    quietMode: before.value?.quietMode ?? false,
+  });
+  dirty.value = false;
+  saved.value = false;
+  cloud.clearError();
+}
+
+watch(
+  () => data.value.profile,
+  () => {
+    if (!dirty.value && stale.value) {
+      reloadProfile();
+    }
+  },
+);
+
+async function submit() {
   error.value = '';
   saved.value = false;
 
@@ -45,12 +79,20 @@ function submit() {
     return;
   }
 
-  saved.value = saveProfile({
-    name: form.name.trim(),
-    nickname: form.nickname.trim(),
-    dueDate: estimatedDueDate.value,
-    quietMode: form.quietMode,
-  });
+  saved.value = await saveProfile(
+    {
+      name: form.name.trim(),
+      nickname: form.nickname.trim(),
+      dueDate: estimatedDueDate.value,
+      quietMode: form.quietMode,
+    },
+    before.value,
+  );
+
+  if (saved.value) {
+    before.value = data.value.profile;
+    dirty.value = false;
+  }
 }
 </script>
 
@@ -59,13 +101,41 @@ function submit() {
     <section class="panel">
       <div class="panel-heading">
         <h2>{{ data.profile ? '家庭档案' : '从认识你开始' }}</h2>
-        <span class="tag">单人模式</span>
+        <span class="tag">
+          {{ active ? (state.family?.mode === 'couple' ? '双人模式' : '单人模式') : '单人 · 本机' }}
+        </span>
       </div>
       <form
         class="form-grid"
         @submit.prevent="submit"
-        @input="saved = false"
+        @input="
+          saved = false;
+          dirty = true;
+        "
+        @change="
+          saved = false;
+          dirty = true;
+        "
       >
+        <p
+          v-if="!canManage"
+          class="muted"
+        >
+          家庭档案由管理员维护，你可以查看最新信息。
+        </p>
+        <p
+          v-if="stale"
+          class="form-error"
+        >
+          档案已有更新。你的输入已保留，载入最新档案后可重新编辑。
+          <button
+            type="button"
+            class="text-button"
+            @click="reloadProfile"
+          >
+            载入最新档案
+          </button>
+        </p>
         <label class="field">
           家庭名称
           <input
@@ -153,7 +223,7 @@ function submit() {
         <div class="form-actions">
           <button
             class="button button-primary"
-            :disabled="locked"
+            :disabled="locked || !canManage || stale"
           >
             保存家庭档案
           </button>
@@ -168,6 +238,8 @@ function submit() {
       </form>
     </section>
     <aside class="settings-aside">
+      <AccountPanel />
+      <FamilyPairing />
       <section class="panel data-note">
         <span class="empty-icon">
           <AppIcon
@@ -177,10 +249,15 @@ function submit() {
         </span>
         <h2>你的记录，由你掌握</h2>
         <p class="muted">
-          当前版本不需要账号，数据仅保存在本机浏览器，尚未加密。请避免录入身份证、完整病历等敏感资料。
+          {{
+            active
+              ? '同步模式的记录保存在服务端；家庭内成员按权限共同访问。退出账号不会删除已同步记录。'
+              : '本机模式的数据保存在当前浏览器。开启同步并上传后，才会存入服务端。'
+          }}
         </p>
         <p class="muted">
-          清除浏览器数据或更换设备后，记录不会自动保留。可导出 JSON 备份；本版尚不支持导入恢复。
+          可导出当前档案的 JSON 备份。未提交的表单不会自动同步，离开前请保存；本版尚不支持 JSON
+          导入。
         </p>
         <button
           class="button button-secondary"
@@ -203,6 +280,11 @@ function submit() {
   grid-template-columns: minmax(0, 1.3fr) minmax(280px, 1fr);
   gap: 26px;
   align-items: start;
+}
+
+.settings-aside {
+  display: grid;
+  gap: 24px;
 }
 
 .gestation-fields {

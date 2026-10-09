@@ -4,7 +4,8 @@ import { useRoute } from 'vue-router';
 import { useFamily } from '@/composables/useFamily';
 import AppIcon from './AppIcon.vue';
 
-const { data, error, toggleTheme, exportBackup } = useFamily();
+const { data, error, toggleTheme, exportBackup, cloud } = useFamily();
+const { active, state, label, lastSynced, busy } = cloud;
 const route = useRoute();
 
 const navigation = [
@@ -91,7 +92,15 @@ const section = computed(
         <span class="avatar">{{ data.profile?.nickname.slice(0, 1) || '家' }}</span>
         <div>
           <strong>{{ data.profile?.name || '我们的家' }}</strong>
-          <small>{{ data.profile ? '单人记录 · 随时开始' : '从建立一份档案开始' }}</small>
+          <small>
+            {{
+              active
+                ? state.family?.mode === 'couple'
+                  ? '双人协作 · 一起陪伴'
+                  : '账号同步 · 独立记录'
+                : '单人记录 · 随时开始'
+            }}
+          </small>
         </div>
         <AppIcon
           name="arrow"
@@ -110,7 +119,7 @@ const section = computed(
         <div class="top-actions">
           <span class="local-badge">
             <i />
-            本机记录
+            {{ label }}
           </span>
           <button
             class="icon-button"
@@ -127,6 +136,14 @@ const section = computed(
         role="alert"
       >
         {{ error }}
+        <button
+          v-if="active"
+          class="text-button"
+          :disabled="busy"
+          @click="cloud.refresh"
+        >
+          同步最新记录
+        </button>
         <button
           class="text-button"
           @click="exportBackup"
@@ -146,7 +163,11 @@ const section = computed(
           name="shield"
           :size="15"
         />
-        记录仅保存在当前浏览器，请定期导出备份。
+        {{
+          active
+            ? `记录保存到服务端 · 最近同步 ${lastSynced || '尚未完成'}`
+            : '记录仅保存在当前浏览器，请定期导出备份。'
+        }}
         <span>24Years · 每一程，都有陪伴</span>
       </footer>
     </div>

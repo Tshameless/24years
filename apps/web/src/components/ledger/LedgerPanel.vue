@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
-import { currency, expenseCategories, summarizeExpenses } from '@/domain/family';
+import { currency, expenseCategories, summarizeExpenses, type Expense } from '@/domain/family';
 import ExpenseForm from './ExpenseForm.vue';
 import ExpenseList from './ExpenseList.vue';
 
 const { data, removeExpense, locked } = useFamily();
 const filter = shallowRef('全部');
 const notice = shallowRef('');
+const editing = shallowRef<Expense>();
+
+function edit(id: string) {
+  const expense = data.value.expenses.find((item) => item.id === id);
+  editing.value = expense ? { ...expense } : undefined;
+  notice.value = '';
+}
 
 const totals = computed(() => summarizeExpenses(data.value.expenses));
 
@@ -23,8 +30,8 @@ const visible = computed(() =>
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
 
-function confirmRemove(id: string) {
-  if (window.confirm('确定删除这笔账目？此操作无法撤销。') && removeExpense(id)) {
+async function confirmRemove(id: string) {
+  if (window.confirm('确定删除这笔账目？此操作无法撤销。') && (await removeExpense(id))) {
     notice.value = '账目已删除。';
   }
 }
@@ -86,6 +93,7 @@ function confirmRemove(id: string) {
         :expenses="visible"
         :disabled="locked"
         @remove="confirmRemove"
+        @edit="edit"
       />
       <p
         v-if="notice"
@@ -100,10 +108,18 @@ function confirmRemove(id: string) {
     </section>
     <section class="panel">
       <div class="panel-heading">
-        <h2>记下这一笔</h2>
+        <h2>{{ editing ? '修改这笔账目' : '记下这一笔' }}</h2>
         <span class="tag">人民币 CNY</span>
       </div>
-      <ExpenseForm @saved="notice = '账目已保存。'" />
+      <ExpenseForm
+        :key="editing?.id ?? 'new'"
+        :expense="editing"
+        @saved="
+          notice = '账目已保存。';
+          editing = undefined;
+        "
+        @cancel="editing = undefined"
+      />
     </section>
   </div>
 </template>

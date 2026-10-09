@@ -11,7 +11,7 @@ function setup() {
     mount(
       defineComponent({
         setup() {
-          store = createFamilyStore();
+          store = createFamilyStore({ connect: false });
 
           return () => null;
         },

@@ -1,21 +1,30 @@
 <script setup lang="ts">
-import { reactive, shallowRef } from 'vue';
+import { computed, reactive, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
-import { isDate, localDate } from '@/domain/family';
+import { isDate, localDate, type FamilyTask } from '@/domain/family';
 
-const emit = defineEmits<{ saved: [] }>();
-const { addTask, locked } = useFamily();
+const props = defineProps<{ task?: FamilyTask }>();
+const emit = defineEmits<{ saved: []; cancel: [] }>();
+const { data, addTask, updateTask, locked, cloud } = useFamily();
+const before = props.task ? (JSON.parse(JSON.stringify(props.task)) as FamilyTask) : undefined;
+let draftId = crypto.randomUUID();
+const stale = computed(
+  () =>
+    before &&
+    JSON.stringify(data.value.tasks.find((item) => item.id === before.id)) !==
+      JSON.stringify(before),
+);
 
 const form = reactive({
-  title: '',
-  date: localDate(),
-  time: '09:00',
-  repeat: 'once' as 'once' | 'daily',
+  title: before?.title ?? '',
+  date: before?.date ?? localDate(),
+  time: before?.time ?? '09:00',
+  repeat: before?.repeat ?? 'once',
 });
 
 const error = shallowRef('');
 
-function submit() {
+async function submit() {
   error.value = '';
 
   if (!form.title.trim() || !isDate(form.date) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(form.time)) {
@@ -24,8 +33,14 @@ function submit() {
     return;
   }
 
-  if (addTask({ ...form, title: form.title.trim() })) {
+  const value = { ...form, title: form.title.trim() };
+  const saved = before
+    ? await updateTask({ ...before, ...value }, before)
+    : await addTask(value, draftId);
+
+  if (saved) {
     form.title = '';
+    draftId = crypto.randomUUID();
     emit('saved');
   }
 }
@@ -36,6 +51,12 @@ function submit() {
     class="form-grid"
     @submit.prevent="submit"
   >
+    <p
+      v-if="stale"
+      class="form-error"
+    >
+      这项计划已被修改或删除。输入仍保留，请取消后从最新列表重新编辑。
+    </p>
     <label class="field">
       计划名称
       <input
@@ -80,9 +101,20 @@ function submit() {
     </p>
     <button
       class="button button-primary"
-      :disabled="locked"
+      :disabled="locked || !!stale"
     >
-      保存计划
+      {{ before ? '保存计划修改' : '保存计划' }}
+    </button>
+    <button
+      v-if="before"
+      class="button button-secondary"
+      type="button"
+      @click="
+        cloud.clearError();
+        $emit('cancel');
+      "
+    >
+      取消编辑
     </button>
   </form>
 </template>

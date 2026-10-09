@@ -14,7 +14,7 @@ defineProps<{
   removable?: boolean;
 }>();
 
-defineEmits<{ toggle: [id: string]; remove: [id: string] }>();
+defineEmits<{ toggle: [id: string]; remove: [id: string]; edit: [id: string] }>();
 </script>
 
 <template>
@@ -51,6 +51,18 @@ defineEmits<{ toggle: [id: string]; remove: [id: string] }>();
         </small>
       </div>
       <time class="numbers">{{ task.time }}</time>
+      <button
+        v-if="removable"
+        class="icon-button"
+        :aria-label="`编辑计划：${task.title}`"
+        :disabled="disabled"
+        @click="$emit('edit', task.id)"
+      >
+        <AppIcon
+          name="edit"
+          :size="16"
+        />
+      </button>
       <button
         v-if="removable"
         class="icon-button"

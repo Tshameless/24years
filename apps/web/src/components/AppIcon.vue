@@ -15,6 +15,7 @@ import {
   Download,
   ShieldCheck,
   Trash2,
+  Pencil,
 } from '@lucide/vue';
 
 withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 });
@@ -34,6 +35,7 @@ const icons: Record<string, Component> = {
   download: Download,
   shield: ShieldCheck,
   trash: Trash2,
+  edit: Pencil,
 };
 </script>
 

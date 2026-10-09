@@ -22,13 +22,40 @@ import {
   type FamilyProfile,
   type FamilyTask,
 } from '@/domain/family';
+import { useCollaboration } from './useCollaboration';
+import type { FamilyChange } from '@/domain/collaboration';
 
 export const STORAGE_KEY = '24years.family.v1';
 
-export function createFamilyStore() {
-  const data = ref<FamilyData>(emptyFamily());
-  const error = shallowRef('');
-  const locked = shallowRef(false);
+export function createFamilyStore(options: { connect?: boolean } = {}) {
+  const localData = ref<FamilyData>(emptyFamily());
+  const localError = shallowRef('');
+  const localLocked = shallowRef(false);
+  const cloud = useCollaboration(options.connect ?? true);
+  const data = computed<FamilyData>(
+    () =>
+      ({
+        ...(cloud.active.value
+          ? (cloud.state.value.family?.data ?? emptyFamily())
+          : localData.value),
+        theme: localData.value.theme,
+      }) as FamilyData,
+  );
+  const error = computed(() => cloud.error.value || localError.value);
+  const locked = computed(
+    () =>
+      !cloud.ready.value ||
+      (cloud.active.value
+        ? cloud.busy.value ||
+          cloud.expired.value ||
+          !cloud.state.value.family ||
+          cloud.role.value === 'viewer'
+        : localLocked.value),
+  );
+  const canManage = computed(() => !cloud.active.value || cloud.role.value === 'owner');
+  const identity = computed(() =>
+    cloud.active.value ? `${cloud.state.value.user?.id}:${cloud.state.value.family?.id}` : 'local',
+  );
   const today = shallowRef(localDate());
 
   let lastSaved: string | null = null;
@@ -37,22 +64,22 @@ export function createFamilyStore() {
     lastSaved = localStorage.getItem(STORAGE_KEY);
 
     if (lastSaved !== null) {
-      data.value = decodeFamily(lastSaved);
+      localData.value = decodeFamily(lastSaved);
     }
   } catch {
-    locked.value = true;
-    error.value = '无法读取本地存档。为保护原始记录，已暂停修改；请先导出备份。';
+    localLocked.value = true;
+    localError.value = '无法读取本地存档。为保护原始记录，已暂停修改；请先导出备份。';
   }
 
   function commit(next: FamilyData): boolean {
-    if (locked.value) {
+    if (localLocked.value) {
       return false;
     }
 
     try {
       if (localStorage.getItem(STORAGE_KEY) !== lastSaved) {
-        error.value = '另一个页面更新了记录，请刷新本页后继续。';
-        locked.value = true;
+        localError.value = '另一个页面更新了记录，请刷新本页后继续。';
+        localLocked.value = true;
 
         return false;
       }
@@ -60,28 +87,59 @@ export function createFamilyStore() {
       const serialized = JSON.stringify(next);
       localStorage.setItem(STORAGE_KEY, serialized);
       lastSaved = serialized;
-      data.value = next;
-      error.value = '';
+      localData.value = next;
+      localError.value = '';
 
       return true;
     } catch {
-      error.value = '保存失败，可能是存储空间不足或浏览器禁止存储。输入已保留，请重试。';
+      localError.value = '保存失败，可能是存储空间不足或浏览器禁止存储。输入已保留，请重试。';
 
       return false;
     }
   }
 
-  function saveProfile(profile: FamilyProfile): boolean {
-    return validProfile(profile) && commit({ ...data.value, profile });
+  function changeRecords(change: FamilyChange, next: FamilyData) {
+    if (locked.value) {
+      return false;
+    }
+
+    return cloud.active.value ? cloud.applyChange(change) : commit(next);
   }
 
-  function addTask(input: Omit<FamilyTask, 'id' | 'completedDates'>): boolean {
-    const task = { ...input, id: crypto.randomUUID(), completedDates: [] };
-
-    return validTask(task) && commit({ ...data.value, tasks: [...data.value.tasks, task] });
+  function saveProfile(profile: FamilyProfile, before = data.value.profile) {
+    return (
+      validProfile(profile) &&
+      canManage.value &&
+      changeRecords({ type: 'profile', value: profile, before }, { ...data.value, profile })
+    );
   }
 
-  function toggleTask(id: string, date = localDate()): boolean {
+  function addTask(input: Omit<FamilyTask, 'id' | 'completedDates'>, id = crypto.randomUUID()) {
+    const task = { ...input, id, completedDates: [] };
+
+    return (
+      validTask(task) &&
+      changeRecords(
+        { type: 'task', value: task, before: null },
+        { ...data.value, tasks: [...data.value.tasks, task] },
+      )
+    );
+  }
+
+  function updateTask(task: FamilyTask, before: FamilyTask) {
+    return (
+      validTask(task) &&
+      changeRecords(
+        { type: 'task', value: task, before },
+        {
+          ...data.value,
+          tasks: data.value.tasks.map((item) => (item.id === task.id ? task : item)),
+        },
+      )
+    );
+  }
+
+  function toggleTask(id: string, date = localDate()) {
     const task = data.value.tasks.find((item) => item.id === id);
 
     if (!task || !taskIsDue(task, date)) {
@@ -92,26 +150,40 @@ export function createFamilyStore() {
       ? task.completedDates.filter((item) => item !== date)
       : [...task.completedDates, date];
 
-    return commit({
-      ...data.value,
-      tasks: data.value.tasks.map((item) => (item.id === id ? { ...item, completedDates } : item)),
-    });
+    return updateTask({ ...task, completedDates }, task);
   }
 
-  function addExpense(input: Omit<Expense, 'id'>): boolean {
-    const expense = { ...input, id: crypto.randomUUID() };
+  function addExpense(input: Omit<Expense, 'id'>, id = crypto.randomUUID()) {
+    const expense = { ...input, id };
 
     return (
       validExpense(expense) &&
-      commit({ ...data.value, expenses: [expense, ...data.value.expenses] })
+      changeRecords(
+        { type: 'expense', value: expense, before: null },
+        { ...data.value, expenses: [expense, ...data.value.expenses] },
+      )
+    );
+  }
+
+  function updateExpense(expense: Expense, before: Expense) {
+    return (
+      validExpense(expense) &&
+      changeRecords(
+        { type: 'expense', value: expense, before },
+        {
+          ...data.value,
+          expenses: data.value.expenses.map((item) => (item.id === expense.id ? expense : item)),
+        },
+      )
     );
   }
 
   function exportBackup() {
     try {
-      const raw = locked.value
-        ? localStorage.getItem(STORAGE_KEY)
-        : JSON.stringify(data.value, null, 2);
+      const raw =
+        localLocked.value && !cloud.active.value
+          ? localStorage.getItem(STORAGE_KEY)
+          : JSON.stringify(data.value, null, 2);
       const url = URL.createObjectURL(new Blob([raw ?? '{}'], { type: 'application/json' }));
       const link = document.createElement('a');
 
@@ -120,7 +192,7 @@ export function createFamilyStore() {
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
-      error.value = '暂时无法导出，请检查浏览器下载与存储权限。';
+      localError.value = '暂时无法导出，请检查浏览器下载与存储权限。';
     }
   }
 
@@ -161,26 +233,47 @@ export function createFamilyStore() {
     locked: readonly(locked),
     today: readonly(today),
     todayTasks,
+    cloud,
+    canManage,
+    identity,
     saveProfile,
     addTask,
     toggleTask,
     addExpense,
+    updateTask,
+    updateExpense,
     exportBackup,
     removeTask: (id: string) =>
-      commit({
-        ...data.value,
-        tasks: data.value.tasks.filter((task) => task.id !== id),
-      }),
+      changeRecords(
+        {
+          type: 'task',
+          value: null,
+          before: data.value.tasks.find((item) => item.id === id) ?? null,
+        },
+        {
+          ...data.value,
+          tasks: data.value.tasks.filter((task) => task.id !== id),
+        },
+      ),
     removeExpense: (id: string) =>
-      commit({
-        ...data.value,
-        expenses: data.value.expenses.filter((expense) => expense.id !== id),
-      }),
+      changeRecords(
+        {
+          type: 'expense',
+          value: null,
+          before: data.value.expenses.find((item) => item.id === id) ?? null,
+        },
+        {
+          ...data.value,
+          expenses: data.value.expenses.filter((expense) => expense.id !== id),
+        },
+      ),
     toggleTheme: () =>
       commit({
-        ...data.value,
-        theme: data.value.theme === 'light' ? 'dark' : 'light',
+        ...localData.value,
+        theme: localData.value.theme === 'light' ? 'dark' : 'light',
       }),
+    uploadLocal: (mode: 'single' | 'couple') =>
+      !localLocked.value && cloud.create(mode, localData.value),
   };
 }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, shallowRef } from 'vue';
+import { computed, reactive, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
 import {
   expenseCategories,
@@ -7,23 +7,33 @@ import {
   parseMoney,
   isDate,
   type ExpenseCategory,
+  type Expense,
 } from '@/domain/family';
 
-const emit = defineEmits<{ saved: [] }>();
-const { addExpense, locked } = useFamily();
+const props = defineProps<{ expense?: Expense }>();
+const emit = defineEmits<{ saved: []; cancel: [] }>();
+const { data, addExpense, updateExpense, locked, cloud } = useFamily();
+const before = props.expense ? { ...props.expense } : undefined;
+let draftId = crypto.randomUUID();
+const stale = computed(
+  () =>
+    before &&
+    JSON.stringify(data.value.expenses.find((item) => item.id === before.id)) !==
+      JSON.stringify(before),
+);
 
 const form = reactive({
-  title: '',
-  date: localDate(),
-  kind: 'expense' as 'expense' | 'allowance',
-  category: '产检医疗' as ExpenseCategory,
-  amount: '',
-  reimbursed: '0',
+  title: before?.title ?? '',
+  date: before?.date ?? localDate(),
+  kind: before?.kind ?? 'expense',
+  category: before?.category ?? ('产检医疗' as ExpenseCategory),
+  amount: before ? (before.amountCents / 100).toFixed(2) : '',
+  reimbursed: before ? (before.reimbursedCents / 100).toFixed(2) : '0',
 });
 
 const error = shallowRef('');
 
-function submit() {
+async function submit() {
   error.value = '';
 
   const amountCents = parseMoney(form.amount);
@@ -47,16 +57,20 @@ function submit() {
     return;
   }
 
-  if (
-    addExpense({
-      title: form.title.trim(),
-      date: form.date,
-      kind: form.kind,
-      category: form.category,
-      amountCents,
-      reimbursedCents,
-    })
-  ) {
+  const value = {
+    title: form.title.trim(),
+    date: form.date,
+    kind: form.kind,
+    category: form.category,
+    amountCents,
+    reimbursedCents,
+  };
+  const saved = before
+    ? await updateExpense({ ...value, id: before.id }, before)
+    : await addExpense(value, draftId);
+
+  if (saved) {
+    draftId = crypto.randomUUID();
     form.title = '';
     form.amount = '';
     form.reimbursed = '0';
@@ -70,6 +84,12 @@ function submit() {
     class="form-grid"
     @submit.prevent="submit"
   >
+    <p
+      v-if="stale"
+      class="form-error"
+    >
+      这笔账目已被修改或删除。输入仍保留，请取消后从最新列表重新编辑。
+    </p>
     <label class="field">
       收支类型
       <select v-model="form.kind">
@@ -143,9 +163,20 @@ function submit() {
     </p>
     <button
       class="button button-primary"
-      :disabled="locked"
+      :disabled="locked || !!stale"
     >
-      保存账目
+      {{ before ? '保存账目修改' : '保存账目' }}
+    </button>
+    <button
+      v-if="before"
+      class="button button-secondary"
+      type="button"
+      @click="
+        cloud.clearError();
+        $emit('cancel');
+      "
+    >
+      取消编辑
     </button>
   </form>
 </template>

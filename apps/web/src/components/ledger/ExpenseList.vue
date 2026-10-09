@@ -4,7 +4,7 @@ import AppIcon from '@/components/AppIcon.vue';
 
 defineProps<{ expenses: readonly Expense[]; disabled?: boolean }>();
 
-defineEmits<{ remove: [id: string] }>();
+defineEmits<{ remove: [id: string]; edit: [id: string] }>();
 </script>
 
 <template>
@@ -44,6 +44,17 @@ defineEmits<{ remove: [id: string] }>();
       >
         {{ expense.kind === 'allowance' ? '+' : '−' }}{{ currency(expense.amountCents) }}
       </span>
+      <button
+        class="icon-button"
+        :disabled="disabled"
+        :aria-label="`编辑账目：${expense.title}`"
+        @click="$emit('edit', expense.id)"
+      >
+        <AppIcon
+          name="edit"
+          :size="16"
+        />
+      </button>
       <button
         class="icon-button"
         :disabled="disabled"

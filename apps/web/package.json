@@ -1,17 +1,24 @@
 {
   "name": "24years-web",
   "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.9.0"
+  },
   "version": "0.1.0",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "dev:api": "node --watch server/index.ts",
+    "start": "node server/index.ts",
+    "build": "pnpm type-check && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.vue --max-warnings=0",
     "lint:style": "stylelint \"src/**/*.{css,vue}\"",
-    "type-check": "vue-tsc --noEmit",
+    "type-check": "vue-tsc --noEmit && tsc -p server/tsconfig.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:api": "node --test server/*.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

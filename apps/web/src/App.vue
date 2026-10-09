@@ -3,11 +3,14 @@ import { provide } from 'vue';
 import AppShell from '@/components/AppShell.vue';
 import { createFamilyStore, familyKey } from '@/composables/useFamily';
 
-provide(familyKey, createFamilyStore());
+const family = createFamilyStore();
+const { identity } = family;
+
+provide(familyKey, family);
 </script>
 
 <template>
   <AppShell>
-    <RouterView />
+    <RouterView :key="identity" />
   </AppShell>
 </template>

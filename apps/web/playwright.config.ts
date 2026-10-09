@@ -21,9 +21,18 @@ export default defineConfig({
     },
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
-  webServer: {
-    command: 'pnpm dev --host 127.0.0.1 --port 4173 --strictPort',
-    url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      command: 'node server/index.ts',
+      env: { API_PORT: '8788', FAMILY_DB: ':memory:', APP_ORIGIN: 'http://127.0.0.1:4173' },
+      url: 'http://127.0.0.1:8788/api/health',
+      reuseExistingServer: false,
+    },
+    {
+      command: 'pnpm dev --host 127.0.0.1 --port 4173 --strictPort',
+      env: { API_PROXY_TARGET: 'http://127.0.0.1:8788' },
+      url: 'http://127.0.0.1:4173',
+      reuseExistingServer: false,
+    },
+  ],
 });

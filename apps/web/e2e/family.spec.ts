@@ -104,6 +104,7 @@ test('静默关怀持久化隐藏首页孕周与计划，数据仍可导出', as
   }
   expect(JSON.parse(Buffer.concat(chunks).toString()).profile.quietMode).toBe(true);
   await page.getByRole('link', { name: '今日陪伴' }).click();
+  await expect(page).toHaveURL('/');
   await page.reload();
   await expect(page.getByText('静默关怀已开启')).toBeVisible();
   await expect(page.getByRole('heading', { name: '今日的小计划' })).toHaveCount(0);

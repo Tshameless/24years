@@ -6,7 +6,8 @@ import AppIcon from '@/components/AppIcon.vue';
 import JourneyCard from './JourneyCard.vue';
 import TaskList from '@/components/tasks/TaskList.vue';
 
-const { data, today, todayTasks, toggleTask, locked } = useFamily();
+const { data, today, todayTasks, toggleTask, locked, cloud } = useFamily();
+const { state } = cloud;
 
 const totals = computed(() => summarizeExpenses(data.value.expenses));
 
@@ -30,8 +31,8 @@ const dateLabel = computed(() =>
         <p class="eyebrow">A LITTLE CARE, EVERY DAY</p>
         <h1>
           {{
-            data.profile?.nickname
-              ? `${data.profile.nickname}，今天也要好好的`
+            state.user?.nickname || data.profile?.nickname
+              ? `${state.user?.nickname || data.profile?.nickname}，今天也要好好的`
               : '你好，欢迎来到 24Years'
           }}
         </h1>
@@ -120,9 +121,17 @@ const dateLabel = computed(() =>
           </div>
           <h3>{{ data.profile?.name || '每一种家庭，都值得被珍惜' }}</h3>
           <p>
-            一个人也可以完整记录。
+            {{
+              state.family?.mode === 'couple'
+                ? `已有 ${state.family.members.length} 位成员参与记录。`
+                : '一个人也可以完整记录。'
+            }}
             <br />
-            不需要绑定伴侣，就能开始。
+            {{
+              state.family?.mode === 'couple'
+                ? '计划与账本，在彼此之间同步。'
+                : '不需要绑定伴侣，就能开始。'
+            }}
           </p>
           <RouterLink
             to="/family"

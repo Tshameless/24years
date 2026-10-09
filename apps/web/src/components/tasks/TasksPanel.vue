@@ -3,10 +3,17 @@ import { computed, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
 import TaskForm from './TaskForm.vue';
 import TaskList from './TaskList.vue';
+import type { FamilyTask } from '@/domain/family';
 
 const { data, today, todayTasks, toggleTask, removeTask, locked } = useFamily();
 const filter = shallowRef('today');
 const notice = shallowRef('');
+const editing = shallowRef<FamilyTask>();
+
+function edit(id: string) {
+  editing.value = JSON.parse(JSON.stringify(data.value.tasks.find((item) => item.id === id)));
+  notice.value = '';
+}
 
 const visible = computed(() =>
   filter.value === 'today'
@@ -16,8 +23,8 @@ const visible = computed(() =>
       ),
 );
 
-function confirmRemove(id: string) {
-  if (window.confirm('删除这项计划及它的打卡记录？此操作无法撤销。') && removeTask(id)) {
+async function confirmRemove(id: string) {
+  if (window.confirm('删除这项计划及它的打卡记录？此操作无法撤销。') && (await removeTask(id))) {
     notice.value = '计划已删除。';
   }
 }
@@ -44,6 +51,7 @@ function confirmRemove(id: string) {
         removable
         @toggle="toggleTask($event, today)"
         @remove="confirmRemove"
+        @edit="edit"
       />
       <p
         v-if="notice"
@@ -55,10 +63,18 @@ function confirmRemove(id: string) {
     </section>
     <section class="panel">
       <div class="panel-heading">
-        <h2>记下一件小事</h2>
+        <h2>{{ editing ? '修改这项计划' : '记下一件小事' }}</h2>
         <span class="tag">自主安排</span>
       </div>
-      <TaskForm @saved="notice = '计划已保存。'" />
+      <TaskForm
+        :key="editing?.id ?? 'new'"
+        :task="editing"
+        @saved="
+          notice = '计划已保存。';
+          editing = undefined;
+        "
+        @cancel="editing = undefined"
+      />
     </section>
   </div>
 </template>
