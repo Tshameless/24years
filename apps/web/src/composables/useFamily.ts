@@ -23,7 +23,7 @@ import {
   type FamilyTask,
 } from '@/domain/family';
 import { useCollaboration } from './useCollaboration';
-import type { FamilyChange } from '@/domain/collaboration';
+import type { FamilyChange, FamilyMode, FamilyParentRole } from '@/domain/collaboration';
 
 export const STORAGE_KEY = '24years.family.v1';
 
@@ -52,7 +52,19 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
           cloud.role.value === 'viewer'
         : localLocked.value),
   );
-  const canManage = computed(() => !cloud.active.value || cloud.role.value === 'owner');
+  const canManage = computed(
+    () => !cloud.active.value || !cloud.state.value.family || cloud.role.value === 'owner',
+  );
+  const profileLocked = computed(
+    () =>
+      !cloud.ready.value ||
+      (cloud.active.value
+        ? cloud.busy.value || cloud.expired.value || !cloud.state.value.user || !canManage.value
+        : localLocked.value),
+  );
+  const familyMode = computed(
+    () => cloud.state.value.family?.mode ?? localData.value.profile?.familyMode ?? 'single',
+  );
   const identity = computed(() =>
     cloud.active.value ? `${cloud.state.value.user?.id}:${cloud.state.value.family?.id}` : 'local',
   );
@@ -107,6 +119,17 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
   }
 
   function saveProfile(profile: FamilyProfile, before = data.value.profile) {
+    if (
+      cloud.active.value &&
+      !cloud.state.value.family &&
+      !profileLocked.value &&
+      validProfile(profile) &&
+      profile.familyMode &&
+      profile.parentRole
+    ) {
+      return cloud.create(profile.familyMode, { ...emptyFamily(), profile }, profile.parentRole);
+    }
+
     return (
       validProfile(profile) &&
       canManage.value &&
@@ -235,6 +258,9 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     todayTasks,
     cloud,
     canManage,
+    profileLocked,
+    familyMode,
+    localProfile: computed(() => localData.value.profile),
     identity,
     saveProfile,
     addTask,
@@ -272,8 +298,8 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
         ...localData.value,
         theme: localData.value.theme === 'light' ? 'dark' : 'light',
       }),
-    uploadLocal: (mode: 'single' | 'couple') =>
-      !localLocked.value && cloud.create(mode, localData.value),
+    uploadLocal: (mode: FamilyMode, parentRole: FamilyParentRole) =>
+      !localLocked.value && cloud.create(mode, localData.value, parentRole),
   };
 }
 

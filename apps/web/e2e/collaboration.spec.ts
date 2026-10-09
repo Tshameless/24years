@@ -13,8 +13,17 @@ async function register(page: Page, nickname: string) {
 }
 
 async function createFamily(page: Page, mode = 'couple') {
-  await page.getByLabel('家庭模式').selectOption(mode);
-  await page.getByRole('button', { name: '创建同步家庭' }).click();
+  await page.getByRole('radio', { name: mode === 'single' ? '单人' : '多人', exact: true }).check();
+
+  if (mode === 'couple') {
+    await page.getByRole('radio', { name: '母亲', exact: true }).first().check();
+  }
+
+  await page.getByLabel('家庭名称').fill('一起长大的家');
+  await page.getByLabel('怎么称呼你').fill('小叶');
+  await page.getByLabel('孕周（周）').fill('24');
+  await page.getByLabel('天数（天）').selectOption('3');
+  await page.getByRole('button', { name: '保存家庭档案' }).click();
   await expect(page.getByRole('heading', { name: '一起照顾这个家' })).toBeVisible();
 }
 
@@ -30,7 +39,8 @@ test('两个独立浏览器配对，共同编辑与权限变更实时同步', as
   try {
     await register(page, '小叶');
     await createFamily(page, 'single');
-    await page.getByRole('button', { name: '双人模式', exact: true }).click();
+    await page.getByRole('radio', { name: '多人', exact: true }).check();
+    await page.getByRole('radio', { name: '母亲', exact: true }).check();
     await page.getByLabel('家庭名称').fill('一起长大的家');
     await page.getByLabel('怎么称呼你').fill('小叶');
     await page.getByLabel('孕周（周）').fill('24');
@@ -43,10 +53,14 @@ test('两个独立浏览器配对，共同编辑与权限变更实时同步', as
     await register(partner, '小树');
     await partner.goto(`/family?invite=${code}`);
     await expect(partner.getByLabel('伴侣邀请码')).toHaveValue(code);
+    await partner.getByRole('radio', { name: '父亲', exact: true }).check();
     partner.once('dialog', (dialog) => dialog.accept());
     await partner.getByRole('button', { name: '加入伴侣家庭' }).click();
     await expect(partner.getByText('2 / 2 位成员')).toBeVisible();
     await expect(page.getByText('2 / 2 位成员')).toBeVisible();
+    await expect(page.getByText('母亲 · 管理员', { exact: true })).toBeVisible();
+    await expect(partner.getByText('父亲 · 共同编辑', { exact: true })).toBeVisible();
+    await expect(page.getByRole('radio', { name: '单人', exact: true })).toBeDisabled();
     await expect(partner.getByLabel('家庭名称')).toHaveValue('一起长大的家');
     await expect(partner.getByRole('button', { name: '保存家庭档案' })).toBeDisabled();
     await page.screenshot({
@@ -101,7 +115,8 @@ test('两个独立浏览器配对，共同编辑与权限变更实时同步', as
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: '解除配对' }).click();
     await expect(partner.getByText('伴侣已修改', { exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: '单人模式', exact: true }).click();
+    await page.getByRole('radio', { name: '单人', exact: true }).check();
+    await page.getByRole('button', { name: '保存家庭档案' }).click();
     await expect(page.getByText('单人模式 · 按自己的节奏记录')).toBeVisible();
   } finally {
     await otherContext.close();
@@ -118,8 +133,17 @@ test('本机记录上传、响应丢失后安全重试，以及另一设备登�
   await page.getByLabel('计划名称').fill('原有本机计划');
   await page.getByRole('button', { name: '保存计划', exact: true }).click();
   await expect(page.getByText('原有本机计划', { exact: true })).toBeVisible();
+  await page.goto('/family');
+  await page.getByRole('radio', { name: '多人', exact: true }).check();
+  await page.getByRole('radio', { name: '父亲', exact: true }).check();
+  await page.getByLabel('家庭名称').fill('爸爸建的档案');
+  await page.getByLabel('怎么称呼你').fill('爸爸');
+  await page.getByLabel('孕周（周）').fill('24');
+  await page.getByRole('button', { name: '保存家庭档案' }).click();
+  await expect(page.getByRole('status')).toHaveText('家庭档案已保存');
   const username = await register(page, '跨端成员');
-  await createFamily(page, 'single');
+  await page.getByRole('button', { name: '上传本机档案并开启同步' }).click();
+  await expect(page.getByText('父亲 · 管理员', { exact: true })).toBeVisible();
   await page.goto('/tasks');
   await expect(page.getByText('原有本机计划', { exact: true })).toBeVisible();
   await page.goto('/ledger');
@@ -149,6 +173,7 @@ test('本机记录上传、响应丢失后安全重试，以及另一设备登�
     await second.getByLabel('账号密码').fill('family-test-password');
     await second.getByRole('button', { name: '登录同步账号', exact: true }).click();
     await expect(second.getByText('1 / 2 位成员')).toBeVisible();
+    await expect(second.getByText('父亲 · 管理员', { exact: true })).toBeVisible();
     await second.goto('/ledger');
     await expect(second.getByTestId('net-cost')).toHaveText('¥42.50');
     await second.reload();

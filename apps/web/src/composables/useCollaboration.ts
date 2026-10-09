@@ -1,5 +1,10 @@
 import { computed, onMounted, onUnmounted, readonly, shallowRef } from 'vue';
-import type { FamilyChange, FamilyMode, SessionState } from '@/domain/collaboration';
+import type {
+  FamilyChange,
+  FamilyMode,
+  FamilyParentRole,
+  SessionState,
+} from '@/domain/collaboration';
 import type { FamilyData } from '@/domain/family';
 
 const ACTIVE_KEY = '24years.cloud.active';
@@ -258,8 +263,9 @@ export function useCollaboration(enabled = true) {
       register: boolean,
       credentials: { username: string; password: string; nickname: string },
     ) => run(register ? 'register' : 'login', credentials),
-    create: (mode: FamilyMode, data: FamilyData) => run('family/create', { mode, data }),
-    join: (code: string) => run('family/join', { code }),
+    create: (mode: FamilyMode, data: FamilyData, familyRole: FamilyParentRole) =>
+      run('family/create', { mode, data, familyRole }),
+    join: (code: string, familyRole: FamilyParentRole) => run('family/join', { code, familyRole }),
     manage: (action: string, body: Record<string, unknown> = {}) =>
       run(`family/${action}`, {
         ...body,

@@ -9,8 +9,24 @@ import {
   pregnancyProgress,
   summarizeExpenses,
   taskIsDue,
+  validProfile,
   type Expense,
 } from './family';
+
+it('旧档案可读取，新档案的家庭类型与身份须匹配', () => {
+  const profile = { name: '家', nickname: '家长', dueDate: '2027-01-26', quietMode: false };
+  expect(decodeFamily(JSON.stringify({ ...emptyFamily(), profile })).profile).toEqual(profile);
+  expect(validProfile({ ...profile, familyMode: 'single', parentRole: 'single_parent' })).toBe(
+    true,
+  );
+  expect(validProfile({ ...profile, familyMode: 'couple', parentRole: 'father' })).toBe(true);
+  expect(validProfile({ ...profile, familyMode: 'couple', parentRole: 'mother' })).toBe(true);
+  expect(validProfile({ ...profile, familyMode: 'couple' })).toBe(false);
+  expect(validProfile({ ...profile, familyMode: 'single', parentRole: 'father' })).toBe(false);
+  expect(validProfile({ ...profile, familyMode: 'couple', parentRole: 'single_parent' })).toBe(
+    false,
+  );
+});
 
 describe('日历与每日计划', () => {
   it('从孕周和天数推算日期，支持闰日与超过 40 周的记录', () => {

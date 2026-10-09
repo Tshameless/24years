@@ -4,8 +4,8 @@ import { useRoute } from 'vue-router';
 import { useFamily } from '@/composables/useFamily';
 import AppIcon from './AppIcon.vue';
 
-const { data, error, toggleTheme, exportBackup, cloud } = useFamily();
-const { active, state, label, lastSynced, busy } = cloud;
+const { data, error, toggleTheme, exportBackup, cloud, familyMode } = useFamily();
+const { active, label, lastSynced, busy } = cloud;
 const route = useRoute();
 
 const navigation = [
@@ -94,11 +94,13 @@ const section = computed(
           <strong>{{ data.profile?.name || '我们的家' }}</strong>
           <small>
             {{
-              active
-                ? state.family?.mode === 'couple'
-                  ? '双人协作 · 一起陪伴'
-                  : '账号同步 · 独立记录'
-                : '单人记录 · 随时开始'
+              familyMode === 'couple'
+                ? active
+                  ? '多人协作 · 一起陪伴'
+                  : '多人家庭 · 待开启同步'
+                : active
+                  ? '账号同步 · 独立记录'
+                  : '单人记录 · 随时开始'
             }}
           </small>
         </div>

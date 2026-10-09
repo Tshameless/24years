@@ -9,7 +9,13 @@ import {
 import { isDeepStrictEqual } from 'node:util';
 import type { DatabaseSync } from 'node:sqlite';
 import { decodeFamily, validExpense, validProfile, validTask } from '../src/domain/family.ts';
-import type { Account, Member, SessionState, SharedFamily } from '../src/domain/collaboration.ts';
+import type {
+  Account,
+  FamilyParentRole,
+  Member,
+  SessionState,
+  SharedFamily,
+} from '../src/domain/collaboration.ts';
 import { transaction } from './database.ts';
 
 export class ApiError extends Error {
@@ -51,6 +57,25 @@ type FamilyRow = {
   updated_by: string;
 };
 
+function familyRole(value: unknown, mode: 'single' | 'couple'): FamilyParentRole {
+  if (mode === 'single' && value === undefined) {
+    return 'single_parent';
+  }
+
+  requireValue(
+    value === 'single_parent' || value === 'mother' || value === 'father',
+    400,
+    '家庭身份无效。',
+  );
+  requireValue(
+    mode === 'couple' ? value === 'mother' || value === 'father' : value === 'single_parent',
+    400,
+    mode === 'couple' ? '多人家庭请选择母亲或父亲。' : '单人家庭使用单人照护者身份。',
+  );
+
+  return value;
+}
+
 export function createService(db: DatabaseSync) {
   function account(id: string): Account {
     return db
@@ -84,7 +109,7 @@ export function createService(db: DatabaseSync) {
       data: decodeFamily(row.data),
       members: db
         .prepare(
-          "SELECT a.id, a.username, a.nickname, m.role FROM members m JOIN accounts a ON a.id = m.user_id WHERE m.family_id = ? ORDER BY m.role = 'owner' DESC, a.id",
+          "SELECT a.id, a.username, a.nickname, m.role, m.family_role AS familyRole FROM members m JOIN accounts a ON a.id = m.user_id WHERE m.family_id = ? ORDER BY m.role = 'owner' DESC, a.id",
         )
         .all(row.id) as unknown as Member[],
       updatedAt: row.updated_at,
@@ -201,13 +226,18 @@ export function createService(db: DatabaseSync) {
 
   function createFamily(userId: string, body: Body) {
     requireValue(!membership(userId), 409, '你已经拥有家庭，请先查看当前家庭。');
-    requireValue(body.mode === 'single' || body.mode === 'couple', 400, '请选择单人或双人模式。');
+    requireValue(body.mode === 'single' || body.mode === 'couple', 400, '请选择单人或多人模式。');
+    const selectedFamilyRole = familyRole(body.familyRole, body.mode);
     let data;
 
     try {
       data = decodeFamily(JSON.stringify(body.data));
     } catch {
       throw new ApiError(400, '档案格式无效，未上传任何记录。');
+    }
+
+    if (data.profile) {
+      data.profile = { ...data.profile, familyMode: body.mode, parentRole: selectedFamilyRole };
     }
 
     const familyId = randomUUID();
@@ -218,7 +248,9 @@ export function createService(db: DatabaseSync) {
       new Date().toISOString(),
       account(userId).nickname,
     );
-    db.prepare('INSERT INTO members VALUES (?, ?, ?)').run(userId, familyId, 'owner');
+    db.prepare(
+      'INSERT INTO members(user_id, family_id, role, family_role) VALUES (?, ?, ?, ?)',
+    ).run(userId, familyId, 'owner', selectedFamilyRole);
   }
 
   function changeRecords(userId: string, body: Body) {
@@ -252,7 +284,14 @@ export function createService(db: DatabaseSync) {
         409,
         '家庭档案已被另一台设备修改。',
       );
-      family.data.profile = value;
+      const mode = value.familyMode ?? family.mode;
+      const currentRole = family.members.find((item) => item.id === userId)!.familyRole;
+      const selectedRole = familyRole(
+        value.parentRole ?? (mode === 'single' ? 'single_parent' : currentRole),
+        mode,
+      );
+      updateFamilyChoice(userId, family, mode, selectedRole);
+      family.data.profile = { ...value, familyMode: mode, parentRole: selectedRole };
     } else {
       requireValue(change.type === 'task' || change.type === 'expense', 400, '不支持的记录类型。');
       const validate = change.type === 'task' ? validTask : validExpense;
@@ -294,25 +333,80 @@ export function createService(db: DatabaseSync) {
     );
   }
 
+  function updateFamilyChoice(
+    userId: string,
+    family: SharedFamily,
+    mode: 'single' | 'couple',
+    selectedRole: FamilyParentRole,
+  ) {
+    requireValue(
+      mode !== 'single' || family.members.length === 1,
+      409,
+      '请先解除伴侣配对，再切换单人模式。',
+    );
+    requireValue(
+      !family.members.some((item) => item.id !== userId && item.familyRole === selectedRole),
+      409,
+      '家庭中已有相同家长身份，请选择另一位身份。',
+    );
+    db.prepare('UPDATE families SET mode = ? WHERE id = ?').run(mode, family.id);
+    db.prepare('UPDATE members SET family_role = ? WHERE user_id = ?').run(selectedRole, userId);
+
+    if (mode !== family.mode) {
+      db.prepare('DELETE FROM invites WHERE family_id = ?').run(family.id);
+    }
+  }
+
   function manage(userId: string, action: string, body: Body) {
-    const member = authorize(userId, body, action === 'leave' ? 'member' : 'owner');
+    const member = authorize(
+      userId,
+      body,
+      action === 'leave' || action === 'identity' ? 'member' : 'owner',
+    );
     const family = snapshot(userId).family!;
     requireValue(body.revision === family.revision, 409, '家庭状态已更新，请同步后重试。');
 
     if (action === 'mode') {
       requireValue(body.mode === 'single' || body.mode === 'couple', 400, '家庭模式无效。');
-      requireValue(
-        body.mode !== 'single' || family.members.length === 1,
-        409,
-        '请先解除伴侣配对，再切换单人模式。',
-      );
-      db.prepare('UPDATE families SET mode = ? WHERE id = ?').run(body.mode, family.id);
-      db.prepare('DELETE FROM invites WHERE family_id = ?').run(family.id);
+      const selectedRole = familyRole(body.familyRole, body.mode);
+      updateFamilyChoice(userId, family, body.mode, selectedRole);
+
+      if (family.data.profile) {
+        family.data.profile = {
+          ...family.data.profile,
+          familyMode: body.mode,
+          parentRole: selectedRole,
+        };
+        db.prepare('UPDATE families SET data = ? WHERE id = ?').run(
+          JSON.stringify(family.data),
+          family.id,
+        );
+      }
+    } else if (action === 'identity') {
+      const selectedRole = familyRole(body.familyRole, family.mode);
+      updateFamilyChoice(userId, family, family.mode, selectedRole);
+
+      if (member.role === 'owner' && family.data.profile) {
+        family.data.profile = {
+          ...family.data.profile,
+          familyMode: family.mode,
+          parentRole: selectedRole,
+        };
+        db.prepare('UPDATE families SET data = ? WHERE id = ?').run(
+          JSON.stringify(family.data),
+          family.id,
+        );
+      }
     } else if (action === 'invite') {
       requireValue(
         family.mode === 'couple' && family.members.length === 1,
         409,
-        '请先选择双人模式；每个家庭最多两位成员。',
+        '请先选择多人模式；当前支持母亲、父亲两位成员。',
+      );
+      requireValue(
+        family.members[0].familyRole === 'mother' || family.members[0].familyRole === 'father',
+        400,
+        '请先选择你的家庭身份，再邀请另一位家长。',
       );
       const code = String(randomInt(100000, 1000000));
       const expiresAt = Date.now() + 86400000;
@@ -371,12 +465,23 @@ export function createService(db: DatabaseSync) {
     const count = db
       .prepare('SELECT count(*) AS count FROM members WHERE family_id = ?')
       .get(familyId) as { count: number };
+    const existingMember = db
+      .prepare('SELECT family_role FROM members WHERE family_id = ?')
+      .get(familyId) as { family_role: string | null };
+    const selectedFamilyRole = familyRole(body.familyRole, 'couple');
+    requireValue(
+      selectedFamilyRole !== existingMember.family_role,
+      409,
+      '家庭中已有相同家长身份，请选择另一位身份。',
+    );
     requireValue(
       family?.mode === 'couple' && Number(count.count) < 2,
       409,
       '这个家庭已经满员或关闭了配对。',
     );
-    db.prepare('INSERT INTO members VALUES (?, ?, ?)').run(userId, familyId, 'editor');
+    db.prepare(
+      'INSERT INTO members(user_id, family_id, role, family_role) VALUES (?, ?, ?, ?)',
+    ).run(userId, familyId, 'editor', selectedFamilyRole);
     db.prepare('DELETE FROM invites WHERE family_id = ?').run(familyId);
     touch(familyId, userId);
   }

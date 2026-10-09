@@ -1,6 +1,7 @@
 import type { FamilyData, FamilyProfile, FamilyTask, Expense } from './family';
 
 export type FamilyMode = 'single' | 'couple';
+export type FamilyParentRole = 'single_parent' | 'mother' | 'father';
 export type MemberRole = 'owner' | 'editor' | 'viewer';
 
 export interface Account {
@@ -11,6 +12,7 @@ export interface Account {
 
 export interface Member extends Account {
   role: MemberRole;
+  familyRole: FamilyParentRole | null;
 }
 
 export interface SharedFamily {
@@ -38,4 +40,10 @@ export const roleLabels: Record<MemberRole, string> = {
   owner: '管理员',
   editor: '共同编辑',
   viewer: '仅查看',
+};
+
+export const familyRoleLabels: Record<FamilyParentRole, string> = {
+  single_parent: '单人照护者',
+  mother: '母亲',
+  father: '父亲',
 };

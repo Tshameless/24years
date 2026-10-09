@@ -5,9 +5,18 @@ import { dueDateFromGestation, localDate, pregnancyProgress } from '@/domain/fam
 import AppIcon from '@/components/AppIcon.vue';
 import AccountPanel from './AccountPanel.vue';
 import FamilyPairing from './FamilyPairing.vue';
+import FamilySetupChoice from './FamilySetupChoice.vue';
+import type { FamilyMode, FamilyParentRole } from '@/domain/collaboration';
 
-const { data, saveProfile, exportBackup, locked, canManage, cloud } = useFamily();
+const { data, saveProfile, exportBackup, profileLocked, canManage, cloud } = useFamily();
 const { active, state } = cloud;
+const currentMember = computed(() =>
+  state.value.family?.members.find((member) => member.id === state.value.user?.id),
+);
+const initialMode =
+  state.value.family?.mode ??
+  data.value.profile?.familyMode ??
+  (data.value.profile ? 'single' : '');
 const before = shallowRef(data.value.profile);
 const dirty = shallowRef(false);
 
@@ -18,6 +27,10 @@ const initialProgress = data.value.profile
   : null;
 
 const form = reactive({
+  familyMode: initialMode as FamilyMode | '',
+  parentRole:
+    (active.value ? currentMember.value?.familyRole : data.value.profile?.parentRole) ??
+    ((initialMode === 'single' ? 'single_parent' : '') as FamilyParentRole | ''),
   name: data.value.profile?.name ?? '',
   nickname: data.value.profile?.nickname ?? '',
   weeks: initialProgress?.weeks ?? ('' as number | ''),
@@ -43,6 +56,9 @@ function reloadProfile() {
     ? pregnancyProgress(before.value.dueDate, referenceDate.value)
     : null;
   Object.assign(form, {
+    familyMode:
+      state.value.family?.mode ?? before.value?.familyMode ?? (before.value ? 'single' : ''),
+    parentRole: (active.value ? currentMember.value?.familyRole : before.value?.parentRole) ?? '',
     name: before.value?.name ?? '',
     nickname: before.value?.nickname ?? '',
     weeks: progress?.weeks ?? '',
@@ -67,6 +83,15 @@ async function submit() {
   error.value = '';
   saved.value = false;
 
+  if (
+    !form.familyMode ||
+    (form.familyMode === 'couple' && form.parentRole !== 'mother' && form.parentRole !== 'father')
+  ) {
+    error.value = '请选择家庭类型；多人家庭还需选择母亲或父亲身份。';
+
+    return;
+  }
+
   if (!form.name.trim() || !form.nickname.trim()) {
     error.value = '请填写家庭名称和你的称呼。';
 
@@ -85,6 +110,9 @@ async function submit() {
       nickname: form.nickname.trim(),
       dueDate: estimatedDueDate.value,
       quietMode: form.quietMode,
+      familyMode: form.familyMode,
+      parentRole:
+        form.familyMode === 'single' ? 'single_parent' : (form.parentRole as FamilyParentRole),
     },
     before.value,
   );
@@ -102,7 +130,13 @@ async function submit() {
       <div class="panel-heading">
         <h2>{{ data.profile ? '家庭档案' : '从认识你开始' }}</h2>
         <span class="tag">
-          {{ active ? (state.family?.mode === 'couple' ? '双人模式' : '单人模式') : '单人 · 本机' }}
+          {{
+            form.familyMode === 'couple'
+              ? '多人家庭'
+              : form.familyMode === 'single'
+                ? '单人家庭'
+                : '选择陪伴方式'
+          }}
         </span>
       </div>
       <form
@@ -117,6 +151,18 @@ async function submit() {
           dirty = true;
         "
       >
+        <FamilySetupChoice
+          v-model:mode="form.familyMode"
+          v-model:parent-role="form.parentRole"
+          :disabled="profileLocked"
+          :disable-single="(state.family?.members.length ?? 0) > 1"
+        />
+        <p
+          v-if="!active && form.familyMode === 'couple'"
+          class="gestation-help"
+        >
+          先保存档案，再开启账号同步，即可邀请另一位家长加入。当前支持母亲、父亲两位成员。
+        </p>
         <p
           v-if="!canManage"
           class="muted"
@@ -162,6 +208,7 @@ async function submit() {
             id="gestation-help"
             class="gestation-help"
           >
+            <span v-if="form.parentRole === 'father'">请填写母亲的怀孕时期。</span>
             按 {{ referenceDate }} 已满的孕周填写，例如 24 周 3 天。
           </p>
           <div class="form-row">
@@ -223,7 +270,7 @@ async function submit() {
         <div class="form-actions">
           <button
             class="button button-primary"
-            :disabled="locked || !canManage || stale"
+            :disabled="profileLocked || stale"
           >
             保存家庭档案
           </button>

@@ -6,7 +6,7 @@ import AppIcon from '@/components/AppIcon.vue';
 import JourneyCard from './JourneyCard.vue';
 import TaskList from '@/components/tasks/TaskList.vue';
 
-const { data, today, todayTasks, toggleTask, locked, cloud } = useFamily();
+const { data, today, todayTasks, toggleTask, locked, cloud, familyMode } = useFamily();
 const { state } = cloud;
 
 const totals = computed(() => summarizeExpenses(data.value.expenses));
@@ -122,14 +122,18 @@ const dateLabel = computed(() =>
           <h3>{{ data.profile?.name || '每一种家庭，都值得被珍惜' }}</h3>
           <p>
             {{
-              state.family?.mode === 'couple'
-                ? `已有 ${state.family.members.length} 位成员参与记录。`
+              familyMode === 'couple'
+                ? state.family
+                  ? `已有 ${state.family.members.length} 位成员参与记录。`
+                  : '已选择多人家庭，一起参与陪伴。'
                 : '一个人也可以完整记录。'
             }}
             <br />
             {{
-              state.family?.mode === 'couple'
-                ? '计划与账本，在彼此之间同步。'
+              familyMode === 'couple'
+                ? state.family
+                  ? '计划与账本，在彼此之间同步。'
+                  : '开启同步后，可邀请另一位家长加入。'
                 : '不需要绑定伴侣，就能开始。'
             }}
           </p>

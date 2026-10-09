@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
-import { roleLabels, type FamilyMode } from '@/domain/collaboration';
-import { emptyFamily } from '@/domain/family';
+import { roleLabels, familyRoleLabels, type FamilyParentRole } from '@/domain/collaboration';
+import FamilySetupChoice from './FamilySetupChoice.vue';
 
-const { cloud, uploadLocal } = useFamily();
+const { cloud, uploadLocal, localProfile } = useFamily();
 const { state, busy, role, invitation, expired } = cloud;
 const family = computed(() => state.value.family);
-const mode = shallowRef<FamilyMode>('single');
-const copyLocal = shallowRef(true);
+const joinMode = shallowRef<'couple'>('couple');
+const joinRole = shallowRef<FamilyParentRole | ''>('');
+const ownRole = shallowRef<FamilyParentRole | ''>('');
+const currentMember = computed(() =>
+  family.value?.members.find((member) => member.id === state.value.user?.id),
+);
 const code = shallowRef(new URLSearchParams(window.location.search).get('invite') ?? '');
 const copied = shallowRef('');
 const inviteLink = computed(() =>
@@ -16,18 +20,22 @@ const inviteLink = computed(() =>
 );
 
 async function create() {
-  if (copyLocal.value) {
-    await uploadLocal(mode.value);
-  } else {
-    await cloud.create(mode.value, emptyFamily());
+  if (localProfile.value) {
+    const mode = localProfile.value.familyMode ?? 'single';
+    const parentRole = localProfile.value.parentRole ?? 'single_parent';
+    await uploadLocal(mode, parentRole);
   }
 }
 
 async function join() {
+  if (joinRole.value !== 'mother' && joinRole.value !== 'father') {
+    return;
+  }
+
   if (
     window.confirm('加入后将与对方共享家庭档案、计划和完整账本；本机记录不会自动合并。确认加入？')
   ) {
-    if (await cloud.join(code.value.trim())) {
+    if (await cloud.join(code.value.trim(), joinRole.value)) {
       window.history.replaceState({}, '', window.location.pathname);
       code.value = '';
     }
@@ -65,36 +73,43 @@ async function copyLink() {
     </div>
     <template v-if="!family">
       <form
+        v-if="localProfile"
         class="form-grid"
         @submit.prevent="create"
       >
-        <label class="field">
-          家庭模式
-          <select v-model="mode">
-            <option value="single">单人模式 · 独立记录</option>
-            <option value="couple">双人模式 · 邀请伴侣</option>
-          </select>
-        </label>
-        <label class="upload-option">
-          <input
-            v-model="copyLocal"
-            type="checkbox"
-          />
-          将本机档案、计划和账本上传到这个账号
-        </label>
-        <p class="muted">本机原始记录会保留；也可以取消勾选，从空白家庭开始。</p>
+        <p class="muted">
+          已有本机档案「{{ localProfile.name }}」：{{
+            localProfile.familyMode === 'couple' ? '多人' : '单人'
+          }}
+          ·
+          {{
+            familyRoleLabels[localProfile.parentRole ?? 'single_parent']
+          }}。上传后沿用建档时的选择，同时上传计划和账本，本机原始记录保留。
+        </p>
         <button
           class="button button-primary"
           :disabled="busy"
         >
-          创建同步家庭
+          上传本机档案并开启同步
         </button>
       </form>
+      <p
+        v-else
+        class="muted"
+      >
+        请先在家庭档案中选择单人或多人并填写资料，保存后即可开始同步；也可以直接加入另一位家长的家庭。
+      </p>
       <form
         class="form-grid join-form"
         @submit.prevent="join"
       >
         <h3>已经收到邀请？</h3>
+        <FamilySetupChoice
+          v-model:mode="joinMode"
+          v-model:parent-role="joinRole"
+          identity-only
+          :disabled="busy"
+        />
         <label class="field">
           伴侣邀请码
           <input
@@ -120,31 +135,29 @@ async function copyLink() {
           family.mode === 'single'
             ? '单人模式 · 按自己的节奏记录'
             : family.members.length === 2
-              ? '双人模式 · 每一天，一起参与'
-              : '双人模式 · 等待另一位成员'
+              ? '多人模式 · 每一天，一起参与'
+              : '多人模式 · 等待另一位家长'
         }}
       </p>
-      <div
-        v-if="role === 'owner'"
-        class="mode-actions"
+      <form
+        v-if="family.mode === 'couple' && !currentMember?.familyRole"
+        class="form-grid"
+        @submit.prevent="ownRole && cloud.manage('identity', { familyRole: ownRole })"
       >
+        <p class="muted">旧档案还没有你的家长身份，请补选。</p>
+        <FamilySetupChoice
+          v-model:mode="joinMode"
+          v-model:parent-role="ownRole"
+          identity-only
+          :disabled="busy"
+        />
         <button
           class="button button-secondary"
-          :aria-pressed="family.mode === 'single'"
-          :disabled="busy || family.mode === 'single' || family.members.length > 1"
-          @click="cloud.manage('mode', { mode: 'single' })"
+          :disabled="busy"
         >
-          单人模式
+          保存我的身份
         </button>
-        <button
-          class="button button-secondary"
-          :aria-pressed="family.mode === 'couple'"
-          :disabled="busy || family.mode === 'couple'"
-          @click="cloud.manage('mode', { mode: 'couple' })"
-        >
-          双人模式
-        </button>
-      </div>
+      </form>
       <ul class="member-list">
         <li
           v-for="member in family.members"
@@ -153,7 +166,10 @@ async function copyLink() {
           <span class="member-avatar">{{ member.nickname.slice(0, 1) }}</span>
           <div class="member-detail">
             <strong>{{ member.nickname }}{{ member.id === state.user.id ? '（我）' : '' }}</strong>
-            <small>{{ roleLabels[member.role] }}</small>
+            <small>
+              {{ member.familyRole ? familyRoleLabels[member.familyRole] : '身份待补充' }} ·
+              {{ roleLabels[member.role] }}
+            </small>
             <template v-if="role === 'owner' && member.role !== 'owner'">
               <select
                 :value="member.role"
@@ -258,19 +274,6 @@ async function copyLink() {
 .pairing-panel .muted {
   font-size: 12px;
   line-height: 1.8;
-}
-
-.upload-option {
-  display: flex;
-  align-items: start;
-  gap: 10px;
-  font-size: 13px;
-  line-height: 1.8;
-}
-
-.upload-option input {
-  margin-top: 5px;
-  accent-color: var(--green);
 }
 
 .join-form {

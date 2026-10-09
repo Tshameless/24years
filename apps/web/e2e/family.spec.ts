@@ -4,11 +4,51 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-09T10:00:00+08:00'));
 });
 
+test('建档先选单人或多人，多人需选择父母身份并持久保存', async ({ page }) => {
+  await page.goto('/family');
+  await expect(page.getByRole('radio', { name: '单人', exact: true })).not.toBeChecked();
+  await expect(page.getByRole('radio', { name: '多人', exact: true })).not.toBeChecked();
+  await expect(page.getByText(/适用于未婚生育、单亲妈妈/)).toBeVisible();
+  await page.getByLabel('家庭名称').fill('我们的家');
+  await page.getByLabel('怎么称呼你').fill('爸爸');
+  await page.getByLabel('孕周（周）').fill('24');
+  await page.getByRole('button', { name: '保存家庭档案' }).click();
+  await expect(page.getByRole('status')).toHaveCount(0);
+  await page.getByRole('radio', { name: '多人', exact: true }).check();
+  await expect(page.getByRole('radio', { name: '母亲', exact: true })).not.toBeChecked();
+  await expect(page.getByRole('radio', { name: '父亲', exact: true })).not.toBeChecked();
+  await page.getByRole('button', { name: '保存家庭档案' }).click();
+  await expect(page.getByRole('status')).toHaveCount(0);
+  await page.getByRole('radio', { name: '父亲', exact: true }).check();
+  await expect(page.getByText('请填写母亲的怀孕时期。')).toBeVisible();
+  await page.getByRole('button', { name: '保存家庭档案' }).click();
+  await expect(page.getByRole('status')).toHaveText('家庭档案已保存');
+  await page.reload();
+  await expect(page.getByRole('radio', { name: '多人', exact: true })).toBeChecked();
+  await expect(page.getByRole('radio', { name: '父亲', exact: true })).toBeChecked();
+  await page.screenshot({
+    path: `test-results/onboarding-${test.info().project.name}.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('radio', { name: '单人', exact: true }).check();
+  await expect(page.getByRole('radio', { name: '父亲', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '保存家庭档案' }).click();
+  await expect(page.getByRole('status')).toHaveText('家庭档案已保存');
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('24years.family.v1')!).profile,
+  );
+  expect(saved.familyMode).toBe('single');
+  expect(saved.parentRole).toBe('single_parent');
+});
+
 test('建立家庭、每日打卡、记账与刷新恢复形成完整闭环', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   await page.getByRole('link', { name: '建立我的家庭档案' }).click();
+  await page.getByRole('radio', { name: '单人', exact: true }).check();
   await page.getByLabel('家庭名称').fill('小树之家');
   await page.getByLabel('怎么称呼你').fill('小叶');
   await page.getByLabel('孕周（周）').fill('24');
@@ -87,6 +127,7 @@ test('无效报销不会入账，删除账目需确认', async ({ page }) => {
 
 test('静默关怀持久化隐藏首页孕周与计划，数据仍可导出', async ({ page }) => {
   await page.goto('/family');
+  await page.getByRole('radio', { name: '单人', exact: true }).check();
   await page.getByLabel('家庭名称').fill('小树之家');
   await page.getByLabel('怎么称呼你').fill('小叶');
   await page.getByLabel('孕周（周）').fill('24');
@@ -113,6 +154,7 @@ test('静默关怀持久化隐藏首页孕周与计划，数据仍可导出', as
 
 test('怀孕时期必填且只接受支持范围内的整数孕周', async ({ page }) => {
   await page.goto('/family');
+  await page.getByRole('radio', { name: '单人', exact: true }).check();
   await page.getByLabel('家庭名称').fill('小树之家');
   await page.getByLabel('怎么称呼你').fill('小叶');
   await expect(page.getByLabel('预产期', { exact: true })).toHaveCount(0);

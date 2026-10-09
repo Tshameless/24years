@@ -53,6 +53,18 @@ export function openDatabase(path: string) {
     );
   `);
 
+  // The first collaboration release only stored permission roles. Keep existing
+  // databases usable while adding the family position selected during onboarding.
+  const columns = db.prepare('PRAGMA table_info(members)').all() as Array<{ name: string }>;
+
+  if (!columns.some((column) => column.name === 'family_role')) {
+    db.exec(`
+      ALTER TABLE members ADD COLUMN family_role TEXT CHECK(family_role IN ('single_parent', 'mother', 'father'));
+      UPDATE members SET family_role = 'single_parent'
+      WHERE family_id IN (SELECT id FROM families WHERE mode = 'single');
+    `);
+  }
+
   return db;
 }
 

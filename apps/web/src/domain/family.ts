@@ -3,6 +3,9 @@ export interface FamilyProfile {
   nickname: string;
   dueDate: string;
   quietMode: boolean;
+  /** Saved for local profiles so the first sync can use the same family choice. */
+  familyMode?: 'single' | 'couple';
+  parentRole?: 'single_parent' | 'mother' | 'father';
 }
 
 export interface FamilyTask {
@@ -174,7 +177,18 @@ export function validProfile(value: unknown): value is FamilyProfile {
     shortText(value.name, 30) &&
     shortText(value.nickname, 20) &&
     isDate(value.dueDate) &&
-    typeof value.quietMode === 'boolean'
+    typeof value.quietMode === 'boolean' &&
+    (value.familyMode === undefined ||
+      value.familyMode === 'single' ||
+      value.familyMode === 'couple') &&
+    (value.parentRole === undefined ||
+      value.parentRole === 'single_parent' ||
+      value.parentRole === 'mother' ||
+      value.parentRole === 'father') &&
+    (value.familyMode === undefined ||
+      (value.familyMode === 'single'
+        ? value.parentRole === 'single_parent'
+        : value.parentRole === 'mother' || value.parentRole === 'father'))
   );
 }
 
