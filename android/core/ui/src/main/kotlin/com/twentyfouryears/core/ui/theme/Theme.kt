@@ -9,11 +9,11 @@ import androidx.compose.ui.graphics.Color
 
 private val LightColors = lightColorScheme(
     primary = Primary,
-    onPrimary = Color.White,
+    onPrimary = Title,
     primaryContainer = PrimaryLight,
     onPrimaryContainer = Title,
     secondary = Success,
-    onSecondary = Color.White,
+    onSecondary = Title,
     error = Danger,
     onError = Color.White,
     errorContainer = DangerLight,
@@ -27,11 +27,11 @@ private val LightColors = lightColorScheme(
 
 private val OledColors = darkColorScheme(
     primary = Primary,
-    onPrimary = Color.White,
+    onPrimary = Title,
     primaryContainer = PrimaryDark,
     onPrimaryContainer = OnDark,
     secondary = Success,
-    onSecondary = Color.White,
+    onSecondary = Title,
     error = Danger,
     onError = Color.White,
     background = OledBlack,

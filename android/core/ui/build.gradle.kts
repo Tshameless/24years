@@ -5,3 +5,5 @@ plugins {
 android {
     namespace = "com.twentyfouryears.core.ui"
 }
+
+dependencies { implementation(project(":core:model")) }

@@ -1,0 +1,178 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "2e559b5be0283364fad0b95719829e69",
+    "entities": [
+      {
+        "tableName": "families",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`familyId` TEXT NOT NULL, `familyMode` TEXT NOT NULL, `currentStage` TEXT NOT NULL, `careState` TEXT NOT NULL, PRIMARY KEY(`familyId`))",
+        "fields": [
+          {
+            "fieldPath": "familyId",
+            "columnName": "familyId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "familyMode",
+            "columnName": "familyMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentStage",
+            "columnName": "currentStage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "careState",
+            "columnName": "careState",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "familyId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "pregnancies",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `dueDate` TEXT NOT NULL, `silent` INTEGER NOT NULL, `hospital` TEXT NOT NULL, `contact` TEXT NOT NULL, `medicalNotes` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dueDate",
+            "columnName": "dueDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "silent",
+            "columnName": "silent",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hospital",
+            "columnName": "hospital",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contact",
+            "columnName": "contact",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "medicalNotes",
+            "columnName": "medicalNotes",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "pregnancy_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `pregnancyId` TEXT NOT NULL, `type` TEXT NOT NULL, `payload` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`pregnancyId`) REFERENCES `pregnancies`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pregnancyId",
+            "columnName": "pregnancyId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_pregnancy_records_pregnancyId",
+            "unique": false,
+            "columnNames": [
+              "pregnancyId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pregnancy_records_pregnancyId` ON `${TABLE_NAME}` (`pregnancyId`)"
+          },
+          {
+            "name": "index_pregnancy_records_type_pregnancyId",
+            "unique": false,
+            "columnNames": [
+              "type",
+              "pregnancyId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pregnancy_records_type_pregnancyId` ON `${TABLE_NAME}` (`type`, `pregnancyId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "pregnancies",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "pregnancyId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2e559b5be0283364fad0b95719829e69')"
+    ]
+  }
+}
