@@ -38,12 +38,15 @@ const { supported, enabled, pending, notice, enable, disable } = useSessionNotif
 });
 
 const soundEnabled = shallowRef(false);
+const soundPending = shallowRef(false);
 const soundNotice = shallowRef('');
 let audio: AudioContext | null = null;
 let disposed = false;
 
 function silence() {
   soundEnabled.value = false;
+  soundPending.value = false;
+  soundNotice.value = '';
   const current = audio;
   audio = null;
   void current?.close().catch(() => {});
@@ -52,16 +55,20 @@ function silence() {
 async function toggleSound() {
   if (soundEnabled.value) {
     silence();
+
     return;
   }
 
-  if (!allowed.value) {
+  if (!allowed.value || soundPending.value) {
     return;
   }
+
+  let current: AudioContext | null = null;
+  soundPending.value = true;
 
   try {
     audio ??= new AudioContext();
-    const current = audio;
+    current = audio;
     await current.resume();
 
     if (!disposed && current === audio && allowed.value) {
@@ -71,14 +78,18 @@ async function toggleSound() {
         : '提示音未能启用，请使用站内提示。';
     }
   } catch {
-    silence();
-    soundNotice.value = '此浏览器无法启用提示音，请使用站内提示。';
+    if (!disposed && current === audio && allowed.value) {
+      silence();
+      soundNotice.value = '此浏览器无法启用提示音，请使用站内提示。';
+    }
+  } finally {
+    if (current === audio) {
+      soundPending.value = false;
+    }
   }
 }
 
-watch(allowed, (value) => {
-  if (!value) silence();
-});
+watch([notificationScope, allowed], silence, { flush: 'sync' });
 watch(
   () => dueKey,
   (key) => {
@@ -187,6 +198,12 @@ onScopeDispose(() => {
       {{ enabled ? '关闭计时系统通知' : '开启计时系统通知' }}
     </button>
     <p
+      v-if="!supported"
+      class="muted"
+    >
+      此浏览器不支持系统通知，计时结束后仍会显示站内提示。
+    </p>
+    <p
       v-if="notice"
       role="status"
     >
@@ -195,7 +212,7 @@ onScopeDispose(() => {
     <button
       type="button"
       class="text-button"
-      :disabled="!allowed"
+      :disabled="!allowed || soundPending"
       @click="toggleSound"
     >
       {{ soundEnabled ? '关闭计时提示音' : '开启计时提示音与振动' }}
@@ -223,11 +240,13 @@ onScopeDispose(() => {
   display: grid;
   gap: 12px;
 }
+
 .timer-value {
   margin: 0;
   font-size: 28px;
   font-variant-numeric: tabular-nums;
 }
+
 .timer-finished {
   padding: 16px;
   border: 1px solid currentColor;

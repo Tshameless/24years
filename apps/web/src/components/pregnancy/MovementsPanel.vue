@@ -40,13 +40,16 @@ const timer = useObservationTimer(toRef(form, 'timer'), {
 });
 
 function startTimer(minutes: number) {
-  if (!timerAllowed.value || timer.running.value) return;
+  if (!timerAllowed.value || timer.running.value) {
+    return;
+  }
 
   if (
     (form.count !== '0' || form.time || form.minutes || form.timer) &&
     !window.confirm('重新计时会将本次次数清零，并更新观察开始时间和时长。继续吗？')
-  )
+  ) {
     return;
+  }
 
   if (timer.start(minutes)) {
     const started = new Date(timer.session.value!.startedAt);

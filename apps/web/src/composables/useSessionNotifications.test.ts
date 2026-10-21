@@ -34,13 +34,15 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function setup() {
+function setup(message?: { title: string; body: string; tag: string }) {
   const scope = effectScope();
   scopes.push(scope);
   const identity = shallowRef('user-a');
   const allowed = shallowRef(true);
   const keys = shallowRef(['a']);
-  const api = scope.run(() => useSessionNotifications({ scope: identity, allowed, keys }))!;
+  const api = scope.run(() =>
+    useSessionNotifications({ scope: identity, allowed, keys, message }),
+  )!;
 
   return { scope, identity, allowed, keys, api };
 }
@@ -98,4 +100,26 @@ it('ignores late rejected requests and reports live errors', async () => {
   await second;
   expect(live.api.notice.value).toContain('暂不能');
   expect(live.api.pending.value).toBe(false);
+});
+
+it('uses the timer payload and falls back if the browser cannot construct notifications', async () => {
+  const { api, keys } = setup({ title: '观察结束', body: '请核对记录', tag: 'observation' });
+  const pending = api.enable();
+  resolvePermission('granted');
+  await pending;
+  await nextTick();
+  expect(opened).toHaveBeenCalledWith({ body: '请核对记录', tag: 'observation' });
+  vi.stubGlobal(
+    'Notification',
+    class {
+      static permission = 'granted';
+      constructor() {
+        throw new Error('Unsupported on mobile');
+      }
+    },
+  );
+  keys.value = ['next'];
+  await nextTick();
+  expect(api.enabled.value).toBe(false);
+  expect(api.notice.value).toContain('已保留站内提醒');
 });
