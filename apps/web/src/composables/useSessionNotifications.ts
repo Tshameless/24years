@@ -5,6 +5,7 @@ export function useSessionNotifications(options: {
   scope: Readonly<Ref<string>>;
   allowed: Readonly<Ref<boolean>>;
   keys: Readonly<Ref<readonly string[]>>;
+  message?: { title: string; body: string; tag: string };
 }) {
   const supported = typeof Notification !== 'undefined' && window.isSecureContext;
   const enabled = shallowRef(false);
@@ -80,9 +81,9 @@ export function useSessionNotifications(options: {
     }
 
     try {
-      const notification = new Notification('24Years 计划提醒', {
-        body: '有计划已到时间，请打开页面查看。',
-        tag: '24years-tasks',
+      const notification = new Notification(options.message?.title ?? '24Years 计划提醒', {
+        body: options.message?.body ?? '有计划已到时间，请打开页面查看。',
+        tag: options.message?.tag ?? '24years-tasks',
       });
       opened.add(notification);
       notification.onclose = () => opened.delete(notification);

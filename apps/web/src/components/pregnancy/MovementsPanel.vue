@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, toRef } from 'vue';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { localDate, type PregnancyRecord } from '@/domain/family';
 import MovementCounter from './MovementCounter.vue';
+import MovementTimer from './MovementTimer.vue';
+import { useObservationTimer } from '@/composables/useObservationTimer';
 
 type Movement = Extract<PregnancyRecord, { type: 'movement' }>;
-const { records, disabled, save, remove, error, message } = usePregnancyRecords();
+const { records, disabled, quietMode, save, remove, error, message } = usePregnancyRecords();
 const entries = computed(() =>
   records.value
     .filter((item): item is Movement => item.type === 'movement')
@@ -18,18 +20,45 @@ const entries = computed(() =>
 );
 const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
   type: 'movement',
-  defaults: () => ({ date: localDate(), time: '', minutes: '', count: '0', notes: '' }),
+  defaults: () => ({ date: localDate(), time: '', minutes: '', count: '0', notes: '', timer: '' }),
+  optionalFields: ['timer'],
   fields: (item: Movement) => ({
     date: item.date,
     time: item.time,
     minutes: String(item.minutes),
     count: String(item.count),
     notes: item.notes,
+    timer: '',
   }),
 });
+const timerAllowed = computed(() => !disabled.value && !stale.value && !before.value);
+const timer = useObservationTimer(toRef(form, 'timer'), {
+  allowed: timerAllowed,
+  onStop: (minutes) => {
+    form.minutes = String(minutes);
+  },
+});
+
+function startTimer(minutes: number) {
+  if (!timerAllowed.value || timer.running.value) return;
+
+  if (
+    (form.count !== '0' || form.time || form.minutes || form.timer) &&
+    !window.confirm('重新计时会将本次次数清零，并更新观察开始时间和时长。继续吗？')
+  )
+    return;
+
+  if (timer.start(minutes)) {
+    const started = new Date(timer.session.value!.startedAt);
+    form.date = localDate(started);
+    form.time = `${String(started.getHours()).padStart(2, '0')}:${String(started.getMinutes()).padStart(2, '0')}`;
+    form.minutes = '';
+    form.count = '0';
+  }
+}
 
 async function submit() {
-  if (disabled.value || stale.value) {
+  if (disabled.value || stale.value || timer.running.value || timer.invalid.value) {
     return;
   }
 
@@ -90,7 +119,7 @@ async function submit() {
           <div class="record-actions">
             <button
               class="text-button"
-              :disabled="disabled"
+              :disabled="disabled || timer.running.value"
               @click="edit(item)"
             >
               编辑
@@ -125,12 +154,25 @@ async function submit() {
           class="record-fields"
           :disabled="disabled || stale"
         >
+          <MovementTimer
+            v-if="!before"
+            :running="timer.running.value"
+            :remaining="timer.remaining.value"
+            :due-key="timer.dueKey.value"
+            :invalid="timer.invalid.value"
+            :disabled="disabled || stale"
+            :quiet="quietMode"
+            :scope="draft.id.value"
+            @start="startTimer"
+            @stop="timer.stop"
+            @acknowledge="timer.acknowledge"
+          />
           <MovementCounter
             v-model="form.count"
             :disabled="disabled || stale"
           />
           <p class="muted">
-            每次点击加一，可用「误点减一」或直接修改次数纠正。不自动合并或过滤点击；本页不自动计时，保存前请填写实际观察时段。
+            每次点击加一，可用「误点减一」或直接修改次数纠正。不自动合并或过滤点击。可手动填写时段，或使用自动计时；提前结束不足一分钟按一分钟填入，请在保存前核对实际观察时长。
           </p>
           <label class="field">
             观察开始日期
@@ -138,6 +180,7 @@ async function submit() {
               v-model="form.date"
               type="date"
               :max="localDate()"
+              :disabled="timer.running.value"
               required
             />
           </label>
@@ -146,6 +189,7 @@ async function submit() {
             <input
               v-model="form.time"
               type="time"
+              :disabled="timer.running.value"
               required
             />
           </label>
@@ -158,6 +202,7 @@ async function submit() {
               max="1440"
               step="1"
               required
+              :disabled="timer.running.value"
               @input="form.minutes = ($event.target as HTMLInputElement).value"
             />
           </label>
@@ -170,7 +215,16 @@ async function submit() {
               placeholder="例如计数方式、观察时的感受"
             />
           </label>
-          <button class="button button-primary">
+          <p
+            v-if="timer.running.value"
+            class="muted"
+          >
+            计时结束后可核对并保存，当前次数已暂存为草稿。
+          </p>
+          <button
+            class="button button-primary"
+            :disabled="timer.running.value || timer.invalid.value"
+          >
             {{ before ? '保存胎动修改' : '保存胎动观察' }}
           </button>
         </fieldset>
