@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useFamily } from '@/composables/useFamily';
-import { currency, summarizeExpenses } from '@/domain/family';
+import { currency, summarizeExpenses, type PregnancyRecord } from '@/domain/family';
 import AppIcon from '@/components/AppIcon.vue';
 import JourneyCard from './JourneyCard.vue';
 import TaskList from '@/components/tasks/TaskList.vue';
@@ -10,6 +10,15 @@ const { data, today, todayTasks, toggleTask, locked, cloud, familyMode } = useFa
 const { state } = cloud;
 
 const totals = computed(() => summarizeExpenses(data.value.expenses));
+const nextCheckup = computed(
+  () =>
+    (data.value.pregnancyRecords ?? [])
+      .filter(
+        (item): item is Extract<PregnancyRecord, { type: 'checkup' }> =>
+          item.type === 'checkup' && !item.completed,
+      )
+      .sort((a, b) => a.date.localeCompare(b.date))[0],
+);
 
 const completed = computed(
   () => todayTasks.value.filter((task) => task.completedDates.includes(today.value)).length,
@@ -58,6 +67,27 @@ const dateLabel = computed(() =>
           :profile="data.profile"
           :today="today"
         />
+        <section
+          v-if="data.profile && !data.profile.quietMode"
+          class="panel"
+        >
+          <div class="panel-heading">
+            <h2>下一次产检</h2>
+            <RouterLink
+              class="text-button"
+              to="/pregnancy"
+            >
+              查看孕期记录
+            </RouterLink>
+          </div>
+          <p v-if="nextCheckup">{{ nextCheckup.date }} · {{ nextCheckup.title }}</p>
+          <p
+            v-else
+            class="muted"
+          >
+            还没有待办产检，按医生建议安排即可。
+          </p>
+        </section>
         <section
           v-if="!data.profile?.quietMode"
           class="panel"

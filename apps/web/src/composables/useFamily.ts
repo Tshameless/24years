@@ -17,6 +17,8 @@ import {
   validExpense,
   validProfile,
   validTask,
+  applyPregnancyChange,
+  type PregnancyChange,
   type Expense,
   type FamilyData,
   type FamilyProfile,
@@ -322,6 +324,15 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
   );
 
   return {
+    savePregnancy: (change: PregnancyChange) => {
+      try {
+        return changeRecords(change, applyPregnancyChange(data.value, change));
+      } catch (reason) {
+        localError.value = reason instanceof Error ? reason.message : '记录保存失败。';
+
+        return false;
+      }
+    },
     data: readonly(data),
     error: readonly(error),
     locked: readonly(locked),

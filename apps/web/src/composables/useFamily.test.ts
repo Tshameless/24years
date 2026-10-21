@@ -38,6 +38,48 @@ const profile = {
 };
 
 describe('本地存档', () => {
+  it('产检完成和费用在本机写入失败时一起回滚，重试可以恢复', () => {
+    const store = setup();
+    const before = {
+      id: 'visit',
+      type: 'checkup' as const,
+      title: '产检',
+      date: '2026-10-21',
+      notes: '',
+      completed: false,
+    };
+    store.savePregnancy({ type: 'pregnancy', before: null, value: before });
+    const original = localStorage.getItem(STORAGE_KEY);
+    const storage = localStorage;
+    vi.stubGlobal('localStorage', {
+      getItem: storage.getItem.bind(storage),
+      setItem: () => {
+        throw new Error('Quota exceeded');
+      },
+    });
+    const change = {
+      type: 'pregnancy' as const,
+      before,
+      value: { ...before, completed: true },
+      expense: {
+        id: 'checkup-visit',
+        title: '产检',
+        date: before.date,
+        kind: 'expense' as const,
+        category: '产检医疗' as const,
+        amountCents: 10000,
+        reimbursedCents: 0,
+      },
+    };
+    expect(store.savePregnancy(change)).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(original);
+    expect(store.data.value.expenses).toHaveLength(0);
+    expect(store.data.value.pregnancyRecords).toEqual([before]);
+    vi.unstubAllGlobals();
+    expect(store.savePregnancy(change)).toBe(true);
+    expect(setup().data.value.expenses).toHaveLength(1);
+    expect(setup().data.value.pregnancyRecords).toEqual([change.value]);
+  });
   it('预览不写入，确认恢复保留原副本，支持损坏存档恢复', async () => {
     localStorage.setItem(STORAGE_KEY, '{broken');
     const store = setup();

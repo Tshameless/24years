@@ -11,6 +11,7 @@ const route = useRoute();
 const navigation = [
   { to: '/', label: '今日陪伴', icon: 'home' },
   { to: '/tasks', label: '日常计划', icon: 'calendar' },
+  { to: '/pregnancy', label: '孕期记录', icon: 'heart' },
   { to: '/ledger', label: '家庭账本', icon: 'wallet' },
   { to: '/family', label: '我的家庭', icon: 'heart' },
 ];
@@ -484,7 +485,7 @@ const section = computed(
 
   .primary-nav {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 4px;
   }
 

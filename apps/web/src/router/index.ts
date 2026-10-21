@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/pregnancy', component: () => import('@/views/PregnancyView.vue') },
     {
       path: '/',
       name: 'Home',

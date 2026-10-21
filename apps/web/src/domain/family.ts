@@ -37,6 +37,170 @@ export interface FamilyData {
   tasks: FamilyTask[];
   expenses: Expense[];
   theme: 'light' | 'dark';
+  pregnancyRecords?: PregnancyRecord[];
+}
+
+export type PregnancyRecord =
+  | { id: string; type: 'checkup'; title: string; date: string; notes: string; completed: boolean }
+  | {
+      id: string;
+      type: 'vital';
+      date: string;
+      metric: 'weight' | 'bloodPressure' | 'glucose';
+      value: number;
+      secondary: number | null;
+      notes: string;
+    }
+  | { id: string; type: 'contraction'; startedAt: number; endedAt: number | null }
+  | {
+      id: string;
+      type: 'medical';
+      hospital: string;
+      contact: string;
+      phone: string;
+      notes: string;
+    };
+
+export interface PregnancyChange {
+  type: 'pregnancy';
+  before: PregnancyRecord | null;
+  value: PregnancyRecord | null;
+  /** Only a new checkup completion can create this expense, in the same transaction. */
+  expense?: Expense;
+}
+
+export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
+  if (!isObject(value) || !shortText(value.id, 100)) {
+    return false;
+  }
+
+  const note = (text: unknown) => typeof text === 'string' && text.length <= 2000;
+  const positive = (n: unknown, max: number) =>
+    typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= max;
+  switch (value.type) {
+    case 'checkup':
+      return (
+        shortText(value.title, 80) &&
+        isDate(value.date) &&
+        note(value.notes) &&
+        typeof value.completed === 'boolean'
+      );
+    case 'vital':
+      return (
+        isDate(value.date) &&
+        note(value.notes) &&
+        ((value.metric === 'weight' && positive(value.value, 1000) && value.secondary === null) ||
+          (value.metric === 'glucose' && positive(value.value, 100) && value.secondary === null) ||
+          (value.metric === 'bloodPressure' &&
+            positive(value.value, 400) &&
+            positive(value.secondary, 400)))
+      );
+    case 'contraction':
+      return (
+        Number.isSafeInteger(value.startedAt) &&
+        positive(value.startedAt, 8640000000000000) &&
+        (value.endedAt === null ||
+          (Number.isSafeInteger(value.endedAt) &&
+            typeof value.endedAt === 'number' &&
+            value.endedAt >= Number(value.startedAt) &&
+            value.endedAt <= 8640000000000000))
+      );
+    case 'medical':
+      return (
+        value.id === 'medical-card' &&
+        typeof value.hospital === 'string' &&
+        value.hospital.length <= 100 &&
+        typeof value.contact === 'string' &&
+        value.contact.length <= 50 &&
+        typeof value.phone === 'string' &&
+        /^[+\d ()-]{0,30}$/.test(value.phone) &&
+        note(value.notes)
+      );
+    default:
+      return false;
+  }
+}
+
+export class PregnancyChangeError extends Error {
+  readonly status: number;
+  constructor(message: string, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// Records are flat objects. Compare fields independently of JSON property ordering.
+function sameRecord(a: PregnancyRecord | null, b: PregnancyRecord | null): boolean {
+  if (!a || !b) {
+    return a === b;
+  }
+
+  return (
+    Object.keys(a).length === Object.keys(b).length &&
+    Object.entries(a).every(
+      ([key, value]) => (b as unknown as Record<string, unknown>)[key] === value,
+    )
+  );
+}
+
+export function applyPregnancyChange(data: FamilyData, change: PregnancyChange): FamilyData {
+  const { before, value, expense } = change;
+
+  if (
+    (before !== null && !validPregnancyRecord(before)) ||
+    (value !== null && !validPregnancyRecord(value)) ||
+    (!before && !value) ||
+    (before && value && (before.id !== value.id || before.type !== value.type))
+  ) {
+    throw new PregnancyChangeError('记录格式无效。');
+  }
+
+  const id = (before ?? value)!.id;
+  const records = data.pregnancyRecords ?? [];
+
+  if (!sameRecord(records.find((item) => item.id === id) ?? null, before)) {
+    throw new PregnancyChangeError('这条记录已变化，请重新打开最新记录，输入已保留。', 409);
+  }
+
+  const updated = [...records.filter((item) => item.id !== id), ...(value ? [value] : [])];
+
+  if (
+    data.profile?.quietMode &&
+    !before &&
+    value?.type === 'contraction' &&
+    value.endedAt === null
+  ) {
+    throw new PregnancyChangeError('安静关怀期间暂停新计时，已有计时仍可结束。');
+  }
+
+  if (updated.filter((item) => item.type === 'contraction' && item.endedAt === null).length > 1) {
+    throw new PregnancyChangeError('已有一次宫缩正在计时，请先结束它。', 409);
+  }
+
+  if (
+    expense &&
+    (!validExpense(expense) ||
+      value?.type !== 'checkup' ||
+      !value.completed ||
+      before?.type !== 'checkup' ||
+      before.completed ||
+      expense.id !== `checkup-${id}` ||
+      expense.kind !== 'expense' ||
+      expense.category !== '产检医疗' ||
+      expense.date !== value.date)
+  ) {
+    throw new PregnancyChangeError('产检费用格式无效。');
+  }
+
+  if (expense && data.expenses.some((item) => item.id === expense.id)) {
+    throw new PregnancyChangeError('本次产检已有关联账目，请在家庭账本中修改。', 409);
+  }
+
+  return {
+    ...data,
+    pregnancyRecords: updated,
+    expenses: expense ? [expense, ...data.expenses] : data.expenses,
+  };
 }
 
 export const emptyFamily = (): FamilyData => ({
@@ -233,6 +397,14 @@ export function decodeFamily(raw: string): FamilyData {
     !value.tasks.every(validTask) ||
     !Array.isArray(value.expenses) ||
     !value.expenses.every(validExpense) ||
+    (value.pregnancyRecords !== undefined &&
+      (!Array.isArray(value.pregnancyRecords) ||
+        !value.pregnancyRecords.every(validPregnancyRecord) ||
+        new Set(value.pregnancyRecords.map((item) => item.id)).size !==
+          value.pregnancyRecords.length ||
+        value.pregnancyRecords.filter(
+          (item) => item.type === 'contraction' && item.endedAt === null,
+        ).length > 1)) ||
     !['light', 'dark'].includes(String(value.theme)) ||
     new Set(value.tasks.map((task) => task.id)).size !== value.tasks.length ||
     new Set(value.expenses.map((expense) => expense.id)).size !== value.expenses.length

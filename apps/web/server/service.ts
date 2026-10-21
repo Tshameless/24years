@@ -10,6 +10,9 @@ import { isDeepStrictEqual } from 'node:util';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   decodeFamily,
+  applyPregnancyChange,
+  PregnancyChangeError,
+  type PregnancyChange,
   validExpense,
   validProfile,
   validTask,
@@ -454,6 +457,16 @@ export function createService(db: DatabaseSync) {
       );
       updateFamilyChoice(userId, family, mode, selectedRole);
       family.data.profile = { ...value, familyMode: mode, parentRole: selectedRole };
+    } else if (change.type === 'pregnancy') {
+      try {
+        family.data = applyPregnancyChange(family.data, change as unknown as PregnancyChange);
+      } catch (reason) {
+        if (reason instanceof PregnancyChangeError) {
+          throw new ApiError(reason.status, reason.message);
+        }
+
+        throw reason;
+      }
     } else {
       requireValue(change.type === 'task' || change.type === 'expense', 400, '不支持的记录类型。');
       const validate = change.type === 'task' ? validTask : validExpense;

@@ -1,4 +1,4 @@
-import type { FamilyData, FamilyProfile, FamilyTask, Expense } from './family';
+import type { FamilyData, FamilyProfile, FamilyTask, Expense, PregnancyChange } from './family';
 
 export type FamilyMode = 'single' | 'couple';
 export type FamilyParentRole = 'single_parent' | 'mother' | 'father';
@@ -32,6 +32,7 @@ export interface SessionState {
 }
 
 export type FamilyChange =
+  | PregnancyChange
   | { type: 'profile'; value: FamilyProfile; before: FamilyProfile | null }
   | { type: 'task'; value: FamilyTask | null; before: FamilyTask | null }
   | { type: 'expense'; value: Expense | null; before: Expense | null };

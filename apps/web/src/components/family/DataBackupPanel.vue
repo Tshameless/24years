@@ -129,7 +129,7 @@ async function downloadPrevious() {
       <summary>从 JSON 备份恢复</summary>
       <div class="form-grid restore-form">
         <p class="muted">
-          恢复会替换档案、计划和账目。仅保留最近一次导入前副本；重要记录请另行导出保存。同步家庭的成员、身份和权限保持当前设置。
+          恢复会替换档案、计划、账目和孕期记录。仅保留最近一次导入前副本；重要记录请另行导出保存。同步家庭的成员、身份和权限保持当前设置。进行中的宫缩计时也会恢复，请核对开始时间。
         </p>
         <p
           v-if="active && role !== 'owner'"
@@ -155,7 +155,10 @@ async function downloadPrevious() {
           class="backup-preview"
         >
           <strong>{{ preview.data.profile?.name || '未命名档案' }}</strong>
-          <p>{{ preview.data.tasks.length }} 条计划 · {{ preview.data.expenses.length }} 笔账目</p>
+          <p>
+            {{ preview.data.tasks.length }} 条计划 · {{ preview.data.expenses.length }} 笔账目 ·
+            {{ preview.data.pregnancyRecords?.length ?? 0 }} 条孕期记录
+          </p>
           <label class="confirm-option">
             <input
               v-model="confirmed"
