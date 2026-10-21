@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createId } from '@/domain/id';
 import { computed, onMounted, onUnmounted, shallowRef } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import type { PregnancyRecord } from '@/domain/family';
@@ -37,7 +38,7 @@ async function toggle() {
     });
   } else {
     draft ??= {
-      id: crypto.randomUUID(),
+      id: createId(),
       type: 'contraction',
       startedAt: Date.now(),
       endedAt: null,

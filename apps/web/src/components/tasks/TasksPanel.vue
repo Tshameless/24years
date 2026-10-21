@@ -63,7 +63,7 @@ async function confirmRemove(id: string) {
     </section>
     <section class="panel">
       <div class="panel-heading">
-        <h2>{{ editing ? '修改这项计划' : '记下一件小事' }}</h2>
+        <h2>{{ editing ? '修改这项计划' : '添加计划' }}</h2>
         <span class="tag">自主安排</span>
       </div>
       <TaskForm

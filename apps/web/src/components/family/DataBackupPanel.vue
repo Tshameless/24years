@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createId } from '@/domain/id';
 import { computed, shallowRef } from 'vue';
 import { useFamily, type ImportTarget } from '@/composables/useFamily';
 import { MAX_BACKUP_BYTES, readFamilyBackup } from '@/domain/backup';
@@ -47,7 +48,7 @@ async function selectFile(event: Event) {
     const data = readFamilyBackup(raw);
 
     if (attempt === selection) {
-      preview.value = { raw, data, target, operationId: crypto.randomUUID() };
+      preview.value = { raw, data, target, operationId: createId() };
     }
   } catch (reason) {
     if (attempt === selection) {

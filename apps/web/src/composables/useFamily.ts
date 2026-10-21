@@ -1,3 +1,4 @@
+import { createId } from '@/domain/id';
 import {
   computed,
   inject,
@@ -148,7 +149,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     );
   }
 
-  function addTask(input: Omit<FamilyTask, 'id' | 'completedDates'>, id = crypto.randomUUID()) {
+  function addTask(input: Omit<FamilyTask, 'id' | 'completedDates'>, id = createId()) {
     const task = { ...input, id, completedDates: [] };
 
     return (
@@ -187,7 +188,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     return updateTask({ ...task, completedDates }, task);
   }
 
-  function addExpense(input: Omit<Expense, 'id'>, id = crypto.randomUUID()) {
+  function addExpense(input: Omit<Expense, 'id'>, id = createId()) {
     const expense = { ...input, id };
 
     return (

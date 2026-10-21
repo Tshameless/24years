@@ -1,3 +1,4 @@
+import { createId } from '@/domain/id';
 import { computed, onMounted, onUnmounted, readonly, shallowRef } from 'vue';
 import type {
   FamilyChange,
@@ -234,7 +235,7 @@ export function useCollaboration(enabled = true) {
   async function applyChange(change: FamilyChange) {
     const familyId = state.value.family?.id;
     const key = JSON.stringify({ familyId, change });
-    const operationId = pendingOperations.get(key) ?? crypto.randomUUID();
+    const operationId = pendingOperations.get(key) ?? createId();
     pendingOperations.set(key, operationId);
     const success = await run('family/records', { familyId, change, operationId });
 

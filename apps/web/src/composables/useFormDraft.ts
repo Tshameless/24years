@@ -1,3 +1,4 @@
+import { createId } from '@/domain/id';
 import { computed, onUnmounted, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -30,7 +31,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
   let draftBaseline = baseline;
   const scope = options.scope();
   const key = PREFIX + JSON.stringify([scope, options.name]);
-  const id = shallowRef(crypto.randomUUID());
+  const id = shallowRef(createId());
   const restored = shallowRef(false);
   const changedSource = shallowRef(false);
   const storageError = shallowRef('');
@@ -106,7 +107,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
     restored.value = false;
     changedSource.value = false;
     draftBaseline = baseline;
-    id.value = crypto.randomUUID();
+    id.value = createId();
     persist();
   }
 
