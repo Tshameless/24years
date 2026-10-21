@@ -16,6 +16,9 @@ export interface FamilyTask {
   repeat: 'once' | 'daily' | 'weekly';
   /** ISO weekdays: Monday = 1, Sunday = 7. Required for weekly tasks. */
   weekdays?: readonly number[];
+  /** Responsibility is descriptive, not an access-control boundary. */
+  assignee?: 'mother' | 'father' | 'single_parent';
+  endDate?: string;
   completedDates: string[];
 }
 
@@ -70,7 +73,7 @@ export interface PregnancyChange {
   type: 'pregnancy';
   before: PregnancyRecord | null;
   value: PregnancyRecord | null;
-  /** Only a new checkup completion can create this expense, in the same transaction. */
+  /** Completing an existing checkup or packing item can atomically create one expense. */
   expense?: Expense;
 }
 
@@ -206,20 +209,21 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
   if (
     expense &&
     (!validExpense(expense) ||
-      value?.type !== 'checkup' ||
+      (value?.type !== 'checkup' && value?.type !== 'packing') ||
       !value.completed ||
-      before?.type !== 'checkup' ||
+      before?.type !== value.type ||
       before.completed ||
-      expense.id !== `checkup-${id}` ||
+      expense.id !== `${value.type}-${id}` ||
       expense.kind !== 'expense' ||
-      expense.category !== '产检医疗' ||
+      expense.category !== (value.type === 'checkup' ? '产检医疗' : '待产准备') ||
+      (value.type === 'packing' && expense.reimbursedCents !== 0) ||
       expense.date !== value.date)
   ) {
-    throw new PregnancyChangeError('产检费用格式无效。');
+    throw new PregnancyChangeError('关联费用格式无效。');
   }
 
   if (expense && data.expenses.some((item) => item.id === expense.id)) {
-    throw new PregnancyChangeError('本次产检已有关联账目，请在家庭账本中修改。', 409);
+    throw new PregnancyChangeError('此记录已有关联账目，请在家庭账本中修改。', 409);
   }
 
   return {
@@ -320,10 +324,15 @@ export const weekDays = [
 ] as const;
 
 export function taskIsDue(
-  task: Pick<FamilyTask, 'repeat' | 'date' | 'weekdays'>,
+  task: Pick<FamilyTask, 'repeat' | 'date' | 'weekdays' | 'endDate'>,
   date: string,
 ): boolean {
-  if (!isDate(date) || !isDate(task.date) || date < task.date) {
+  if (
+    !isDate(date) ||
+    !isDate(task.date) ||
+    date < task.date ||
+    (task.endDate && date > task.endDate)
+  ) {
     return false;
   }
 
@@ -428,6 +437,11 @@ export function validTask(value: unknown): value is FamilyTask {
     shortText(value.id, 100) &&
     shortText(value.title, 80) &&
     isDate(value.date) &&
+    (value.endDate === undefined || (isDate(value.endDate) && value.endDate >= value.date)) &&
+    (value.assignee === undefined ||
+      value.assignee === 'mother' ||
+      value.assignee === 'father' ||
+      value.assignee === 'single_parent') &&
     typeof value.time === 'string' &&
     /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value.time) &&
     (value.repeat === 'once' || value.repeat === 'daily' || value.repeat === 'weekly') &&

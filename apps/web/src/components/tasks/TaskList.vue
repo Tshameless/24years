@@ -2,6 +2,7 @@
 import type { FamilyTask } from '@/domain/family';
 import { taskIsDue, taskScheduleLabel } from '@/domain/family';
 import AppIcon from '@/components/AppIcon.vue';
+import { responsibilityLabels } from '@/domain/taskReminders';
 
 defineProps<{
   tasks: readonly {
@@ -47,6 +48,8 @@ defineEmits<{ toggle: [id: string]; remove: [id: string]; edit: [id: string] }>(
         <strong>{{ task.title }}</strong>
         <small>
           {{ taskScheduleLabel(task) }}
+          <span v-if="task.endDate">· 截至 {{ task.endDate }}</span>
+          <span v-if="task.assignee">· 负责人：{{ responsibilityLabels[task.assignee] }}</span>
           <span v-if="!taskIsDue(task, date)">· 非今日计划</span>
         </small>
       </div>

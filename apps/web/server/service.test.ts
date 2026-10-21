@@ -60,12 +60,24 @@ test('每周计划服务端校验、共享读取与周期修改保留历史', as
   const f = await fixture();
 
   try {
-    const weekly: FamilyTask = { ...task('每周计划'), repeat: 'weekly', weekdays: [1, 3, 5] };
+    const weekly: FamilyTask = {
+      ...task('每周计划'),
+      repeat: 'weekly',
+      weekdays: [1, 3, 5],
+      assignee: 'father',
+      endDate: '2026-11-01',
+    };
     f.change(f.owner, 'task', weekly, null);
     assert.deepEqual(f.service.snapshot(f.owner).family!.data.tasks[0], weekly);
     const code = f.manage('invite').invitation!.code;
     f.service.mutate(f.partner, 'join', { code, familyRole: 'father' });
     assert.deepEqual(f.service.snapshot(f.partner).family!.data.tasks[0], weekly);
+    for (const invalid of [
+      { ...weekly, assignee: 'admin' },
+      { ...weekly, endDate: '2026-10-01' },
+    ]) {
+      assert.throws(() => f.change(f.owner, 'task', invalid, weekly), failsWith(400));
+    }
     for (const weekdays of [[], [0], [8], [1, 1], ['3']]) {
       assert.throws(
         () => f.change(f.owner, 'task', { ...weekly, weekdays }, weekly),

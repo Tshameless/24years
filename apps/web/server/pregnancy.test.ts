@@ -75,6 +75,45 @@ test('孕期协作支持幂等原子入账、冲突回滚、只读权限和备�
     assert.equal(service.snapshot(partner).family!.data.expenses.length, 1);
     assert.equal(service.snapshot(partner).family!.revision, previous.revision + 1);
     assert.throws(() => write(partner, change), fail(409));
+    const packing = {
+      id: 'purchase',
+      type: 'packing' as const,
+      title: '资料袋',
+      date: before.date,
+      notes: '',
+      completed: false,
+    };
+    write(partner, { type: 'pregnancy', before: null, value: packing });
+    const purchase: PregnancyChange = {
+      type: 'pregnancy',
+      before: packing,
+      value: { ...packing, completed: true },
+      expense: {
+        id: 'packing-purchase',
+        title: packing.title,
+        date: packing.date,
+        kind: 'expense',
+        category: '待产准备',
+        amountCents: 1234,
+        reimbursedCents: 0,
+      },
+    };
+    const purchaseOperation = randomUUID();
+    const purchaseBefore = service.snapshot(owner).family!;
+    assert.throws(
+      () => write(owner, { ...purchase, expense: { ...purchase.expense!, reimbursedCents: 1 } }),
+      fail(400),
+    );
+    assert.deepEqual(service.snapshot(owner).family, purchaseBefore);
+    write(owner, purchase, purchaseOperation);
+    write(owner, purchase, purchaseOperation);
+    assert.equal(
+      service
+        .snapshot(partner)
+        .family!.data.expenses.filter((item) => item.id === 'packing-purchase').length,
+      1,
+    );
+    assert.throws(() => write(partner, purchase), fail(409));
     // Role management is a separate permission path from record validation.
     const care: PregnancyRecord[] = [
       {

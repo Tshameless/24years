@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, shallowRef } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
+import VitalTrends from './VitalTrends.vue';
 import { localDate, type PregnancyRecord } from '@/domain/family';
 
 type Vital = Extract<PregnancyRecord, { type: 'vital' }>;
@@ -62,6 +63,7 @@ async function submit() {
 </script>
 
 <template>
+  <VitalTrends />
   <div class="pregnancy-columns">
     <section class="panel">
       <div class="panel-heading">

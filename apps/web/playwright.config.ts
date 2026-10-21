@@ -29,7 +29,7 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: 'pnpm dev --host 127.0.0.1 --port 4173 --strictPort',
+      command: 'node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4173 --strictPort',
       env: { API_PROXY_TARGET: 'http://127.0.0.1:8788' },
       url: 'http://127.0.0.1:4173',
       reuseExistingServer: false,

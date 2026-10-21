@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, shallowRef } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
+import { checkupTemplates } from '@/domain/preparationTemplates';
 import { isDate, localDate, parseMoney, type PregnancyRecord, type Expense } from '@/domain/family';
 
 type Checkup = Extract<PregnancyRecord, { type: 'checkup' }>;
@@ -11,6 +12,22 @@ const checkups = computed(() =>
     .sort((a, b) => Number(a.completed) - Number(b.completed) || a.date.localeCompare(b.date)),
 );
 const before = shallowRef<Checkup | null>(null);
+const template = shallowRef('');
+
+function applyTemplate() {
+  const selected = checkupTemplates[Number(template.value)];
+
+  if (template.value === '' || !selected || disabled.value || before.value) {
+    return;
+  }
+
+  if ((form.title || form.notes) && !window.confirm('用模板替换产检名称和备注？')) {
+    return;
+  }
+
+  Object.assign(form, selected);
+}
+
 let draftId = crypto.randomUUID();
 const form = reactive({
   title: '',
@@ -177,6 +194,34 @@ async function submit() {
           :disabled="disabled || !!stale"
           class="record-fields"
         >
+          <div
+            v-if="!before"
+            class="field"
+          >
+            <label for="checkup-template">就诊准备模板</label>
+            <select
+              id="checkup-template"
+              v-model="template"
+            >
+              <option value="">请选择模板</option>
+              <option
+                v-for="(item, index) in checkupTemplates"
+                :key="item.title"
+                :value="String(index)"
+              >
+                {{ item.title }}
+              </option>
+            </select>
+            <button
+              type="button"
+              class="button button-secondary"
+              :disabled="template === ''"
+              @click="applyTemplate"
+            >
+              填入就诊模板
+            </button>
+            <small>整理用途，不是标准产检排程；日期、项目与准备要求请向医院确认。</small>
+          </div>
           <label class="field">
             产检名称
             <input

@@ -3,6 +3,7 @@ import { computed, reactive, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
 import { useFormDraft } from '@/composables/useFormDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
+import { taskTemplates } from '@/domain/taskReminders';
 import { isDate, localDate, weekDays, validTask, type FamilyTask } from '@/domain/family';
 
 const props = defineProps<{ task?: FamilyTask }>();
@@ -22,6 +23,8 @@ const form = reactive({
   time: before?.time ?? '09:00',
   repeat: before?.repeat ?? 'once',
   weekdays: before?.weekdays?.join(',') ?? '',
+  assignee: before?.assignee ?? '',
+  endDate: before?.endDate ?? '',
 });
 
 const error = shallowRef('');
@@ -38,8 +41,24 @@ const {
   scope: () => `${identity.value}:${cloud.role.value ?? 'local'}`,
   name: `task:${before?.id ?? 'new'}`,
   baseline: before,
-  optionalFields: ['weekdays'],
+  optionalFields: ['weekdays', 'assignee', 'endDate'],
 });
+const template = shallowRef('');
+
+function applyTemplate() {
+  const selected = taskTemplates[Number(template.value)];
+
+  if (template.value === '' || !selected) {
+    return;
+  }
+
+  if (dirty.value && !window.confirm('用模板替换名称、时间和重复方式？其他输入保留。')) {
+    return;
+  }
+
+  Object.assign(form, selected, { weekdays: selected.repeat === 'weekly' ? '7' : '' });
+}
+
 const selectedDays = computed(() => (form.weekdays ? form.weekdays.split(',').map(Number) : []));
 
 function toggleWeekday(day: number) {
@@ -86,6 +105,8 @@ async function submit() {
     date: form.date,
     time: form.time,
     repeat: form.repeat,
+    ...(form.assignee ? { assignee: form.assignee as FamilyTask['assignee'] } : {}),
+    ...(form.endDate ? { endDate: form.endDate } : {}),
     ...(form.repeat === 'weekly' ? { weekdays: selectedDays.value } : {}),
   };
   const task = {
@@ -95,7 +116,7 @@ async function submit() {
   };
 
   if (!validTask(task)) {
-    error.value = '计划重复规则无效，请重新选择重复方式与星期。';
+    error.value = '请检查重复规则、负责人及结束日期（不得早于开始日期）。';
 
     return;
   }
@@ -128,6 +149,33 @@ async function submit() {
     >
       这项计划已被修改或删除。输入仍保留，请取消后从最新列表重新编辑。
     </p>
+    <div
+      v-if="!before"
+      class="field"
+    >
+      <label for="task-template">常用计划模板</label>
+      <select
+        id="task-template"
+        v-model="template"
+      >
+        <option value="">请选择模板</option>
+        <option
+          v-for="(item, index) in taskTemplates"
+          :key="item.title"
+          :value="String(index)"
+        >
+          {{ item.title }}
+        </option>
+      </select>
+      <button
+        type="button"
+        class="button button-secondary"
+        :disabled="locked || template === ''"
+        @click="applyTemplate"
+      >
+        填入模板
+      </button>
+    </div>
     <label class="field">
       计划名称
       <input
@@ -162,8 +210,35 @@ async function submit() {
         <option value="daily">每天重复</option>
         <option value="weekly">每周指定星期</option>
       </select>
-      <small>仅作为页面计划清单，不会发送系统通知；用药安排请遵医嘱。</small>
+      <small>
+        到时显示站内提醒；可另行开启本次页面会话的浏览器通知。关闭页面不保证提醒，用药安排请遵医嘱。
+      </small>
     </label>
+    <div class="form-row">
+      <label class="field">
+        负责人
+        <select
+          v-model="form.assignee"
+          aria-label="负责人"
+        >
+          <option value="">不指定</option>
+          <option value="single_parent">本人（单人家庭）</option>
+          <option value="mother">母亲</option>
+          <option value="father">父亲</option>
+        </select>
+      </label>
+      <label class="field">
+        结束日期（可选）
+        <input
+          v-model="form.endDate"
+          type="date"
+          :min="form.date"
+        />
+      </label>
+    </div>
+    <small>
+      负责人表示分工，不改变编辑权限；任一可编辑成员仍可代为完成。尚不支持双方分别确认。
+    </small>
     <fieldset
       v-if="form.repeat === 'weekly'"
       class="weekday-picker"

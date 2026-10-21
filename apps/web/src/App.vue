@@ -2,6 +2,7 @@
 import { provide, watch } from 'vue';
 import { clearFormDrafts } from '@/composables/useFormDraft';
 import AppShell from '@/components/AppShell.vue';
+import ReminderCenter from '@/components/tasks/ReminderCenter.vue';
 import { createFamilyStore, familyKey } from '@/composables/useFamily';
 
 const family = createFamilyStore();
@@ -28,6 +29,7 @@ provide(familyKey, family);
 
 <template>
   <AppShell>
+    <ReminderCenter />
     <RouterView
       v-if="cloud.ready.value"
       :key="`${identity}:${cloud.role.value ?? 'local'}`"

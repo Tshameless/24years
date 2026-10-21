@@ -90,7 +90,7 @@ test('孕期闭环：产检原子入账、体征、计时、就医卡和备份�
   await page.getByRole('link', { name: '体征记录', exact: true }).click();
   await page.getByLabel('体重（kg）', { exact: true }).fill('62.5');
   await page.getByRole('button', { name: '保存体征', exact: true }).click();
-  await expect(page.getByText('62.5', { exact: true })).toBeVisible();
+  await expect(page.locator('.record-list').getByText('62.5', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: '宫缩计时', exact: true }).click();
   await page.getByRole('button', { name: '开始本次宫缩' }).click();
   await page.reload();
