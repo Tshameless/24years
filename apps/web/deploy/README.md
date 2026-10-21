@@ -35,6 +35,12 @@ pnpm db:restore data/backups/manual-2026-10-09.sqlite data/recovered-2026-10-09.
 
 ## 运行检查和保留策略
 
+### 页面更新提示
+
+每次 `pnpm build` 会生成配套的前端版本号及 `dist/version.json`。部署时需要一起发布整个 `dist` 目录，不能只替换 JavaScript 文件。已打开的页面会在打开时、回到标签页、网络恢复及每分钟检查新版本；发现更新后显示“刷新更新”，由用户先保存内容再手动刷新。版本检查失败不会影响正常记录。
+
+此功能首次上线时，已经打开的旧页面需要手动刷新一次才能启用。服务器为静态文件设置了 `Cache-Control: no-cache`，如另有 CDN 或反向代理缓存，请让 `index.html` 与 `version.json` 不使用长期缓存。
+
 ```sh
 systemctl status 24years.service
 systemctl list-timers 24years-backup.timer
