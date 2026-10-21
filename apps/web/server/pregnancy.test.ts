@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { openDatabase } from './database.ts';
 import { ApiError, createService } from './service.ts';
-import { emptyFamily, type PregnancyChange } from '../src/domain/family.ts';
+import {
+  emptyFamily,
+  decodeFamily,
+  type PregnancyChange,
+  type PregnancyRecord,
+} from '../src/domain/family.ts';
 
 test('孕期协作支持幂等原子入账、冲突回滚、只读权限和备份恢复', async () => {
   const db = openDatabase(':memory:');
@@ -71,7 +76,55 @@ test('孕期协作支持幂等原子入账、冲突回滚、只读权限和备�
     assert.equal(service.snapshot(partner).family!.revision, previous.revision + 1);
     assert.throws(() => write(partner, change), fail(409));
     // Role management is a separate permission path from record validation.
+    const care: PregnancyRecord[] = [
+      {
+        id: 'bonding',
+        type: 'bonding',
+        date: before.date,
+        title: '读诗',
+        minutes: 10,
+        notes: '一起陪伴',
+      },
+      { id: 'mood', type: 'mood', date: before.date, title: '平静', notes: '散步' },
+      {
+        id: 'packing',
+        type: 'packing',
+        date: before.date,
+        title: '资料袋',
+        completed: false,
+        notes: '玄关',
+      },
+    ];
+    for (const value of care) {
+      write(partner, { type: 'pregnancy', before: null, value });
+      assert.deepEqual(
+        service.snapshot(owner).family!.data.pregnancyRecords!.find((item) => item.id === value.id),
+        value,
+      );
+      assert.throws(() => write(owner, { type: 'pregnancy', before: null, value }), fail(409));
+    }
+    assert.throws(() =>
+      decodeFamily(
+        JSON.stringify({ ...emptyFamily(), pregnancyRecords: [{ ...care[0], minutes: -1 }] }),
+      ),
+    );
+    assert.throws(() =>
+      decodeFamily(
+        JSON.stringify({ ...emptyFamily(), pregnancyRecords: [{ ...care[1], title: 'invalid' }] }),
+      ),
+    );
+    assert.throws(() =>
+      decodeFamily(
+        JSON.stringify({ ...emptyFamily(), pregnancyRecords: [{ ...care[2], completed: 'yes' }] }),
+      ),
+    );
     manage('role', { userId: partner, role: 'viewer' });
+    for (const value of care) {
+      assert.throws(
+        () => write(partner, { type: 'pregnancy', before: value, value: null }),
+        fail(403),
+      );
+    }
     assert.throws(
       () =>
         write(partner, {
