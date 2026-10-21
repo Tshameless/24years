@@ -120,6 +120,13 @@ const section = computed(
         </span>
         <span class="mobile-brand">24Years</span>
         <div class="top-actions">
+          <RouterLink
+            v-if="!active"
+            to="/login"
+            class="text-button"
+          >
+            登录
+          </RouterLink>
           <span class="local-badge">
             <i />
             {{ label }}
@@ -162,6 +169,12 @@ const section = computed(
         <slot />
       </main>
       <footer class="page-footer">
+        <RouterLink
+          to="/backup"
+          class="text-button"
+        >
+          导入 / 导出备份
+        </RouterLink>
         <AppIcon
           name="shield"
           :size="15"
@@ -409,6 +422,7 @@ const section = computed(
 }
 
 .page-footer {
+  flex-wrap: wrap;
   max-width: 1260px;
   margin: auto;
   padding: 16px 44px 28px;

@@ -4,9 +4,12 @@ import { useFamily } from '@/composables/useFamily';
 import AccountRecovery from './AccountRecovery.vue';
 import AccountSecurity from './AccountSecurity.vue';
 
+const props = defineProps<{ initialMode?: 'login' | 'register' }>();
 const { cloud } = useFamily();
 const { state, busy, expired, active, accountNotice } = cloud;
-const register = shallowRef(!accountNotice.value);
+const register = shallowRef(
+  props.initialMode ? props.initialMode === 'register' : !accountNotice.value,
+);
 const credentials = reactive({ username: '', password: '', nickname: '' });
 const recovering = shallowRef(false);
 
