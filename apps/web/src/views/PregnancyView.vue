@@ -6,16 +6,22 @@ import CheckupsPanel from '@/components/pregnancy/CheckupsPanel.vue';
 import VitalsPanel from '@/components/pregnancy/VitalsPanel.vue';
 import ContractionsPanel from '@/components/pregnancy/ContractionsPanel.vue';
 import MedicalCardPanel from '@/components/pregnancy/MedicalCardPanel.vue';
+import BondingPanel from '@/components/pregnancy/BondingPanel.vue';
+import CareJournal from '@/components/pregnancy/CareJournal.vue';
 
 const { data, locked, cloud } = useFamily();
 const route = useRoute();
 const tabs = [
+  { id: 'bonding', label: '胎教陪伴', component: BondingPanel },
+  { id: 'mood', label: '心情日记', component: CareJournal },
+  { id: 'packing', label: '待产清单', component: CareJournal },
   { id: 'checkups', label: '产检安排', component: CheckupsPanel },
   { id: 'vitals', label: '体征记录', component: VitalsPanel },
   { id: 'contractions', label: '宫缩计时', component: ContractionsPanel },
   { id: 'medical', label: '就医卡', component: MedicalCardPanel },
 ];
-const selected = computed(() => tabs.find((item) => item.id === route.query.tab) ?? tabs[0]);
+const selected = computed(() => tabs.find((item) => item.id === route.query.tab) ?? tabs[3]);
+const journalKind = computed(() => (selected.value.id === 'mood' ? 'mood' : 'packing'));
 </script>
 
 <template>
@@ -65,13 +71,22 @@ const selected = computed(() => tabs.find((item) => item.id === route.query.tab)
           {{ item.label }}
         </RouterLink>
       </nav>
-      <component :is="selected.component" />
+      <CareJournal
+        v-if="selected.component === CareJournal"
+        :key="selected.id"
+        :kind="journalKind"
+      />
+      <component
+        :is="selected.component"
+        v-else
+      />
     </template>
   </div>
 </template>
 
 <style>
 .pregnancy-tabs {
+  flex-wrap: wrap;
   display: flex;
   gap: 6px;
   padding: 6px;
@@ -82,7 +97,7 @@ const selected = computed(() => tabs.find((item) => item.id === route.query.tab)
 }
 
 .pregnancy-tabs a {
-  flex: 1;
+  flex: 1 0 100px;
   text-align: center;
   padding: 14px 6px;
   border-radius: 9px;

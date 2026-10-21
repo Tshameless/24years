@@ -41,6 +41,9 @@ export interface FamilyData {
 }
 
 export type PregnancyRecord =
+  | { id: string; type: 'bonding'; date: string; title: string; minutes: number; notes: string }
+  | { id: string; type: 'mood'; date: string; title: string; notes: string }
+  | { id: string; type: 'packing'; date: string; title: string; completed: boolean; notes: string }
   | { id: string; type: 'checkup'; title: string; date: string; notes: string; completed: boolean }
   | {
       id: string;
@@ -78,6 +81,27 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
   const positive = (n: unknown, max: number) =>
     typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= max;
   switch (value.type) {
+    case 'bonding':
+      return (
+        isDate(value.date) &&
+        shortText(value.title, 80) &&
+        note(value.notes) &&
+        Number.isInteger(value.minutes) &&
+        positive(value.minutes, 1440)
+      );
+    case 'mood':
+      return (
+        isDate(value.date) &&
+        ['愉悦', '平静', '烦躁', '低落', '疲惫'].includes(String(value.title)) &&
+        note(value.notes)
+      );
+    case 'packing':
+      return (
+        isDate(value.date) &&
+        shortText(value.title, 80) &&
+        typeof value.completed === 'boolean' &&
+        note(value.notes)
+      );
     case 'checkup':
       return (
         shortText(value.title, 80) &&
