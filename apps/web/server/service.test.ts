@@ -56,6 +56,35 @@ const task = (title: string): FamilyTask => ({
 const failsWith = (status: number) => (error: unknown) =>
   error instanceof ApiError && error.status === status;
 
+test('每周计划服务端校验、共享读取与周期修改保留历史', async () => {
+  const f = await fixture();
+
+  try {
+    const weekly: FamilyTask = { ...task('每周计划'), repeat: 'weekly', weekdays: [1, 3, 5] };
+    f.change(f.owner, 'task', weekly, null);
+    assert.deepEqual(f.service.snapshot(f.owner).family!.data.tasks[0], weekly);
+    const code = f.manage('invite').invitation!.code;
+    f.service.mutate(f.partner, 'join', { code, familyRole: 'father' });
+    assert.deepEqual(f.service.snapshot(f.partner).family!.data.tasks[0], weekly);
+    for (const weekdays of [[], [0], [8], [1, 1], ['3']]) {
+      assert.throws(
+        () => f.change(f.owner, 'task', { ...weekly, weekdays }, weekly),
+        failsWith(400),
+      );
+    }
+    const completed = { ...weekly, completedDates: ['2026-10-09'] };
+    f.change(f.owner, 'task', completed, weekly);
+    const { weekdays: _weekdays, ...rest } = completed;
+    assert.deepEqual(_weekdays, [1, 3, 5]);
+    f.change(f.owner, 'task', { ...rest, repeat: 'daily' }, completed);
+    assert.deepEqual(f.service.snapshot(f.owner).family!.data.tasks[0]!.completedDates, [
+      '2026-10-09',
+    ]);
+  } finally {
+    f.db.close();
+  }
+});
+
 test('建档保存家庭类型和父母身份，身份不改变权限且错误加入不消耗邀请', async () => {
   const f = await fixture();
 

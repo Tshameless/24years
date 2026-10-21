@@ -110,6 +110,11 @@ test('两个独立浏览器配对，共同编辑与权限变更实时同步', as
     await page.goto('/family');
     await page.getByLabel('小树的权限').selectOption('viewer');
     await expect(partner.getByRole('button', { name: '保存账目', exact: true })).toBeDisabled();
+    await expect(partner.getByTestId('filtered-net')).toHaveText('¥80.05');
+    partner.once('dialog', (dialog) => dialog.accept());
+    const viewerDownload = partner.waitForEvent('download');
+    await partner.getByRole('button', { name: '导出当前筛选 CSV' }).click();
+    expect((await viewerDownload).suggestedFilename()).toBe('24years-ledger-all-全部.csv');
     await page.getByLabel('小树的权限').selectOption('editor');
     await expect(partner.getByRole('button', { name: '保存账目', exact: true })).toBeEnabled();
     page.once('dialog', (dialog) => dialog.accept());

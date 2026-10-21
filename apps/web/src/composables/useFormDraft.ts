@@ -21,6 +21,8 @@ export function useFormDraft<T extends Record<string, string>>(options: {
   scope: () => string;
   name: string;
   baseline?: unknown;
+  /** Newly added string fields may use their initial defaults in older drafts. */
+  optionalFields?: readonly (keyof T)[];
 }) {
   const router = useRouter();
   const initial = JSON.stringify(options.form);
@@ -48,8 +50,14 @@ export function useFormDraft<T extends Record<string, string>>(options: {
         !saved.id ||
         typeof saved.baseline !== 'string' ||
         !saved.form ||
-        Object.keys(saved.form).length !== fields.length ||
-        !fields.every((field) => typeof saved.form[field] === 'string')
+        typeof saved.form !== 'object' ||
+        Array.isArray(saved.form) ||
+        Object.keys(saved.form).some((field) => !fields.includes(field)) ||
+        !fields.every(
+          (field) =>
+            typeof saved.form[field] === 'string' ||
+            (saved.form[field] === undefined && options.optionalFields?.includes(field)),
+        )
       ) {
         throw new Error('Invalid draft');
       }

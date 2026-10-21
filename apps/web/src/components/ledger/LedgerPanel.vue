@@ -4,9 +4,13 @@ import { useFamily } from '@/composables/useFamily';
 import { currency, expenseCategories, summarizeExpenses, type Expense } from '@/domain/family';
 import ExpenseForm from './ExpenseForm.vue';
 import ExpenseList from './ExpenseList.vue';
+import LedgerReport from './LedgerReport.vue';
+import { filterLedger, type LedgerCategory } from '@/domain/ledgerReport';
 
-const { data, removeExpense, locked } = useFamily();
-const filter = shallowRef('全部');
+const { data, removeExpense, locked, today } = useFamily();
+const filter = shallowRef<LedgerCategory>('全部');
+const month = shallowRef('');
+const categories: LedgerCategory[] = ['全部', ...expenseCategories, '津贴'];
 const notice = shallowRef('');
 const editing = shallowRef<Expense>();
 
@@ -18,17 +22,7 @@ function edit(id: string) {
 
 const totals = computed(() => summarizeExpenses(data.value.expenses));
 
-const visible = computed(() =>
-  data.value.expenses
-    .filter(
-      (item) =>
-        filter.value === '全部' ||
-        (filter.value === '津贴'
-          ? item.kind === 'allowance'
-          : item.kind === 'expense' && item.category === filter.value),
-    )
-    .sort((a, b) => b.date.localeCompare(a.date)),
-);
+const visible = computed(() => filterLedger(data.value.expenses, month.value, filter.value));
 
 async function confirmRemove(id: string) {
   if (window.confirm('确定删除这笔账目？此操作无法撤销。') && (await removeExpense(id))) {
@@ -75,12 +69,39 @@ async function confirmRemove(id: string) {
         <h2>收支明细</h2>
         <span class="tag">{{ visible.length }} 笔记录</span>
       </div>
+      <div class="month-filters">
+        <label class="field">
+          账目月份
+          <input
+            v-model="month"
+            type="month"
+          />
+          <small>留空显示全部月份</small>
+        </label>
+        <button
+          type="button"
+          class="text-button"
+          @click="month = today.slice(0, 7)"
+        >
+          本月
+        </button>
+        <button
+          type="button"
+          class="text-button"
+          @click="
+            month = '';
+            filter = '全部';
+          "
+        >
+          重置筛选
+        </button>
+      </div>
       <div
         class="category-filters"
         aria-label="账目分类"
       >
         <button
-          v-for="category in ['全部', ...expenseCategories, '津贴']"
+          v-for="category in categories"
           :key="category"
           :aria-pressed="filter === category"
           :class="{ selected: filter === category }"
@@ -89,6 +110,11 @@ async function confirmRemove(id: string) {
           {{ category }}
         </button>
       </div>
+      <LedgerReport
+        :expenses="visible"
+        :month="month"
+        :category="filter"
+      />
       <ExpenseList
         :expenses="visible"
         :disabled="locked"
@@ -103,7 +129,7 @@ async function confirmRemove(id: string) {
         {{ notice }}
       </p>
       <p class="ledger-footnote">
-        汇总展示全部账目，不受分类筛选影响。净支出可为负值，表示到账津贴大于当前自付支出。
+        顶部累计汇总展示全部账目，不受月份与分类筛选影响。筛选汇总与下方明细一致；净支出允许为负值。
       </p>
     </section>
     <section class="panel">
@@ -125,6 +151,18 @@ async function confirmRemove(id: string) {
 </template>
 
 <style scoped>
+.month-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.month-filters .field {
+  flex: 1 1 180px;
+}
+
 .ledger-summary {
   display: flex;
   align-items: center;

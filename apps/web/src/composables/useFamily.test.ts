@@ -38,6 +38,23 @@ const profile = {
 };
 
 describe('本地存档', () => {
+  it('每周计划只允许当日符合规则时打卡，修改周期保留历史并能刷新恢复', async () => {
+    const store = setup();
+    const id = crypto.randomUUID();
+    await store.addTask(
+      { title: '每周整理', date: '2026-10-21', time: '09:00', repeat: 'weekly', weekdays: [3, 5] },
+      id,
+    );
+    expect(await store.toggleTask(id, '2026-10-22')).toBe(false);
+    expect(await store.toggleTask(id, '2026-10-21')).toBe(true);
+    const stored = store.data.value.tasks[0]!;
+    const before = { ...stored, completedDates: [...stored.completedDates] };
+    const { weekdays: _weekdays, ...rest } = before;
+    expect(_weekdays).toEqual([3, 5]);
+    await store.updateTask({ ...rest, repeat: 'daily' }, before);
+    expect(setup().data.value.tasks[0]!.completedDates).toEqual(['2026-10-21']);
+    expect(await store.toggleTask(id, '2026-10-22')).toBe(true);
+  });
   it('产检完成和费用在本机写入失败时一起回滚，重试可以恢复', () => {
     const store = setup();
     const before = {

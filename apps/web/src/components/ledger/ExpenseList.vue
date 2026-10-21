@@ -79,7 +79,7 @@ defineEmits<{ remove: [id: string]; edit: [id: string] }>();
       />
     </span>
     <h3>让每一笔支出，都心中有数</h3>
-    <p>这个分类还没有账目，从第一笔真实记录开始。</p>
+    <p>当前筛选没有账目，可以调整月份或分类，也可以添加真实记录。</p>
   </div>
 </template>
 

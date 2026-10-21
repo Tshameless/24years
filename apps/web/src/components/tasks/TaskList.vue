@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { FamilyTask } from '@/domain/family';
-import { taskIsDue } from '@/domain/family';
+import { taskIsDue, taskScheduleLabel } from '@/domain/family';
 import AppIcon from '@/components/AppIcon.vue';
 
 defineProps<{
@@ -46,7 +46,7 @@ defineEmits<{ toggle: [id: string]; remove: [id: string]; edit: [id: string] }>(
       <div class="task-content">
         <strong>{{ task.title }}</strong>
         <small>
-          {{ task.repeat === 'daily' ? `每日 · 始于 ${task.date}` : task.date }}
+          {{ taskScheduleLabel(task) }}
           <span v-if="!taskIsDue(task, date)">· 非今日计划</span>
         </small>
       </div>

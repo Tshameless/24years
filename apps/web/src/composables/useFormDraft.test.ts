@@ -9,13 +9,23 @@ const router = vi.hoisted(() => ({
 vi.mock('vue-router', () => ({ useRouter: () => router }));
 const wrappers: ReturnType<typeof mount>[] = [];
 
-function setup(scope = shallowRef('local'), baseline?: unknown) {
-  const form = reactive({ title: '', amount: '' });
+function setup(
+  scope = shallowRef('local'),
+  baseline?: unknown,
+  extraFields: Record<string, string> = {},
+) {
+  const form = reactive<Record<string, string>>({ title: '', amount: '', ...extraFields });
   let draft!: ReturnType<typeof useFormDraft>;
   const wrapper = mount(
     defineComponent({
       setup() {
-        draft = useFormDraft({ form, scope: () => scope.value, name: 'expense:new', baseline });
+        draft = useFormDraft({
+          form,
+          scope: () => scope.value,
+          name: 'expense:new',
+          baseline,
+          optionalFields: Object.keys(extraFields),
+        });
 
         return () => null;
       },
@@ -52,6 +62,18 @@ it('restores incomplete input and stable record id without submitting it', () =>
   expect(sessionStorage.length).toBe(0);
   expect(second.draft.dirty.value).toBe(false);
   expect(second.draft.id.value).not.toBe(id);
+});
+
+it('旧草稿可补新增可选字段，原有输入与编号保持不变', () => {
+  const old = setup();
+  old.form.title = '旧计划草稿';
+  const id = old.draft.id.value;
+  old.wrapper.unmount();
+  const { form, draft } = setup(undefined, undefined, { weekdays: '' });
+  expect(form.title).toBe('旧计划草稿');
+  expect(form.weekdays).toBe('');
+  expect(draft.id.value).toBe(id);
+  expect(draft.storageError.value).toBe('');
 });
 
 it('isolates identities and stops old forms writing after a scope change', () => {
