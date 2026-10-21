@@ -14,17 +14,45 @@ import CareJournal from '@/components/pregnancy/CareJournal.vue';
 
 const { data, locked, cloud } = useFamily();
 const route = useRoute();
-const tabs = [
-  { id: 'bonding', label: '胎教陪伴', component: BondingPanel },
-  { id: 'mood', label: '心情日记', component: CareJournal },
-  { id: 'packing', label: '待产清单', component: PackingPanel },
-  { id: 'checkups', label: '产检安排', component: CheckupsPanel },
-  { id: 'vitals', label: '体征记录', component: VitalsPanel },
-  { id: 'movements', label: '胎动记录', component: MovementsPanel },
-  { id: 'contractions', label: '宫缩计时', component: ContractionsPanel },
-  { id: 'medical', label: '就医卡', component: MedicalCardPanel },
+
+const tabGroups = [
+  {
+    id: 'daily',
+    label: '日常陪伴',
+    description: '记录今天的感受与身体变化。',
+    tabs: [
+      { id: 'bonding', label: '胎教陪伴', component: BondingPanel },
+      { id: 'mood', label: '心情日记', component: CareJournal },
+      { id: 'movements', label: '胎动记录', component: MovementsPanel },
+    ],
+  },
+  {
+    id: 'health',
+    label: '产检与健康',
+    description: '按医生建议安排检查，留下身体记录。',
+    tabs: [
+      { id: 'checkups', label: '产检安排', component: CheckupsPanel },
+      { id: 'vitals', label: '体征记录', component: VitalsPanel },
+    ],
+  },
+  {
+    id: 'preparation',
+    label: '待产与应急',
+    description: '提前准备物品，需要时快速找到重要信息。',
+    tabs: [
+      { id: 'packing', label: '待产清单', component: PackingPanel },
+      { id: 'contractions', label: '宫缩计时', component: ContractionsPanel },
+      { id: 'medical', label: '就医卡', component: MedicalCardPanel },
+    ],
+  },
 ];
-const selected = computed(() => tabs.find((item) => item.id === route.query.tab) ?? tabs[3]);
+
+const tabs = computed(() => tabGroups.flatMap((group) => group.tabs));
+const selected = computed(
+  () =>
+    tabs.value.find((item) => item.id === route.query.tab) ??
+    tabs.value.find((item) => item.id === 'checkups')!,
+);
 </script>
 
 <template>
@@ -61,19 +89,31 @@ const selected = computed(() => tabs.find((item) => item.id === route.query.tab)
         }}
       </p>
       <nav
-        class="pregnancy-tabs"
-        aria-label="孕期记录分类"
+        class="pregnancy-groups"
+        aria-label="孕期记录类型"
       >
-        <RouterLink
-          v-for="item in tabs"
-          :key="item.id"
-          :to="{ path: '/pregnancy', query: { tab: item.id } }"
-          class="pregnancy-tab"
-          :class="{ selected: selected.id === item.id }"
-          :aria-current="selected.id === item.id ? 'page' : undefined"
+        <section
+          v-for="group in tabGroups"
+          :key="group.id"
+          class="pregnancy-group"
         >
-          {{ item.label }}
-        </RouterLink>
+          <div class="pregnancy-group-heading">
+            <h2>{{ group.label }}</h2>
+            <p>{{ group.description }}</p>
+          </div>
+          <div class="pregnancy-group-tabs">
+            <RouterLink
+              v-for="item in group.tabs"
+              :key="item.id"
+              :to="{ path: '/pregnancy', query: { tab: item.id } }"
+              class="pregnancy-tab"
+              :class="{ selected: selected.id === item.id }"
+              :aria-current="selected.id === item.id ? 'page' : undefined"
+            >
+              {{ item.label }}
+            </RouterLink>
+          </div>
+        </section>
       </nav>
       <CareJournal
         v-if="selected.component === CareJournal"
@@ -89,23 +129,59 @@ const selected = computed(() => tabs.find((item) => item.id === route.query.tab)
 </template>
 
 <style scoped>
-.pregnancy-tabs {
-  flex-wrap: wrap;
-  display: flex;
-  gap: 6px;
-  padding: 6px;
+.pregnancy-groups {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
   border: 1px solid var(--border);
   background: var(--surface);
   border-radius: 14px;
   margin-bottom: 24px;
 }
 
+.pregnancy-group {
+  display: grid;
+  grid-template-columns: minmax(145px, 0.7fr) minmax(0, 1.8fr);
+  gap: 14px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.pregnancy-group + .pregnancy-group {
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.pregnancy-group-heading h2 {
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.pregnancy-group-heading p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.pregnancy-group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .pregnancy-tab {
-  flex: 1 0 100px;
+  flex: 1 0 110px;
   text-align: center;
-  padding: 14px 6px;
+  padding: 12px 8px;
   border-radius: 9px;
   font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.pregnancy-tab:hover {
+  background: var(--canvas);
 }
 
 .pregnancy-tab.selected {
@@ -114,8 +190,16 @@ const selected = computed(() => tabs.find((item) => item.id === route.query.tab)
   font-weight: 600;
 }
 
+@media (max-width: 600px) {
+  .pregnancy-group {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
 @media (max-width: 480px) {
   .pregnancy-tab {
+    flex-basis: 95px;
     font-size: 13px;
   }
 }

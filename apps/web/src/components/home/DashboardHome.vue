@@ -4,6 +4,7 @@ import { useFamily } from '@/composables/useFamily';
 import { currency, summarizeExpenses, type PregnancyRecord } from '@/domain/family';
 import AppIcon from '@/components/AppIcon.vue';
 import JourneyCard from './JourneyCard.vue';
+import GettingStarted from './GettingStarted.vue';
 import TaskList from '@/components/tasks/TaskList.vue';
 
 const { data, today, todayTasks, toggleTask, locked, cloud, familyMode } = useFamily();
@@ -63,6 +64,7 @@ const dateLabel = computed(() =>
     </header>
     <div class="dashboard-grid">
       <div class="dashboard-main">
+        <GettingStarted />
         <JourneyCard
           :profile="data.profile"
           :today="today"
