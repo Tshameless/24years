@@ -75,6 +75,15 @@ export type PregnancyRecord =
   | { id: string; type: 'contraction'; startedAt: number; endedAt: number | null }
   | {
       id: string;
+      type: 'movement';
+      date: string;
+      time: string;
+      minutes: number;
+      count: number;
+      notes: string;
+    }
+  | {
+      id: string;
       type: 'medical';
       hospital: string;
       contact: string;
@@ -144,6 +153,19 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
           (value.metric === 'bloodPressure' &&
             positive(value.value, 400) &&
             positive(value.secondary, 400)))
+      );
+    case 'movement':
+      return (
+        isDate(value.date) &&
+        typeof value.time === 'string' &&
+        /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time) &&
+        Number.isInteger(value.minutes) &&
+        positive(value.minutes, 1440) &&
+        Number.isInteger(value.count) &&
+        typeof value.count === 'number' &&
+        value.count >= 0 &&
+        value.count <= 9999 &&
+        note(value.notes)
       );
     case 'contraction':
       return (

@@ -170,6 +170,15 @@ test('孕期协作支持幂等原子入账、冲突回滚、只读权限和备�
         completed: false,
         notes: '玄关',
       },
+      {
+        id: 'movement',
+        type: 'movement',
+        date: before.date,
+        time: '09:30',
+        minutes: 30,
+        count: 0,
+        notes: '观察记录',
+      },
     ];
     for (const value of care) {
       write(partner, { type: 'pregnancy', before: null, value });
@@ -179,6 +188,24 @@ test('孕期协作支持幂等原子入账、冲突回滚、只读权限和备�
       );
       assert.throws(() => write(owner, { type: 'pregnancy', before: null, value }), fail(409));
     }
+    const movement = care.find((item) => item.type === 'movement')!;
+
+    if (movement.type === 'movement') {
+      for (const patch of [{ count: -1 }, { count: 1.5 }, { minutes: 0 }, { time: '24:00' }]) {
+        assert.throws(
+          () =>
+            write(owner, { type: 'pregnancy', before: movement, value: { ...movement, ...patch } }),
+          fail(400),
+        );
+      }
+      assert.deepEqual(
+        service
+          .snapshot(partner)
+          .family!.data.pregnancyRecords!.find((item) => item.id === movement.id),
+        movement,
+      );
+    }
+
     assert.throws(() =>
       decodeFamily(
         JSON.stringify({ ...emptyFamily(), pregnancyRecords: [{ ...care[0], minutes: -1 }] }),

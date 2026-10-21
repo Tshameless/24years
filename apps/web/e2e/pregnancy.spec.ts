@@ -47,8 +47,32 @@ test('孕期记录双端同步，草稿冲突保留输入，只读成员不能�
     await expect(page.getByText(/这条产检已变化/)).toBeVisible();
     await expect(page.getByLabel('产检备注')).toHaveValue('保留我的草稿');
     await expect(page.getByRole('button', { name: '保存产检修改' })).toBeDisabled();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('link', { name: '胎动记录', exact: true }).click();
+    await page.getByLabel('观察开始时间').fill('09:30');
+    await page.getByLabel('实际观察时长（分钟）').fill('30');
+    await page.getByRole('button', { name: '记录一次胎动 +1', exact: true }).click();
+    await page.getByRole('button', { name: '保存胎动观察' }).click();
+    await partner.getByRole('link', { name: '胎动记录', exact: true }).click();
+    await expect(partner.locator('.record-list')).toContainText('1 次');
+    await page.locator('.record-list').getByRole('button', { name: '编辑', exact: true }).click();
+    await page.getByLabel('观察备注').fill('未提交修改');
+    await partner
+      .locator('.record-list')
+      .getByRole('button', { name: '编辑', exact: true })
+      .click();
+    await partner.getByLabel('本次记录次数').fill('2');
+    await partner.getByRole('button', { name: '保存胎动修改' }).click();
+    await expect(page.getByRole('button', { name: '保存胎动修改' })).toBeDisabled();
+    await expect(page.getByLabel('观察备注')).toHaveValue('未提交修改');
+    page.once('dialog', (dialog) => dialog.accept());
     await page.goto('/family');
     await page.getByLabel('小树的权限').selectOption('viewer');
+    await expect(partner.getByRole('button', { name: '保存胎动观察' })).toBeDisabled();
+    await expect(
+      partner.getByRole('button', { name: '记录一次胎动 +1', exact: true }),
+    ).toBeDisabled();
+    await partner.getByRole('link', { name: '产检安排', exact: true }).click();
     await expect(partner.getByRole('button', { name: '保存产检安排' })).toBeDisabled();
     await partner.getByRole('link', { name: '就医卡', exact: true }).click();
     await expect(partner.getByRole('button', { name: '保存就医卡' })).toBeDisabled();

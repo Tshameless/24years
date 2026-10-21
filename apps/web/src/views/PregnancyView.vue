@@ -8,6 +8,7 @@ import ContractionsPanel from '@/components/pregnancy/ContractionsPanel.vue';
 import MedicalCardPanel from '@/components/pregnancy/MedicalCardPanel.vue';
 import BondingPanel from '@/components/pregnancy/BondingPanel.vue';
 import PackingPanel from '@/components/pregnancy/PackingPanel.vue';
+import MovementsPanel from '@/components/pregnancy/MovementsPanel.vue';
 import '@/assets/pregnancy.css';
 import CareJournal from '@/components/pregnancy/CareJournal.vue';
 
@@ -19,6 +20,7 @@ const tabs = [
   { id: 'packing', label: '待产清单', component: PackingPanel },
   { id: 'checkups', label: '产检安排', component: CheckupsPanel },
   { id: 'vitals', label: '体征记录', component: VitalsPanel },
+  { id: 'movements', label: '胎动记录', component: MovementsPanel },
   { id: 'contractions', label: '宫缩计时', component: ContractionsPanel },
   { id: 'medical', label: '就医卡', component: MedicalCardPanel },
 ];

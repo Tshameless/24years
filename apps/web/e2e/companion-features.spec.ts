@@ -2,6 +2,64 @@ import { expect, test } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+test('胎动计数草稿刷新、纠错、编辑和零次数记录', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (['error', 'warning'].includes(message.type())) {
+      errors.push(message.text());
+    }
+  });
+  page.on('dialog', (dialog) => dialog.accept());
+  await page.goto('/pregnancy?tab=movements');
+  await expect(page).toHaveTitle(/24Years/);
+  await expect(page.getByRole('heading', { name: '胎动观察历史' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '误点减一' })).toBeDisabled();
+  for (let count = 0; count < 3; count += 1) {
+    await page.getByRole('button', { name: '记录一次胎动 +1', exact: true }).click();
+  }
+  await expect(page.getByLabel('本次记录次数')).toHaveValue('3');
+  await page.getByRole('button', { name: '误点减一' }).click();
+  await expect(page.getByLabel('本次记录次数')).toHaveValue('2');
+  await page.getByLabel('观察开始时间').fill('09:30');
+  await page.getByLabel('实际观察时长（分钟）').fill('30');
+  await page.getByLabel('观察备注').fill('本次观察');
+  await page.reload();
+  await expect(page.getByLabel('本次记录次数')).toHaveValue('2');
+  await expect(page.getByLabel('观察开始时间')).toHaveValue('09:30');
+  await expect(page.getByText('已恢复未提交草稿。', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: '保存胎动观察', exact: true }).click();
+  await expect(page.locator('.record-list')).toContainText('2 次');
+  await page.reload();
+  await page.locator('.record-list').getByRole('button', { name: '编辑', exact: true }).click();
+  await page.getByLabel('本次记录次数').fill('0');
+  await page.reload();
+  await expect(page.getByLabel('本次记录次数')).toHaveValue('0');
+  await page.getByRole('button', { name: '保存胎动修改' }).click();
+  await expect(page.locator('.record-list')).toContainText('0 次');
+  await expect(page.locator('.record-list')).toContainText('观察时长：30 分钟');
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('24years.family.v1')!).pregnancyRecords,
+  );
+  expect(saved).toHaveLength(1);
+  expect(saved[0]).toMatchObject({
+    type: 'movement',
+    count: 0,
+    minutes: 30,
+    time: '09:30',
+    notes: '本次观察',
+  });
+  await page.screenshot({
+    path: join(tmpdir(), `24years-movements-${testInfo.project.name}.png`),
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.locator('vite-error-overlay').count()).toBe(0);
+  await page.locator('.record-list').getByRole('button', { name: '删除', exact: true }).click();
+  await expect(page.getByText('暂无胎动观察记录。', { exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('体征时间场景兼容旧草稿，支持刷新、编辑和清空', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
