@@ -342,7 +342,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     canManage,
     profileLocked,
     familyMode,
-    localProfile: computed(() => localData.value.profile),
+    localProfile: readonly(computed(() => localData.value.profile)),
     identity,
     saveProfile,
     addTask,

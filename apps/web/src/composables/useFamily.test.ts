@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { defineComponent } from 'vue';
+import { defineComponent, isReadonly } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BEFORE_IMPORT_KEY, createFamilyStore, STORAGE_KEY, type FamilyStore } from './useFamily';
 import { emptyFamily } from '@/domain/family';
@@ -38,6 +38,12 @@ const profile = {
 };
 
 describe('本地存档', () => {
+  it('本机档案对消费者深度只读', async () => {
+    const store = setup();
+    await store.saveProfile(profile);
+    expect(isReadonly(store.localProfile)).toBe(true);
+    expect(isReadonly(store.localProfile.value)).toBe(true);
+  });
   it('每周计划只允许当日符合规则时打卡，修改周期保留历史并能刷新恢复', async () => {
     const store = setup();
     const id = crypto.randomUUID();

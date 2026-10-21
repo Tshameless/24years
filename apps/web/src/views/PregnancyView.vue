@@ -7,6 +7,8 @@ import VitalsPanel from '@/components/pregnancy/VitalsPanel.vue';
 import ContractionsPanel from '@/components/pregnancy/ContractionsPanel.vue';
 import MedicalCardPanel from '@/components/pregnancy/MedicalCardPanel.vue';
 import BondingPanel from '@/components/pregnancy/BondingPanel.vue';
+import PackingPanel from '@/components/pregnancy/PackingPanel.vue';
+import '@/assets/pregnancy.css';
 import CareJournal from '@/components/pregnancy/CareJournal.vue';
 
 const { data, locked, cloud } = useFamily();
@@ -14,14 +16,13 @@ const route = useRoute();
 const tabs = [
   { id: 'bonding', label: '胎教陪伴', component: BondingPanel },
   { id: 'mood', label: '心情日记', component: CareJournal },
-  { id: 'packing', label: '待产清单', component: CareJournal },
+  { id: 'packing', label: '待产清单', component: PackingPanel },
   { id: 'checkups', label: '产检安排', component: CheckupsPanel },
   { id: 'vitals', label: '体征记录', component: VitalsPanel },
   { id: 'contractions', label: '宫缩计时', component: ContractionsPanel },
   { id: 'medical', label: '就医卡', component: MedicalCardPanel },
 ];
 const selected = computed(() => tabs.find((item) => item.id === route.query.tab) ?? tabs[3]);
-const journalKind = computed(() => (selected.value.id === 'mood' ? 'mood' : 'packing'));
 </script>
 
 <template>
@@ -65,6 +66,7 @@ const journalKind = computed(() => (selected.value.id === 'mood' ? 'mood' : 'pac
           v-for="item in tabs"
           :key="item.id"
           :to="{ path: '/pregnancy', query: { tab: item.id } }"
+          class="pregnancy-tab"
           :class="{ selected: selected.id === item.id }"
           :aria-current="selected.id === item.id ? 'page' : undefined"
         >
@@ -74,7 +76,7 @@ const journalKind = computed(() => (selected.value.id === 'mood' ? 'mood' : 'pac
       <CareJournal
         v-if="selected.component === CareJournal"
         :key="selected.id"
-        :kind="journalKind"
+        kind="mood"
       />
       <component
         :is="selected.component"
@@ -84,7 +86,7 @@ const journalKind = computed(() => (selected.value.id === 'mood' ? 'mood' : 'pac
   </div>
 </template>
 
-<style>
+<style scoped>
 .pregnancy-tabs {
   flex-wrap: wrap;
   display: flex;
@@ -96,7 +98,7 @@ const journalKind = computed(() => (selected.value.id === 'mood' ? 'mood' : 'pac
   margin-bottom: 24px;
 }
 
-.pregnancy-tabs a {
+.pregnancy-tab {
   flex: 1 0 100px;
   text-align: center;
   padding: 14px 6px;
@@ -104,116 +106,15 @@ const journalKind = computed(() => (selected.value.id === 'mood' ? 'mood' : 'pac
   font-size: 14px;
 }
 
-.pregnancy-tabs a.selected {
+.pregnancy-tab.selected {
   background: var(--green-light);
   color: var(--green);
   font-weight: 600;
 }
 
-.pregnancy-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: 22px;
-  align-items: start;
-}
-
-.record-fields {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  min-width: 0;
-  display: grid;
-  gap: 18px;
-}
-
-.record-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.record-list li {
-  padding: 20px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.record-list li:first-child {
-  padding-top: 0;
-}
-
-.record-list li:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.record-heading {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 12px;
-  overflow-wrap: anywhere;
-}
-
-.record-heading strong {
-  min-width: 0;
-  font-size: 15px;
-  line-height: 1.8;
-}
-
-.record-heading .tag {
-  flex-shrink: 0;
-}
-
-.record-list .muted {
-  margin: 10px 0;
-  font-size: 13px;
-}
-
-.record-notes {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: 14px;
-  line-height: 1.8;
-}
-
-.record-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin-top: 14px;
-}
-
-.check-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-}
-
-.check-option input {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--green);
-}
-
-.pregnancy-columns .muted {
-  font-size: 13px;
-  line-height: 1.9;
-}
-
-@media (max-width: 980px) {
-  .pregnancy-columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 @media (max-width: 480px) {
-  .pregnancy-tabs a {
+  .pregnancy-tab {
     font-size: 13px;
-  }
-
-  .pregnancy-columns .panel {
-    padding: 20px;
   }
 }
 </style>

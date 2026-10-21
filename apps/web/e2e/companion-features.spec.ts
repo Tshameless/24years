@@ -2,6 +2,91 @@ import { expect, test } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+test('待产分工字段与编辑草稿刷新恢复，备齐费用只入账一次', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => {
+    if (['error', 'warning'].includes(m.type())) {
+      errors.push(m.text());
+    }
+  });
+  page.on('dialog', (dialog) => dialog.accept());
+  await page.goto('/pregnancy?tab=packing');
+  await expect(page).toHaveTitle(/24Years/);
+  await page.getByLabel('物品名称').fill('出院用品');
+  await page.getByLabel('物品分类（可选）').fill('宝宝用品');
+  await page.getByLabel('物品数量（可选）').fill('3');
+  await page.getByLabel('负责人', { exact: true }).selectOption('single_parent');
+  await page.reload();
+  await expect(page.getByLabel('物品数量（可选）')).toHaveValue('3');
+  await expect(page.getByText('已恢复未提交草稿。', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: '保存待产清单' }).click();
+  await expect(page.locator('.record-list')).toContainText('数量：3 · 负责人：本人');
+  await page.locator('.record-list').getByRole('button', { name: '编辑', exact: true }).click();
+  await page.getByLabel('已经备齐').check();
+  await page.getByLabel('采购金额（元，可留空）').fill('12.34');
+  await page.reload();
+  await expect(page.getByLabel('已经备齐')).toBeChecked();
+  await expect(page.getByLabel('采购金额（元，可留空）')).toHaveValue('12.34');
+  await page.getByRole('button', { name: '保存待产清单' }).click();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('24years.family.v1')!));
+  expect(saved.expenses).toHaveLength(1);
+  expect(saved.expenses[0].amountCents).toBe(1234);
+  expect(saved.pregnancyRecords[0]).toMatchObject({
+    category: '宝宝用品',
+    quantity: 3,
+    assignee: 'single_parent',
+    completed: true,
+  });
+  await page.screenshot({
+    path: join(tmpdir(), '24years-packing-refactor-' + testInfo.project.name + '.png'),
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.locator('vite-error-overlay').count()).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('孕期各类草稿恢复，不把暂存输入当成已保存记录', async ({ page }) => {
+  page.on('dialog', (dialog) => dialog.accept());
+  for (const [tab, label, value, save] of [
+    ['checkups', '产检名称', '复诊草稿', '保存产检安排'],
+    ['vitals', '体重（kg）', '62.5', '保存体征'],
+    ['mood', '记录备注', '心情草稿', '保存心情日记'],
+    ['bonding', '陪伴内容', '读诗草稿', '保存陪伴记录'],
+    ['medical', '就诊医院', '就医卡草稿', '保存就医卡'],
+  ]) {
+    await page.goto('/pregnancy?tab=' + tab);
+    await page.getByLabel(label!, { exact: true }).fill(value!);
+    await page.reload();
+    await expect(page.getByLabel(label!, { exact: true })).toHaveValue(value!);
+    await expect(page.getByText('已恢复未提交草稿。', { exact: false })).toBeVisible();
+    await page.getByRole('button', { name: save!, exact: true }).click();
+    await expect(page.getByText('记录已保存。', { exact: true })).toBeVisible();
+    await expect(page.getByText('已恢复未提交草稿。', { exact: false })).toHaveCount(0);
+  }
+});
+
+test('恢复已冲突编辑草稿时保留内容并禁止覆盖', async ({ page }) => {
+  page.on('dialog', (dialog) => dialog.accept());
+  await page.goto('/pregnancy?tab=checkups');
+  await page.getByLabel('产检名称').fill('预约');
+  await page.getByRole('button', { name: '保存产检安排' }).click();
+  await page.getByRole('button', { name: '编辑 / 完成' }).click();
+  await page.getByLabel('产检备注').fill('我的未提交修改');
+  await page.evaluate(() => {
+    const data = JSON.parse(localStorage.getItem('24years.family.v1')!);
+    data.pregnancyRecords[0].notes = '另一处已更新';
+    localStorage.setItem('24years.family.v1', JSON.stringify(data));
+  });
+  await page.reload();
+  await expect(page.getByLabel('产检备注')).toHaveValue('我的未提交修改');
+  await expect(page.getByRole('button', { name: '保存产检修改' })).toBeDisabled();
+  await expect(page.getByText(/这条产检已变化/)).toBeVisible();
+  await page.getByRole('button', { name: '清除草稿' }).click();
+  await expect(page.getByRole('button', { name: '保存产检安排' })).toBeEnabled();
+});
+
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-21T20:00:00+08:00'));
   await page.addInitScript(() => {

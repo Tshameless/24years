@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { computed, reactive, shallowRef } from 'vue';
+import { computed, shallowRef } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { checkupTemplates } from '@/domain/preparationTemplates';
 import { isDate, localDate, parseMoney, type PregnancyRecord, type Expense } from '@/domain/family';
 
+import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
+import FormDraftNotice from '@/components/FormDraftNotice.vue';
+
 type Checkup = Extract<PregnancyRecord, { type: 'checkup' }>;
-const { records, disabled, message, error, save, remove } = usePregnancyRecords();
+const { records, disabled, message, error, reportError, save, remove } = usePregnancyRecords();
 const checkups = computed(() =>
   records.value
     .filter((item): item is Checkup => item.type === 'checkup')
     .sort((a, b) => Number(a.completed) - Number(b.completed) || a.date.localeCompare(b.date)),
 );
-const before = shallowRef<Checkup | null>(null);
+
 const template = shallowRef('');
 
 function applyTemplate() {
@@ -28,53 +31,41 @@ function applyTemplate() {
   Object.assign(form, selected);
 }
 
-let draftId = crypto.randomUUID();
-const form = reactive({
-  title: '',
-  date: localDate(),
-  notes: '',
-  completed: false,
-  amount: '',
-  reimbursed: '0',
-});
-const stale = computed(
-  () =>
-    before.value &&
-    JSON.stringify(records.value.find((item) => item.id === before.value?.id)) !==
-      JSON.stringify(before.value),
-);
-
-function reset() {
-  before.value = null;
-  draftId = crypto.randomUUID();
-  Object.assign(form, {
+const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
+  type: 'checkup',
+  defaults: () => ({
     title: '',
     date: localDate(),
     notes: '',
     completed: false,
     amount: '',
     reimbursed: '0',
-  });
-}
-
-function edit(item: Checkup) {
-  before.value = { ...item };
-  Object.assign(form, item, { amount: '', reimbursed: '0' });
-  error.value = '';
-  message.value = '';
-}
+  }),
+  fields: (item: Checkup) => ({
+    title: item.title,
+    date: item.date,
+    notes: item.notes,
+    completed: item.completed,
+    amount: '',
+    reimbursed: '0',
+  }),
+});
 
 async function submit() {
-  error.value = '';
+  if (disabled.value || stale.value) {
+    return;
+  }
+
+  reportError('');
 
   if (!form.title.trim() || !isDate(form.date)) {
-    error.value = '请填写产检名称和有效日期。';
+    reportError('请填写产检名称和有效日期。');
 
     return;
   }
 
   const value: Checkup = {
-    id: before.value?.id ?? draftId,
+    id: before.value?.id ?? draft.id.value,
     type: 'checkup',
     title: form.title.trim(),
     date: form.date,
@@ -90,7 +81,7 @@ async function submit() {
     !form.amount.trim() &&
     parseMoney(form.reimbursed) !== 0
   ) {
-    error.value = '填写报销金额时，请同时填写本次费用。';
+    reportError('填写报销金额时，请同时填写本次费用。');
 
     return;
   }
@@ -105,7 +96,7 @@ async function submit() {
       reimbursed > amount ||
       (amount === 0 && reimbursed !== 0)
     ) {
-      error.value = '费用最多两位小数，报销不能超过总额。';
+      reportError('费用最多两位小数，报销不能超过总额。');
 
       return;
     }
@@ -190,6 +181,13 @@ async function submit() {
         class="form-grid"
         @submit.prevent="submit"
       >
+        <FormDraftNotice
+          :dirty="draft.dirty.value"
+          :restored="draft.restored.value"
+          :error="draft.storageError.value"
+          :blocked="stale"
+          @discard="cancel"
+        />
         <fieldset
           :disabled="disabled || !!stale"
           class="record-fields"
@@ -294,7 +292,7 @@ async function submit() {
           type="button"
           class="button button-secondary"
           :disabled="disabled"
-          @click="reset"
+          @click="cancel"
         >
           取消编辑
         </button>

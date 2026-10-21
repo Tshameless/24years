@@ -5,6 +5,7 @@ import {
   emptyFamily,
   taskIsDue,
   validTask,
+  validPregnancyRecord,
   type FamilyTask,
   type PregnancyChange,
   type PregnancyRecord,
@@ -22,6 +23,33 @@ const task: FamilyTask = {
   assignee: 'father',
   completedDates: [],
 };
+
+it('待产独立字段校验且兼容旧存档', () => {
+  const legacy = {
+    id: 'bag',
+    type: 'packing',
+    date: '2026-10-21',
+    title: '资料袋',
+    notes: '',
+    completed: false,
+  };
+  expect(validPregnancyRecord(legacy)).toBe(true);
+  const record = { ...legacy, category: '证件', quantity: 2, assignee: 'father' };
+  expect(
+    decodeFamily(JSON.stringify({ ...emptyFamily(), pregnancyRecords: [record] })).pregnancyRecords,
+  ).toEqual([record]);
+  for (const invalid of [
+    { quantity: 0 },
+    { quantity: 1.5 },
+    { quantity: 10000 },
+    { quantity: '2' },
+    { category: '' },
+    { category: 'a'.repeat(31) },
+    { assignee: 'admin' },
+  ]) {
+    expect(validPregnancyRecord({ ...record, ...invalid })).toBe(false);
+  }
+});
 
 it('结束日期包含当天、阻止后续计划，旧计划不受影响', () => {
   expect(taskIsDue(task, '2026-10-23')).toBe(true);

@@ -16,7 +16,7 @@ export function clearFormDrafts() {
 }
 
 /** Tab-scoped form protection, never an offline submission queue. */
-export function useFormDraft<T extends Record<string, string>>(options: {
+export function useFormDraft<T extends Record<string, string | number | boolean>>(options: {
   form: T;
   scope: () => string;
   name: string;
@@ -55,7 +55,8 @@ export function useFormDraft<T extends Record<string, string>>(options: {
         Object.keys(saved.form).some((field) => !fields.includes(field)) ||
         !fields.every(
           (field) =>
-            typeof saved.form[field] === 'string' ||
+            (typeof saved.form[field] === typeof options.form[field] &&
+              (typeof saved.form[field] !== 'number' || Number.isFinite(saved.form[field]))) ||
             (saved.form[field] === undefined && options.optionalFields?.includes(field)),
         )
       ) {

@@ -1,33 +1,47 @@
 <script setup lang="ts">
-import { computed, reactive, shallowRef } from 'vue';
+import { computed } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import type { PregnancyRecord } from '@/domain/family';
 
+import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
+import FormDraftNotice from '@/components/FormDraftNotice.vue';
+
 type MedicalCard = Extract<PregnancyRecord, { type: 'medical' }>;
-const { store, records, disabled, message, error, save } = usePregnancyRecords();
+const { cloudActive, records, disabled, message, error, save } = usePregnancyRecords();
 const card = computed(
   () => records.value.find((item): item is MedicalCard => item.type === 'medical') ?? null,
 );
-const before = shallowRef<MedicalCard | null>(card.value ? { ...card.value } : null);
-const form = reactive({
-  hospital: before.value?.hospital ?? '',
-  contact: before.value?.contact ?? '',
-  phone: before.value?.phone ?? '',
-  notes: before.value?.notes ?? '',
+const { form, before, stale, draft, reset, edit } = usePregnancyDraft({
+  type: 'medical',
+  initial: card.value,
+  defaults: () => ({ hospital: '', contact: '', phone: '', notes: '' }),
+  fields: (item: MedicalCard) => ({
+    hospital: item.hospital,
+    contact: item.contact,
+    phone: item.phone,
+    notes: item.notes,
+  }),
 });
-const stale = computed(() => JSON.stringify(card.value) !== JSON.stringify(before.value));
+
+function cancel() {
+  if (draft.confirmDiscard()) {
+    reset(card.value);
+  }
+}
 
 function reload() {
-  before.value = card.value ? { ...card.value } : null;
-  Object.assign(form, {
-    hospital: before.value?.hospital ?? '',
-    contact: before.value?.contact ?? '',
-    phone: before.value?.phone ?? '',
-    notes: before.value?.notes ?? '',
-  });
+  if (card.value) {
+    edit(card.value);
+  } else {
+    cancel();
+  }
 }
 
 async function submit() {
+  if (disabled.value || stale.value) {
+    return;
+  }
+
   const value: MedicalCard = {
     id: 'medical-card',
     type: 'medical',
@@ -38,7 +52,7 @@ async function submit() {
   };
 
   if (await save({ type: 'pregnancy', before: before.value, value })) {
-    reload();
+    reset(value);
   }
 }
 </script>
@@ -52,7 +66,7 @@ async function submit() {
       </div>
       <p class="muted">
         {{
-          store.cloud.active.value
+          cloudActive
             ? '此卡与孕期记录对家庭全部成员可见，请只填写愿意共享的信息。'
             : '此卡保存在当前浏览器，登录并同步后会对家庭成员可见。'
         }}
@@ -84,6 +98,13 @@ async function submit() {
         class="form-grid"
         @submit.prevent="submit"
       >
+        <FormDraftNotice
+          :dirty="draft.dirty.value"
+          :restored="draft.restored.value"
+          :error="draft.storageError.value"
+          :blocked="stale"
+          @discard="cancel"
+        />
         <fieldset
           class="record-fields"
           :disabled="disabled || stale"

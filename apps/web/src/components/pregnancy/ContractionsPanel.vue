@@ -4,7 +4,7 @@ import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import type { PregnancyRecord } from '@/domain/family';
 
 type Contraction = Extract<PregnancyRecord, { type: 'contraction' }>;
-const { store, records, disabled, message, error, save, remove } = usePregnancyRecords();
+const { quietMode, records, disabled, message, error, save, remove } = usePregnancyRecords();
 const now = shallowRef(Date.now());
 const entries = computed(() =>
   records.value
@@ -66,13 +66,13 @@ async function toggle() {
       </p>
       <button
         class="button button-primary"
-        :disabled="disabled || (!active && !!store.data.value.profile?.quietMode)"
+        :disabled="disabled || (!active && !!quietMode)"
         @click="toggle"
       >
         {{ active ? '结束本次宫缩' : '开始本次宫缩' }}
       </button>
       <p
-        v-if="store.data.value.profile?.quietMode"
+        v-if="quietMode"
         class="muted"
       >
         安静关怀已开启，暂停新计时；已开始的计时仍可结束。

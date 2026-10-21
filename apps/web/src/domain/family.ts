@@ -48,7 +48,17 @@ export interface FamilyData {
 export type PregnancyRecord =
   | { id: string; type: 'bonding'; date: string; title: string; minutes: number; notes: string }
   | { id: string; type: 'mood'; date: string; title: string; notes: string }
-  | { id: string; type: 'packing'; date: string; title: string; completed: boolean; notes: string }
+  | {
+      id: string;
+      type: 'packing';
+      date: string;
+      title: string;
+      completed: boolean;
+      notes: string;
+      category?: string;
+      quantity?: number;
+      assignee?: 'mother' | 'father' | 'single_parent';
+    }
   | { id: string; type: 'checkup'; title: string; date: string; notes: string; completed: boolean }
   | {
       id: string;
@@ -105,6 +115,11 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         isDate(value.date) &&
         shortText(value.title, 80) &&
         typeof value.completed === 'boolean' &&
+        (value.category === undefined || shortText(value.category, 30)) &&
+        (value.quantity === undefined ||
+          (Number.isInteger(value.quantity) && positive(value.quantity, 9999))) &&
+        (value.assignee === undefined ||
+          ['mother', 'father', 'single_parent'].includes(String(value.assignee))) &&
         note(value.notes)
       );
     case 'checkup':

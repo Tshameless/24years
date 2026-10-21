@@ -1,16 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue';
+import { computed, onMounted, onUnmounted, shallowRef } from 'vue';
+import { useSessionNotifications } from '@/composables/useSessionNotifications';
 import { useFamily } from '@/composables/useFamily';
 import { localDate } from '@/domain/family';
 import { dueReminders } from '@/domain/taskReminders';
 
 const { data, cloud, identity, familyMode } = useFamily();
 const now = shallowRef(new Date());
-const enabled = shallowRef(false);
-const notice = shallowRef('');
-const supported = typeof Notification !== 'undefined' && window.isSecureContext;
-const sent = new Set<string>();
-const openNotifications = new Set<Notification>();
 const role = computed(() =>
   familyMode.value === 'single'
     ? 'single_parent'
@@ -32,82 +28,32 @@ const due = computed(() =>
   ),
 );
 
-function closeNotifications() {
-  openNotifications.forEach((item) => item.close());
-  openNotifications.clear();
-}
-
-async function enable() {
-  const scope = identity.value;
-  const previousRole = cloud.role.value;
-
-  try {
-    const granted = supported && (await Notification.requestPermission()) === 'granted';
-
-    if (
-      identity.value !== scope ||
-      cloud.role.value !== previousRole ||
-      data.value.profile?.quietMode ||
-      cloud.expired.value
-    ) {
-      return;
-    }
-
-    enabled.value = granted;
-    notice.value = enabled.value
-      ? '本次页面会话已开启通知；锁屏或关闭页面不保证送达。'
-      : '未获通知权限，站内提醒仍可用。';
-  } catch {
-    notice.value = '此浏览器暂不能显示系统通知，请使用站内提醒。';
-  }
-}
-
-watch([due, enabled], () => {
-  if (!enabled.value || !due.value.length || Notification.permission !== 'granted') {
-    return;
-  }
-
-  const date = localDate(now.value);
-  const fresh = due.value.filter(
-    (task) => !sent.has(`${identity.value}:${date}:${task.id}:${task.time}`),
-  );
-
-  if (!fresh.length) {
-    return;
-  }
-
-  try {
-    // Keep sensitive task titles off the operating-system notification surface.
-    const notification = new Notification('24Years 计划提醒', {
-      body: '有计划已到时间，请打开页面查看。',
-      tag: '24years-tasks',
-    });
-    openNotifications.add(notification);
-    notification.onclose = () => openNotifications.delete(notification);
-    fresh.forEach((task) => sent.add(`${identity.value}:${date}:${task.id}:${task.time}`));
-  } catch {
-    enabled.value = false;
-    notice.value = '此浏览器不支持当前通知方式，已保留站内提醒。';
-  }
+const notificationScope = computed(() =>
+  JSON.stringify([
+    identity.value,
+    cloud.role.value,
+    role.value,
+    !!data.value.profile?.quietMode,
+    cloud.ready.value,
+    cloud.expired.value,
+  ]),
+);
+const allowed = computed(
+  () =>
+    !!data.value.profile &&
+    cloud.ready.value &&
+    !cloud.expired.value &&
+    !data.value.profile.quietMode &&
+    cloud.role.value !== 'viewer',
+);
+const notificationKeys = computed(() =>
+  due.value.map((task) => `${identity.value}:${localDate(now.value)}:${task.id}:${task.time}`),
+);
+const { enabled, pending, notice, supported, enable, disable } = useSessionNotifications({
+  scope: notificationScope,
+  allowed,
+  keys: notificationKeys,
 });
-watch(
-  [
-    identity,
-    () => cloud.role.value,
-    () => data.value.profile?.quietMode,
-    () => cloud.expired.value,
-  ],
-  () => {
-    enabled.value = false;
-    sent.clear();
-    notice.value = '';
-    closeNotifications();
-  },
-);
-watch(
-  () => localDate(now.value),
-  () => sent.clear(),
-);
 let timer: ReturnType<typeof setInterval>;
 onMounted(() => {
   timer = setInterval(() => {
@@ -116,7 +62,6 @@ onMounted(() => {
 });
 onUnmounted(() => {
   clearInterval(timer);
-  closeNotifications();
 });
 </script>
 
@@ -154,6 +99,7 @@ onUnmounted(() => {
       v-if="supported && !enabled"
       type="button"
       class="button button-secondary"
+      :disabled="pending"
       @click="enable"
     >
       开启本次页面通知
@@ -162,10 +108,7 @@ onUnmounted(() => {
       v-if="enabled"
       type="button"
       class="button button-secondary"
-      @click="
-        enabled = false;
-        closeNotifications();
-      "
+      @click="disable"
     >
       关闭本次页面通知
     </button>

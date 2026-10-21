@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, reactive, shallowRef } from 'vue';
+import { computed } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import VitalTrends from './VitalTrends.vue';
 import { localDate, type PregnancyRecord } from '@/domain/family';
+
+import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
+import FormDraftNotice from '@/components/FormDraftNotice.vue';
 
 type Vital = Extract<PregnancyRecord, { type: 'vital' }>;
 const { records, disabled, message, error, save, remove } = usePregnancyRecords();
@@ -12,42 +15,31 @@ const entries = computed(() =>
     .filter((item): item is Vital => item.type === 'vital')
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
-const before = shallowRef<Vital | null>(null);
-let draftId = crypto.randomUUID();
-const form = reactive({
-  date: localDate(),
-  metric: 'weight' as Vital['metric'],
-  value: '',
-  secondary: '',
-  notes: '',
-});
-const stale = computed(
-  () =>
-    before.value &&
-    JSON.stringify(records.value.find((item) => item.id === before.value?.id)) !==
-      JSON.stringify(before.value),
-);
-
-function reset() {
-  before.value = null;
-  draftId = crypto.randomUUID();
-  Object.assign(form, { date: localDate(), value: '', secondary: '', notes: '' });
-}
-
-function edit(item: Vital) {
-  before.value = { ...item };
-  Object.assign(form, {
-    ...item,
+const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
+  type: 'vital',
+  defaults: () => ({
+    date: localDate(),
+    metric: 'weight' as Vital['metric'],
+    value: '',
+    secondary: '',
+    notes: '',
+  }),
+  fields: (item: Vital) => ({
+    date: item.date,
+    metric: item.metric,
     value: String(item.value),
     secondary: item.secondary === null ? '' : String(item.secondary),
-  });
-  message.value = '';
-  error.value = '';
-}
+    notes: item.notes,
+  }),
+});
 
 async function submit() {
+  if (disabled.value || stale.value) {
+    return;
+  }
+
   const value: Vital = {
-    id: before.value?.id ?? draftId,
+    id: before.value?.id ?? draft.id.value,
     type: 'vital',
     date: form.date,
     metric: form.metric,
@@ -125,6 +117,13 @@ async function submit() {
         class="form-grid"
         @submit.prevent="submit"
       >
+        <FormDraftNotice
+          :dirty="draft.dirty.value"
+          :restored="draft.restored.value"
+          :error="draft.storageError.value"
+          :blocked="stale"
+          @discard="cancel"
+        />
         <fieldset
           class="record-fields"
           :disabled="disabled || !!stale"
@@ -153,12 +152,13 @@ async function submit() {
           <label class="field">
             {{ form.metric === 'bloodPressure' ? '收缩压（mmHg）' : labels[form.metric] }}
             <input
-              v-model="form.value"
+              :value="form.value"
               type="number"
               min="0.01"
               :max="form.metric === 'weight' ? 1000 : form.metric === 'glucose' ? 100 : 400"
               step="any"
               required
+              @input="form.value = ($event.target as HTMLInputElement).value"
             />
           </label>
           <label
@@ -167,12 +167,13 @@ async function submit() {
           >
             舒张压（mmHg）
             <input
-              v-model="form.secondary"
+              :value="form.secondary"
               type="number"
               min="0.01"
               max="400"
               step="any"
               required
+              @input="form.secondary = ($event.target as HTMLInputElement).value"
             />
           </label>
           <label class="field">
@@ -198,7 +199,7 @@ async function submit() {
           class="button button-secondary"
           type="button"
           :disabled="disabled"
-          @click="reset"
+          @click="cancel"
         >
           取消编辑
         </button>

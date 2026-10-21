@@ -1,4 +1,4 @@
-import { computed, shallowRef } from 'vue';
+import { computed, readonly, shallowRef } from 'vue';
 import { useFamily } from './useFamily';
 import type { PregnancyChange, PregnancyRecord } from '@/domain/family';
 
@@ -40,5 +40,24 @@ export function usePregnancyRecords() {
     }
   }
 
-  return { store, records, disabled, message, error, save, remove };
+  const quietMode = computed(() => !!store.data.value.profile?.quietMode);
+  const cloudActive = computed(() => store.cloud.active.value);
+  const hasExpense = (id: string) => store.data.value.expenses.some((item) => item.id === id);
+
+  function reportError(value: string) {
+    error.value = value;
+  }
+
+  return {
+    records,
+    disabled,
+    message: readonly(message),
+    error: readonly(error),
+    reportError,
+    save,
+    remove,
+    quietMode,
+    cloudActive,
+    hasExpense,
+  };
 }

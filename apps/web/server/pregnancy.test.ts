@@ -78,12 +78,25 @@ test('孕期协作支持幂等原子入账、冲突回滚、只读权限和备�
     const packing = {
       id: 'purchase',
       type: 'packing' as const,
+      category: '证件',
+      quantity: 2,
+      assignee: 'father' as const,
       title: '资料袋',
       date: before.date,
       notes: '',
       completed: false,
     };
     write(partner, { type: 'pregnancy', before: null, value: packing });
+    assert.deepEqual(
+      service.snapshot(owner).family!.data.pregnancyRecords!.find((item) => item.id === packing.id),
+      packing,
+    );
+    for (const quantity of [0, -1, 1.5, 10000]) {
+      assert.throws(
+        () => write(owner, { type: 'pregnancy', before: packing, value: { ...packing, quantity } }),
+        fail(400),
+      );
+    }
     const purchase: PregnancyChange = {
       type: 'pregnancy',
       before: packing,
