@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, reactive, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
+import { useFormDraft } from '@/composables/useFormDraft';
+import FormDraftNotice from '@/components/FormDraftNotice.vue';
 import { isDate, localDate, type FamilyTask } from '@/domain/family';
 
 const props = defineProps<{ task?: FamilyTask }>();
 const emit = defineEmits<{ saved: []; cancel: [] }>();
-const { data, addTask, updateTask, locked, cloud } = useFamily();
+const { data, addTask, updateTask, locked, cloud, identity } = useFamily();
 const before = props.task ? (JSON.parse(JSON.stringify(props.task)) as FamilyTask) : undefined;
-let draftId = crypto.randomUUID();
 const stale = computed(
   () =>
     before &&
@@ -23,9 +24,39 @@ const form = reactive({
 });
 
 const error = shallowRef('');
+const {
+  id: draftId,
+  dirty,
+  restored,
+  changedSource,
+  storageError,
+  accept,
+  confirmDiscard,
+} = useFormDraft({
+  form,
+  scope: () => `${identity.value}:${cloud.role.value ?? 'local'}`,
+  name: `task:${before?.id ?? 'new'}`,
+  baseline: before,
+});
+const draftBlocked = computed(
+  () =>
+    changedSource.value ||
+    (restored.value && !before && data.value.tasks.some((item) => item.id === draftId.value)),
+);
+
+function cancel() {
+  if (confirmDiscard()) {
+    cloud.clearError();
+    emit('cancel');
+  }
+}
 
 async function submit() {
   error.value = '';
+
+  if (locked.value || stale.value || draftBlocked.value) {
+    return;
+  }
 
   if (!form.title.trim() || !isDate(form.date) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(form.time)) {
     error.value = '请填写计划名称、日期与时间。';
@@ -36,11 +67,11 @@ async function submit() {
   const value = { ...form, title: form.title.trim() };
   const saved = before
     ? await updateTask({ ...before, ...value }, before)
-    : await addTask(value, draftId);
+    : await addTask(value, draftId.value);
 
   if (saved) {
     form.title = '';
-    draftId = crypto.randomUUID();
+    accept();
     emit('saved');
   }
 }
@@ -51,6 +82,13 @@ async function submit() {
     class="form-grid"
     @submit.prevent="submit"
   >
+    <FormDraftNotice
+      :dirty="dirty"
+      :restored="restored"
+      :error="storageError"
+      :blocked="draftBlocked"
+      @discard="cancel"
+    />
     <p
       v-if="stale"
       class="form-error"
@@ -101,7 +139,7 @@ async function submit() {
     </p>
     <button
       class="button button-primary"
-      :disabled="locked || !!stale"
+      :disabled="locked || !!stale || draftBlocked"
     >
       {{ before ? '保存计划修改' : '保存计划' }}
     </button>
@@ -109,10 +147,7 @@ async function submit() {
       v-if="before"
       class="button button-secondary"
       type="button"
-      @click="
-        cloud.clearError();
-        $emit('cancel');
-      "
+      @click="cancel"
     >
       取消编辑
     </button>

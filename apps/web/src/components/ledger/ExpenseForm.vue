@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
+import { useFormDraft } from '@/composables/useFormDraft';
+import FormDraftNotice from '@/components/FormDraftNotice.vue';
 import {
   expenseCategories,
   localDate,
@@ -12,9 +14,8 @@ import {
 
 const props = defineProps<{ expense?: Expense }>();
 const emit = defineEmits<{ saved: []; cancel: [] }>();
-const { data, addExpense, updateExpense, locked, cloud } = useFamily();
+const { data, addExpense, updateExpense, locked, cloud, identity } = useFamily();
 const before = props.expense ? { ...props.expense } : undefined;
-let draftId = crypto.randomUUID();
 const stale = computed(
   () =>
     before &&
@@ -32,9 +33,39 @@ const form = reactive({
 });
 
 const error = shallowRef('');
+const {
+  id: draftId,
+  dirty,
+  restored,
+  changedSource,
+  storageError,
+  accept,
+  confirmDiscard,
+} = useFormDraft({
+  form,
+  scope: () => `${identity.value}:${cloud.role.value ?? 'local'}`,
+  name: `expense:${before?.id ?? 'new'}`,
+  baseline: before,
+});
+const draftBlocked = computed(
+  () =>
+    changedSource.value ||
+    (restored.value && !before && data.value.expenses.some((item) => item.id === draftId.value)),
+);
+
+function cancel() {
+  if (confirmDiscard()) {
+    cloud.clearError();
+    emit('cancel');
+  }
+}
 
 async function submit() {
   error.value = '';
+
+  if (locked.value || stale.value || draftBlocked.value) {
+    return;
+  }
 
   const amountCents = parseMoney(form.amount);
   const reimbursedCents = form.kind === 'allowance' ? 0 : parseMoney(form.reimbursed);
@@ -67,13 +98,13 @@ async function submit() {
   };
   const saved = before
     ? await updateExpense({ ...value, id: before.id }, before)
-    : await addExpense(value, draftId);
+    : await addExpense(value, draftId.value);
 
   if (saved) {
-    draftId = crypto.randomUUID();
     form.title = '';
     form.amount = '';
     form.reimbursed = '0';
+    accept();
     emit('saved');
   }
 }
@@ -84,6 +115,13 @@ async function submit() {
     class="form-grid"
     @submit.prevent="submit"
   >
+    <FormDraftNotice
+      :dirty="dirty"
+      :restored="restored"
+      :error="storageError"
+      :blocked="draftBlocked"
+      @discard="cancel"
+    />
     <p
       v-if="stale"
       class="form-error"
@@ -163,7 +201,7 @@ async function submit() {
     </p>
     <button
       class="button button-primary"
-      :disabled="locked || !!stale"
+      :disabled="locked || !!stale || draftBlocked"
     >
       {{ before ? '保存账目修改' : '保存账目' }}
     </button>
@@ -171,10 +209,7 @@ async function submit() {
       v-if="before"
       class="button button-secondary"
       type="button"
-      @click="
-        cloud.clearError();
-        $emit('cancel');
-      "
+      @click="cancel"
     >
       取消编辑
     </button>
