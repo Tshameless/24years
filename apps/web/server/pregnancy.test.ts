@@ -63,6 +63,30 @@ test('孕期协作支持幂等原子入账、冲突回滚、只读权限和备�
       },
     };
     const fail = (status: number) => (e: unknown) => e instanceof ApiError && e.status === status;
+    const vital: PregnancyRecord = {
+      id: 'measurement',
+      type: 'vital',
+      date: before.date,
+      time: '08:30',
+      context: '晨起',
+      metric: 'weight',
+      value: 65,
+      secondary: null,
+      notes: '',
+    };
+    write(partner, { type: 'pregnancy', before: null, value: vital });
+    assert.deepEqual(
+      service.snapshot(owner).family!.data.pregnancyRecords!.find((item) => item.id === vital.id),
+      vital,
+    );
+    const vitalSnapshot = service.snapshot(owner).family!;
+    for (const invalid of [{ time: '24:00' }, { context: 'a'.repeat(81) }]) {
+      assert.throws(
+        () => write(owner, { type: 'pregnancy', before: vital, value: { ...vital, ...invalid } }),
+        fail(400),
+      );
+      assert.deepEqual(service.snapshot(owner).family, vitalSnapshot);
+    }
     const previous = service.snapshot(owner).family!;
     assert.throws(
       () => write(owner, { ...change, expense: { ...change.expense!, reimbursedCents: 20000 } }),

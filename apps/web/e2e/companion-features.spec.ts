@@ -2,6 +2,61 @@ import { expect, test } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+test('体征时间场景兼容旧草稿，支持刷新、编辑和清空', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (['error', 'warning'].includes(message.type())) {
+      errors.push(message.text());
+    }
+  });
+  await page.goto('/pregnancy?tab=vitals');
+  await expect(page).toHaveTitle(/24Years/);
+  await page.getByLabel('体重（kg）', { exact: true }).fill('65');
+  // Simulate a draft saved before these optional fields existed.
+  await page.evaluate(() => {
+    const key = Object.keys(sessionStorage).find((key) => key.includes('pregnancy:vital'))!;
+    const saved = JSON.parse(sessionStorage.getItem(key)!);
+    delete saved.form.time;
+    delete saved.form.context;
+    sessionStorage.setItem(key, JSON.stringify(saved));
+  });
+  await page.reload();
+  await expect(page.getByLabel('体重（kg）', { exact: true })).toHaveValue('65');
+  await expect(page.getByLabel('测量时间（可选）')).toHaveValue('');
+  await page.getByLabel('测量时间（可选）').fill('08:30');
+  await page.getByLabel('测量场景（可选）').fill('晨起');
+  await page.reload();
+  await expect(page.getByLabel('测量时间（可选）')).toHaveValue('08:30');
+  await expect(page.getByLabel('测量场景（可选）')).toHaveValue('晨起');
+  await page.getByRole('button', { name: '保存体征', exact: true }).click();
+  await expect(page.locator('.record-list')).toContainText('08:30');
+  await page.reload();
+  await page.getByText('查看趋势数据（1 条）').click();
+  await expect(page.getByRole('table')).toContainText('晨起');
+  await expect(page.getByRole('table')).toContainText('08:30');
+  await page.screenshot({
+    path: join(tmpdir(), `24years-vital-context-${testInfo.project.name}.png`),
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.locator('.record-list').getByRole('button', { name: '编辑', exact: true }).click();
+  await expect(page.getByLabel('测量时间（可选）')).toHaveValue('08:30');
+  await page.getByLabel('测量时间（可选）').fill('');
+  await page.getByLabel('测量场景（可选）').fill('');
+  await page.getByRole('button', { name: '保存体征修改' }).click();
+  await page.reload();
+  await expect(page.locator('.record-list')).toContainText('时间未记录');
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('24years.family.v1')!).pregnancyRecords,
+  );
+  expect(saved).toHaveLength(1);
+  expect(saved[0]).not.toHaveProperty('time');
+  expect(saved[0]).not.toHaveProperty('context');
+  expect(await page.locator('vite-error-overlay').count()).toBe(0);
+  expect(errors).toEqual([]);
+});
+
 test('待产分工字段与编辑草稿刷新恢复，备齐费用只入账一次', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));

@@ -24,6 +24,41 @@ const task: FamilyTask = {
   completedDates: [],
 };
 
+it('体征时间和场景校验，旧记录与备份往返兼容', () => {
+  const legacy: Vital = {
+    id: 'measurement',
+    type: 'vital',
+    date: '2026-10-21',
+    metric: 'weight',
+    value: 65,
+    secondary: null,
+    notes: '',
+  };
+  expect(validPregnancyRecord(legacy)).toBe(true);
+  for (const time of ['00:00', '09:05', '23:59']) {
+    const record = { ...legacy, time, context: '晨起' };
+    expect(
+      decodeFamily(JSON.stringify({ ...emptyFamily(), pregnancyRecords: [record] }))
+        .pregnancyRecords,
+    ).toEqual([record]);
+  }
+  for (const invalid of [
+    { time: '' },
+    { time: '24:00' },
+    { time: '12:60' },
+    { time: '9:05' },
+    { time: '12:00:00' },
+    { time: null },
+    { time: 1200 },
+    { context: '' },
+    { context: ' ' },
+    { context: 'a'.repeat(81) },
+    { context: null },
+  ]) {
+    expect(validPregnancyRecord({ ...legacy, ...invalid })).toBe(false);
+  }
+});
+
 it('待产独立字段校验且兼容旧存档', () => {
   const legacy = {
     id: 'bag',

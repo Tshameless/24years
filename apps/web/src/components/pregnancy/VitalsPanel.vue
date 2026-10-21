@@ -17,8 +17,11 @@ const entries = computed(() =>
 );
 const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
   type: 'vital',
+  optionalFields: ['time', 'context'],
   defaults: () => ({
     date: localDate(),
+    time: '',
+    context: '',
     metric: 'weight' as Vital['metric'],
     value: '',
     secondary: '',
@@ -26,6 +29,8 @@ const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
   }),
   fields: (item: Vital) => ({
     date: item.date,
+    time: item.time ?? '',
+    context: item.context ?? '',
     metric: item.metric,
     value: String(item.value),
     secondary: item.secondary === null ? '' : String(item.secondary),
@@ -42,6 +47,8 @@ async function submit() {
     id: before.value?.id ?? draft.id.value,
     type: 'vital',
     date: form.date,
+    ...(form.time ? { time: form.time } : {}),
+    ...(form.context.trim() ? { context: form.context.trim() } : {}),
     metric: form.metric,
     value: Number(form.value),
     secondary: form.metric === 'bloodPressure' ? Number(form.secondary) : null,
@@ -83,7 +90,13 @@ async function submit() {
               {{ item.value }}{{ item.secondary === null ? '' : ` / ${item.secondary}` }}
             </span>
           </div>
-          <p class="muted">{{ item.date }}</p>
+          <p class="muted">{{ item.date }} · {{ item.time || '时间未记录' }}</p>
+          <p
+            v-if="item.context"
+            class="record-notes"
+          >
+            测量场景：{{ item.context }}
+          </p>
           <p
             v-if="item.notes"
             class="record-notes"
@@ -150,6 +163,22 @@ async function submit() {
             />
           </label>
           <label class="field">
+            测量时间（可选）
+            <input
+              v-model="form.time"
+              type="time"
+            />
+          </label>
+          <label class="field">
+            测量场景（可选）
+            <input
+              v-model="form.context"
+              maxlength="80"
+              placeholder="按实际情况填写，例如晨起、休息后"
+            />
+          </label>
+          <p class="muted">日期和时间按测量时当地时间填写；不确定时间可留空。</p>
+          <label class="field">
             {{ form.metric === 'bloodPressure' ? '收缩压（mmHg）' : labels[form.metric] }}
             <input
               :value="form.value"
@@ -182,7 +211,7 @@ async function submit() {
               v-model="form.notes"
               rows="3"
               maxlength="2000"
-              placeholder="例如：空腹、餐后两小时或测量时间"
+              placeholder="其他需要保留的测量说明"
             />
           </label>
           <button class="button button-primary">{{ before ? '保存体征修改' : '保存体征' }}</button>

@@ -64,6 +64,9 @@ export type PregnancyRecord =
       id: string;
       type: 'vital';
       date: string;
+      /** Local wall-clock time; absent for measurements with unknown time. */
+      time?: string;
+      context?: string;
       metric: 'weight' | 'bloodPressure' | 'glucose';
       value: number;
       secondary: number | null;
@@ -132,6 +135,9 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
     case 'vital':
       return (
         isDate(value.date) &&
+        (value.time === undefined ||
+          (typeof value.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time))) &&
+        (value.context === undefined || shortText(value.context, 80)) &&
         note(value.notes) &&
         ((value.metric === 'weight' && positive(value.value, 1000) && value.secondary === null) ||
           (value.metric === 'glucose' && positive(value.value, 100) && value.secondary === null) ||

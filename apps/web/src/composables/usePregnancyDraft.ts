@@ -7,7 +7,13 @@ import { validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
 export function usePregnancyDraft<
   R extends PregnancyRecord,
   T extends Record<string, string | number | boolean>,
->(options: { type: R['type']; defaults: () => T; fields: (record: R) => T; initial?: R | null }) {
+>(options: {
+  type: R['type'];
+  defaults: () => T;
+  fields: (record: R) => T;
+  initial?: R | null;
+  optionalFields?: readonly (keyof T)[];
+}) {
   const { data, identity, cloud } = useFamily();
   const form = reactive({
     ...options.defaults(),
@@ -18,6 +24,7 @@ export function usePregnancyDraft<
     form,
     scope: () => `${identity.value}:${cloud.role.value ?? 'local'}`,
     name: `pregnancy:${options.type}`,
+    optionalFields: options.optionalFields,
   });
   const source = computed(() => {
     try {

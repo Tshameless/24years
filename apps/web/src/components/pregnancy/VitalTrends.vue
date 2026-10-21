@@ -61,7 +61,7 @@ const secondary = computed(
       </label>
     </div>
     <p class="muted">
-      只展示已保存的原始测量值，不标注正常范围或作诊断。同日测量位于相同横坐标，先后时间未知；纵轴自动缩放。血糖不同测量场景不可直接比较。
+      只展示已保存的原始测量值，不标注正常范围或作诊断。同日测量位于相同横坐标，具体时间与场景见数据表；未记录时间不推断先后，纵轴自动缩放。血糖不同测量场景不可直接比较。
     </p>
     <p
       v-if="invalid"
@@ -161,6 +161,8 @@ const secondary = computed(
             <thead>
               <tr>
                 <th scope="col">日期</th>
+                <th scope="col">时间</th>
+                <th scope="col">测量场景</th>
                 <th scope="col">{{ metric === 'bloodPressure' ? '收缩压 / 舒张压' : '测量值' }}</th>
                 <th scope="col">备注</th>
               </tr>
@@ -170,7 +172,9 @@ const secondary = computed(
                 v-for="item in entries"
                 :key="item.id"
               >
-                <td>{{ item.date }}</td>
+                <td class="measurement-date">{{ item.date }}</td>
+                <td class="measurement-date">{{ item.time || '未记录' }}</td>
+                <td>{{ item.context || '未记录' }}</td>
                 <td>{{ item.value }}{{ item.secondary === null ? '' : ` / ${item.secondary}` }}</td>
                 <td>{{ item.notes || '—' }}</td>
               </tr>
@@ -237,7 +241,12 @@ const secondary = computed(
 
 .trend-table table {
   width: 100%;
+  min-width: 480px;
   border-collapse: collapse;
+}
+
+.trend-table .measurement-date {
+  white-space: nowrap;
 }
 
 .trend-table th,
