@@ -1,0 +1,281 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+import FormDraftNotice from '@/components/FormDraftNotice.vue';
+import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
+import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
+import { localDate, validPregnancyRecord, type PregnancyOutcome } from '@/domain/family';
+
+const { outcome, outcomeDisabled, saveOutcome, error, message, reportError } =
+  usePregnancyRecords();
+const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
+  type: 'outcome',
+  initial: outcome.value,
+  defaults: () => ({
+    kind: 'birth',
+    date: localDate(),
+    time: '',
+    mode: 'unknown',
+    location: '',
+    babyName: '',
+    birthWeightGrams: '',
+    birthLengthCm: '',
+    headCircumferenceCm: '',
+    apgarOne: '',
+    apgarFive: '',
+    notes: '',
+  }),
+  fields: (item: PregnancyOutcome) => ({
+    kind: item.kind,
+    date: item.date,
+    time: item.time ?? '',
+    mode: item.mode ?? 'unknown',
+    location: item.location ?? '',
+    babyName: item.babyName ?? '',
+    birthWeightGrams: String(item.birthWeightGrams ?? ''),
+    birthLengthCm: String(item.birthLengthCm ?? ''),
+    headCircumferenceCm: String(item.headCircumferenceCm ?? ''),
+    apgarOne: String(item.apgarOne ?? ''),
+    apgarFive: String(item.apgarFive ?? ''),
+    notes: item.notes,
+  }),
+});
+const measurements = [
+  { key: 'birthWeightGrams', label: '出生体重（克）', max: 10000, step: 1, min: 1 },
+  { key: 'birthLengthCm', label: '出生身长（厘米）', max: 100, step: 0.1, min: 0.1 },
+  { key: 'headCircumferenceCm', label: '头围（厘米）', max: 100, step: 0.1, min: 0.1 },
+  { key: 'apgarOne', label: '1 分钟 Apgar（按病历）', max: 10, step: 1, min: 0 },
+  { key: 'apgarFive', label: '5 分钟 Apgar（按病历）', max: 10, step: 1, min: 0 },
+] as const;
+const birth = computed(() => form.kind === 'birth');
+
+async function submit() {
+  if (outcomeDisabled.value || stale.value) {
+    return;
+  }
+
+  const value = {
+    id: 'pregnancy-outcome',
+    type: 'outcome',
+    kind: form.kind,
+    date: form.date,
+    ...(form.time ? { time: form.time } : {}),
+    notes: form.notes.trim(),
+    ...(birth.value
+      ? {
+          mode: form.mode,
+          ...(form.location.trim() ? { location: form.location.trim() } : {}),
+          ...(form.babyName.trim() ? { babyName: form.babyName.trim() } : {}),
+          ...Object.fromEntries(
+            measurements
+              .filter(({ key }) => String(form[key]).trim() !== '')
+              .map(({ key }) => [key, Number(form[key])]),
+          ),
+        }
+      : {}),
+  };
+
+  if (
+    !validPregnancyRecord(value) ||
+    value.date > localDate() ||
+    (birth.value &&
+      measurements.some(({ key }) => form[key] !== '' && !/^\d+(?:\.\d+)?$/.test(form[key])))
+  ) {
+    reportError('请检查日期与出生数据；实际结束日期不能晚于今天，出生数据可留空。');
+
+    return;
+  }
+
+  if (
+    !window.confirm(
+      birth.value
+        ? '确认保存分娩记录？孕期记录将转为只读，并开启产后交接。'
+        : '确认记录孕期结束？历史记录将保留，并开启静默关怀。',
+    )
+  ) {
+    return;
+  }
+
+  if (await saveOutcome({ type: 'pregnancy', before: before.value, value })) {
+    reset(value as PregnancyOutcome);
+  }
+}
+
+async function reopen() {
+  if (!before.value || outcomeDisabled.value || stale.value || !draft.confirmDiscard()) {
+    return;
+  }
+
+  if (
+    !window.confirm(
+      '仅用于更正误操作：撤销结束记录并恢复孕期编辑？已有历史保留，静默关怀需在家庭设置中自行调整。',
+    )
+  ) {
+    return;
+  }
+
+  if (await saveOutcome({ type: 'pregnancy', before: before.value, value: null })) {
+    reset();
+  }
+}
+</script>
+
+<template>
+  <section class="panel">
+    <div class="panel-heading">
+      <h2>分娩与孕期结束</h2>
+      <span class="tag">{{ outcome ? '已归档' : '由你确认' }}</span>
+    </div>
+    <p class="muted">
+      只有你确认实际结束日期后，才会切换阶段。历史记录、账本和日常计划都会保留。已保存的信息随家庭共享。
+    </p>
+    <form
+      class="form-grid"
+      @submit.prevent="submit"
+    >
+      <FormDraftNotice
+        :dirty="draft.dirty.value"
+        :restored="draft.restored.value"
+        :error="draft.storageError.value"
+        :blocked="stale"
+        @discard="cancel"
+      />
+      <fieldset
+        class="record-fields"
+        :disabled="outcomeDisabled || stale"
+      >
+        <label class="field">
+          结束方式
+          <select
+            v-model="form.kind"
+            aria-label="结束方式"
+          >
+            <option value="birth">已分娩</option>
+            <option value="ended">其他原因结束孕期</option>
+          </select>
+        </label>
+        <div class="form-row">
+          <label class="field">
+            实际结束日期
+            <input
+              v-model="form.date"
+              type="date"
+              :max="localDate()"
+              required
+            />
+          </label>
+          <label class="field">
+            时间（可留空）
+            <input
+              v-model="form.time"
+              type="time"
+            />
+          </label>
+        </div>
+        <template v-if="birth">
+          <label class="field">
+            分娩方式
+            <select v-model="form.mode">
+              <option value="unknown">未填写</option>
+              <option value="vaginal">阴道分娩</option>
+              <option value="cesarean">剖宫产</option>
+              <option value="assisted">助产分娩</option>
+            </select>
+          </label>
+          <label class="field">
+            分娩地点（可留空）
+            <input
+              v-model="form.location"
+              maxlength="100"
+            />
+          </label>
+          <label class="field">
+            宝宝称呼（可留空）
+            <input
+              v-model="form.babyName"
+              maxlength="40"
+            />
+          </label>
+          <p class="muted">以下仅抄录出生病历，可全部留空，不用于自行评分或诊断。</p>
+          <label
+            v-for="item in measurements"
+            :key="item.key"
+            class="field"
+          >
+            {{ item.label }}
+            <input
+              v-model="form[item.key]"
+              type="text"
+              inputmode="decimal"
+              :min="item.min"
+              :max="item.max"
+              :step="item.step"
+            />
+          </label>
+        </template>
+        <p
+          v-else
+          class="muted"
+        >
+          不需要说明原因。保存后首页会隐藏孕周、倒计时和任务提示，你仍可随时查阅记录。
+        </p>
+        <label class="field">
+          结束记录备注
+          <textarea
+            v-model="form.notes"
+            maxlength="2000"
+            rows="4"
+          />
+        </label>
+        <div class="form-actions">
+          <button class="button button-primary">
+            {{ before ? '保存结束记录修改' : '确认结束孕期' }}
+          </button>
+          <button
+            v-if="before"
+            class="button button-secondary"
+            type="button"
+            @click="cancel"
+          >
+            放弃修改
+          </button>
+          <button
+            v-if="before"
+            class="text-button"
+            type="button"
+            @click="reopen"
+          >
+            撤销结束记录
+          </button>
+        </div>
+      </fieldset>
+    </form>
+    <p
+      v-if="stale"
+      class="form-error"
+      role="alert"
+    >
+      结束记录已有更新，请放弃草稿后载入最新记录。
+    </p>
+    <p
+      v-if="error"
+      class="form-error"
+      role="alert"
+    >
+      {{ error }}
+    </p>
+    <p
+      v-if="message"
+      class="success-message"
+      role="status"
+    >
+      {{ message }}
+    </p>
+    <RouterLink
+      v-if="outcome?.kind === 'birth'"
+      class="button button-secondary"
+      to="/pregnancy?tab=postpartum"
+    >
+      进入产后交接
+    </RouterLink>
+  </section>
+</template>

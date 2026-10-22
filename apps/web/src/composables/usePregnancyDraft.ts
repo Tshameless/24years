@@ -1,4 +1,4 @@
-import { computed, reactive } from 'vue';
+import { computed, reactive, watch } from 'vue';
 import { useFamily } from './useFamily';
 import { useFormDraft } from './useFormDraft';
 import { validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
@@ -47,13 +47,21 @@ export function usePregnancyDraft<
 
     const records = data.value.pregnancyRecords ?? [];
     const original = before.value;
+    const fixedId =
+      options.type === 'medical'
+        ? 'medical-card'
+        : options.type === 'birthPlan'
+          ? 'birth-plan'
+          : options.type === 'postpartum'
+            ? 'postpartum-plan'
+            : options.type === 'outcome'
+              ? 'pregnancy-outcome'
+              : draft.id.value;
 
     return original
       ? JSON.stringify(records.find((item) => item.id === original.id) ?? null) !==
           JSON.stringify(original)
-      : records.some(
-          (item) => item.id === (options.type === 'medical' ? 'medical-card' : draft.id.value),
-        );
+      : records.some((item) => item.id === fixedId);
   });
 
   function reset(record: R | null = null) {
@@ -62,6 +70,23 @@ export function usePregnancyDraft<
     });
     draft.accept();
   }
+
+  watch(
+    () => data.value.pregnancyRecords,
+    () => {
+      if (
+        ['medical', 'birthPlan', 'outcome', 'postpartum'].includes(options.type) &&
+        !draft.dirty.value &&
+        stale.value
+      ) {
+        reset(
+          (data.value.pregnancyRecords?.find((item) => item.type === options.type) as
+            | R
+            | undefined) ?? null,
+        );
+      }
+    },
+  );
 
   function edit(record: R) {
     if (!draft.confirmDiscard()) {
@@ -78,7 +103,14 @@ export function usePregnancyDraft<
       return false;
     }
 
-    reset(options.type === 'medical' ? (options.initial ?? null) : null);
+    const singleton = ['medical', 'birthPlan', 'outcome', 'postpartum'].includes(options.type);
+    reset(
+      singleton
+        ? (((data.value.pregnancyRecords ?? []).find((item) => item.type === options.type) as
+            | R
+            | undefined) ?? null)
+        : null,
+    );
 
     return true;
   }

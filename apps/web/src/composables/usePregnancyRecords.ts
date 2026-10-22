@@ -1,6 +1,6 @@
 import { computed, readonly, shallowRef } from 'vue';
 import { useFamily } from './useFamily';
-import type { PregnancyChange, PregnancyRecord } from '@/domain/family';
+import { pregnancyOutcome, type PregnancyChange, type PregnancyRecord } from '@/domain/family';
 
 export function usePregnancyRecords() {
   const store = useFamily();
@@ -8,10 +8,16 @@ export function usePregnancyRecords() {
   const message = shallowRef('');
   const error = shallowRef('');
   const records = computed(() => store.data.value.pregnancyRecords ?? []);
-  const disabled = computed(() => store.locked.value || busy.value);
+  const outcome = computed(() => pregnancyOutcome(records.value));
+  const outcomeDisabled = computed(() => store.locked.value || busy.value);
+  const disabled = computed(() => outcomeDisabled.value || !!outcome.value);
 
-  async function save(change: PregnancyChange) {
-    if (disabled.value) {
+  async function persist(change: PregnancyChange, allowedType?: 'outcome' | 'postpartum') {
+    if (
+      outcomeDisabled.value ||
+      (!!outcome.value && !allowedType) ||
+      (allowedType && (change.value ?? change.before)?.type !== allowedType)
+    ) {
       return false;
     }
 
@@ -34,6 +40,11 @@ export function usePregnancyRecords() {
     }
   }
 
+  const save = (change: PregnancyChange) => persist(change);
+  const saveOutcome = (change: PregnancyChange) => persist(change, 'outcome');
+
+  const savePostpartum = (change: PregnancyChange) => persist(change, 'postpartum');
+
   async function remove(before: PregnancyRecord) {
     if (window.confirm('确认删除这条记录？已生成的账目会保留在家庭账本中。')) {
       await save({ type: 'pregnancy', before: { ...before }, value: null });
@@ -50,11 +61,15 @@ export function usePregnancyRecords() {
 
   return {
     records,
+    outcome,
     disabled,
+    outcomeDisabled,
     message: readonly(message),
     error: readonly(error),
     reportError,
     save,
+    saveOutcome,
+    savePostpartum,
     remove,
     quietMode,
     cloudActive,

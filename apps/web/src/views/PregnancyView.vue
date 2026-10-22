@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { pregnancyOutcome } from '@/domain/family';
+import BirthPlanPanel from '@/components/pregnancy/BirthPlanPanel.vue';
+import OutcomePanel from '@/components/pregnancy/OutcomePanel.vue';
+import PostpartumPanel from '@/components/pregnancy/PostpartumPanel.vue';
+import CycleOverview from '@/components/pregnancy/CycleOverview.vue';
 import { useFamily } from '@/composables/useFamily';
 import CheckupsPanel from '@/components/pregnancy/CheckupsPanel.vue';
 import VitalsPanel from '@/components/pregnancy/VitalsPanel.vue';
@@ -14,8 +19,19 @@ import CareJournal from '@/components/pregnancy/CareJournal.vue';
 
 const { data, locked, cloud } = useFamily();
 const route = useRoute();
+const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
 
 const tabGroups = [
+  {
+    id: 'cycle',
+    label: '全周期管理',
+    description: '从建档到分娩，再到产后交接。',
+    tabs: [
+      { id: 'overview', label: '全周期总览', component: CycleOverview },
+      { id: 'outcome', label: '分娩与孕期结束', component: OutcomePanel },
+      { id: 'postpartum', label: '产后交接', component: PostpartumPanel },
+    ],
+  },
   {
     id: 'daily',
     label: '日常陪伴',
@@ -40,6 +56,7 @@ const tabGroups = [
     label: '待产与应急',
     description: '提前准备物品，需要时快速找到重要信息。',
     tabs: [
+      { id: 'birth-plan', label: '分娩沟通计划', component: BirthPlanPanel },
       { id: 'packing', label: '待产清单', component: PackingPanel },
       { id: 'contractions', label: '宫缩计时', component: ContractionsPanel },
       { id: 'medical', label: '就医卡', component: MedicalCardPanel },
@@ -51,7 +68,11 @@ const tabs = computed(() => tabGroups.flatMap((group) => group.tabs));
 const selected = computed(
   () =>
     tabs.value.find((item) => item.id === route.query.tab) ??
-    tabs.value.find((item) => item.id === 'checkups')!,
+    tabs.value.find(
+      (item) =>
+        item.id ===
+        (outcome.value?.kind === 'birth' ? 'postpartum' : outcome.value ? 'outcome' : 'checkups'),
+    )!,
 );
 </script>
 
@@ -87,6 +108,15 @@ const selected = computed(
             ? '你有查看权限，记录由家庭管理员和共同编辑维护。'
             : '当前暂不可编辑，请等待同步完成或检查账号状态。'
         }}
+      </p>
+      <p
+        v-if="outcome"
+        class="muted"
+        role="status"
+      >
+        本次孕期已于
+        {{ outcome.date }}
+        结束。孕期历史仅供查阅；可在“分娩与孕期结束”更正状态，分娩后可继续维护产后交接。
       </p>
       <nav
         class="pregnancy-groups"

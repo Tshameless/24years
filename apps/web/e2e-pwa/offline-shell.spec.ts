@@ -14,7 +14,10 @@ async function register(page: import('@playwright/test').Page) {
   await page.getByLabel('孕周（周）').fill('24');
   await page.getByLabel('天数（天）').selectOption('3');
   await page.getByRole('button', { name: '保存家庭档案' }).click();
-  await expect(page.getByText('家庭档案已保存', { exact: true })).toBeVisible();
+  // Creating the first cloud family changes scope and remounts the form.
+  await expect(page.getByRole('heading', { name: '家庭档案', exact: true })).toBeVisible();
+  await expect(page.getByLabel('家庭名称')).toHaveValue('离线快照家庭');
+  await expect(page.getByRole('button', { name: '保存家庭档案' })).toBeEnabled();
 }
 
 test('离线刷新和首次打开其他路由仍可用，缓存不含 API 或版本数据', async ({ page, context }) => {
@@ -68,7 +71,7 @@ test('同步模式离线冷启动显示不可用提示，不冒用本机档案',
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole('status').filter({ hasText: '无法连接云端' })).toBeVisible();
-  await expect(page.getByRole('status').filter({ hasText: '云端家庭数据未缓存' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: '没有可用的家庭快照' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '日常计划', exact: true })).toBeVisible();
 });
 

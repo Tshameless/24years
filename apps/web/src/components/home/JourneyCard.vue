@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { pregnancyProgress, type FamilyProfile } from '@/domain/family';
+import {
+  dayDifference,
+  pregnancyProgress,
+  type PregnancyOutcome,
+  type FamilyProfile,
+} from '@/domain/family';
 import AppIcon from '@/components/AppIcon.vue';
 
-const props = defineProps<{ profile: FamilyProfile | null; today: string }>();
+const props = defineProps<{
+  profile: FamilyProfile | null;
+  today: string;
+  outcome?: PregnancyOutcome | null;
+}>();
 
 const progress = computed(() =>
   props.profile ? pregnancyProgress(props.profile.dueDate, props.today) : null,
@@ -43,6 +52,25 @@ const progress = computed(() =>
             name="arrow"
             :size="16"
           />
+        </RouterLink>
+      </template>
+      <template v-else-if="outcome">
+        <span class="journey-tag">
+          {{ outcome.kind === 'birth' ? '新的陪伴阶段' : '按自己的节奏来' }}
+        </span>
+        <h2>
+          {{
+            outcome.kind === 'birth'
+              ? `产后第 ${Math.max(0, dayDifference(today, outcome.date)) + 1} 天`
+              : '本次孕期已结束'
+          }}
+        </h2>
+        <p>记录日期：{{ outcome.date }}。历史记录已保留。</p>
+        <RouterLink
+          class="button button-primary"
+          :to="outcome.kind === 'birth' ? '/pregnancy?tab=postpartum' : '/pregnancy?tab=outcome'"
+        >
+          {{ outcome.kind === 'birth' ? '查看产后交接' : '查看结束记录' }}
         </RouterLink>
       </template>
       <template v-else-if="profile && progress">

@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useFamily } from '@/composables/useFamily';
-import { currency, summarizeExpenses, type PregnancyRecord } from '@/domain/family';
+import {
+  pregnancyOutcome,
+  currency,
+  summarizeExpenses,
+  type PregnancyRecord,
+} from '@/domain/family';
 import AppIcon from '@/components/AppIcon.vue';
 import JourneyCard from './JourneyCard.vue';
 import GettingStarted from './GettingStarted.vue';
@@ -10,6 +15,10 @@ import TaskList from '@/components/tasks/TaskList.vue';
 const { data, today, todayTasks, toggleTask, locked, cloud, familyMode } = useFamily();
 const { state } = cloud;
 
+const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
+const postpartum = computed(() =>
+  data.value.pregnancyRecords?.find((item) => item.type === 'postpartum'),
+);
 const totals = computed(() => summarizeExpenses(data.value.expenses));
 const nextCheckup = computed(
   () =>
@@ -68,9 +77,10 @@ const dateLabel = computed(() =>
         <JourneyCard
           :profile="data.profile"
           :today="today"
+          :outcome="outcome"
         />
         <section
-          v-if="data.profile && !data.profile.quietMode"
+          v-if="data.profile && !data.profile.quietMode && !outcome"
           class="panel"
         >
           <div class="panel-heading">
@@ -89,6 +99,22 @@ const dateLabel = computed(() =>
           >
             还没有待办产检，按医生建议安排即可。
           </p>
+        </section>
+        <section
+          v-if="outcome?.kind === 'birth' && !data.profile?.quietMode"
+          class="panel"
+        >
+          <div class="panel-heading">
+            <h2>接下来的照护安排</h2>
+            <RouterLink
+              class="text-button"
+              to="/pregnancy?tab=postpartum"
+            >
+              管理产后交接
+            </RouterLink>
+          </div>
+          <p>产后复诊：{{ postpartum?.followupDate || '尚未填写，按出院医嘱安排' }}</p>
+          <p>新生儿随访：{{ postpartum?.newbornFollowupDate || '尚未填写，按医嘱安排' }}</p>
         </section>
         <section
           v-if="!data.profile?.quietMode"

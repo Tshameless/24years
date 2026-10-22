@@ -46,6 +46,18 @@ export interface FamilyData {
 }
 
 export type PregnancyRecord =
+  | {
+      id: 'postpartum-plan';
+      type: 'postpartum';
+      date: string;
+      followupDate?: string;
+      newbornFollowupDate?: string;
+      supportPerson: string;
+      recovery: string;
+      feeding: string;
+      questions: string;
+      notes: string;
+    }
   | { id: string; type: 'bonding'; date: string; title: string; minutes: number; notes: string }
   | { id: string; type: 'mood'; date: string; title: string; notes: string }
   | {
@@ -89,7 +101,42 @@ export type PregnancyRecord =
       contact: string;
       phone: string;
       notes: string;
+    }
+  | {
+      id: 'birth-plan';
+      type: 'birthPlan';
+      date: string;
+      supportPerson: string;
+      discussPainRelief: boolean;
+      discussPosition: boolean;
+      discussProcedures: boolean;
+      discussNewbornCare: boolean;
+      discussEarlyContact: boolean;
+      questions: string;
+      notes: string;
+    }
+  | {
+      id: 'pregnancy-outcome';
+      type: 'outcome';
+      kind: 'birth' | 'ended';
+      date: string;
+      time?: string;
+      mode?: 'vaginal' | 'cesarean' | 'assisted' | 'unknown';
+      location?: string;
+      babyName?: string;
+      birthWeightGrams?: number;
+      birthLengthCm?: number;
+      headCircumferenceCm?: number;
+      apgarOne?: number;
+      apgarFive?: number;
+      notes: string;
     };
+
+export type PregnancyOutcome = Extract<PregnancyRecord, { type: 'outcome' }>;
+
+export function pregnancyOutcome(records: readonly PregnancyRecord[] | undefined) {
+  return records?.find((record): record is PregnancyOutcome => record.type === 'outcome') ?? null;
+}
 
 export interface PregnancyChange {
   type: 'pregnancy';
@@ -188,6 +235,92 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         /^[+\d ()-]{0,30}$/.test(value.phone) &&
         note(value.notes)
       );
+    case 'postpartum':
+      return (
+        value.id === 'postpartum-plan' &&
+        isDate(value.date) &&
+        (value.followupDate === undefined ||
+          (isDate(value.followupDate) && value.followupDate >= value.date)) &&
+        (value.newbornFollowupDate === undefined ||
+          (isDate(value.newbornFollowupDate) && value.newbornFollowupDate >= value.date)) &&
+        typeof value.supportPerson === 'string' &&
+        value.supportPerson.length <= 80 &&
+        note(value.recovery) &&
+        note(value.feeding) &&
+        note(value.questions) &&
+        note(value.notes)
+      );
+    case 'birthPlan':
+      return (
+        value.id === 'birth-plan' &&
+        isDate(value.date) &&
+        typeof value.supportPerson === 'string' &&
+        value.supportPerson.length <= 80 &&
+        typeof value.discussPainRelief === 'boolean' &&
+        typeof value.discussPosition === 'boolean' &&
+        typeof value.discussProcedures === 'boolean' &&
+        typeof value.discussNewbornCare === 'boolean' &&
+        typeof value.discussEarlyContact === 'boolean' &&
+        note(value.questions) &&
+        note(value.notes)
+      );
+    case 'outcome': {
+      const shared =
+        value.id === 'pregnancy-outcome' &&
+        isDate(value.date) &&
+        (value.time === undefined ||
+          (typeof value.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time))) &&
+        note(value.notes);
+
+      if (value.kind === 'ended') {
+        return (
+          shared &&
+          value.mode === undefined &&
+          value.location === undefined &&
+          value.babyName === undefined &&
+          value.birthWeightGrams === undefined &&
+          value.birthLengthCm === undefined &&
+          value.headCircumferenceCm === undefined &&
+          value.apgarOne === undefined &&
+          value.apgarFive === undefined
+        );
+      }
+
+      return (
+        shared &&
+        value.kind === 'birth' &&
+        ['vaginal', 'cesarean', 'assisted', 'unknown'].includes(String(value.mode)) &&
+        (value.location === undefined ||
+          (typeof value.location === 'string' && value.location.length <= 100)) &&
+        (value.babyName === undefined ||
+          (typeof value.babyName === 'string' && value.babyName.length <= 40)) &&
+        (value.birthWeightGrams === undefined ||
+          (typeof value.birthWeightGrams === 'number' &&
+            Number.isInteger(value.birthWeightGrams) &&
+            value.birthWeightGrams > 0 &&
+            value.birthWeightGrams <= 10000)) &&
+        (value.birthLengthCm === undefined ||
+          (typeof value.birthLengthCm === 'number' &&
+            Number.isFinite(value.birthLengthCm) &&
+            value.birthLengthCm > 0 &&
+            value.birthLengthCm <= 100)) &&
+        (value.headCircumferenceCm === undefined ||
+          (typeof value.headCircumferenceCm === 'number' &&
+            Number.isFinite(value.headCircumferenceCm) &&
+            value.headCircumferenceCm > 0 &&
+            value.headCircumferenceCm <= 100)) &&
+        (value.apgarOne === undefined ||
+          (typeof value.apgarOne === 'number' &&
+            Number.isInteger(value.apgarOne) &&
+            value.apgarOne >= 0 &&
+            value.apgarOne <= 10)) &&
+        (value.apgarFive === undefined ||
+          (typeof value.apgarFive === 'number' &&
+            Number.isInteger(value.apgarFive) &&
+            value.apgarFive >= 0 &&
+            value.apgarFive <= 10))
+      );
+    }
     default:
       return false;
   }
@@ -234,7 +367,51 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
     throw new PregnancyChangeError('这条记录已变化，请重新打开最新记录，输入已保留。', 409);
   }
 
+  const currentOutcome = pregnancyOutcome(records);
+
+  if (
+    currentOutcome &&
+    (before ?? value)?.type !== 'outcome' &&
+    (before ?? value)?.type !== 'postpartum'
+  ) {
+    throw new PregnancyChangeError('孕期记录已结束，历史记录仅供查阅。', 409);
+  }
+
+  if (value?.type === 'outcome' && (!data.profile || value.date > localDate())) {
+    throw new PregnancyChangeError('请先建立档案，并填写不晚于今天的实际结束日期。');
+  }
+
+  if (
+    value?.type === 'postpartum' &&
+    (currentOutcome?.kind !== 'birth' || value.date < currentOutcome.date)
+  ) {
+    throw new PregnancyChangeError('请先记录分娩，交接日期不能早于分娩日期。');
+  }
+
+  if (
+    before?.type === 'outcome' &&
+    (!value || (value.type === 'outcome' && value.kind !== 'birth')) &&
+    records.some((item) => item.type === 'postpartum')
+  ) {
+    throw new PregnancyChangeError('请先在产后交接中删除交接记录，再更正孕期结束状态。', 409);
+  }
+
+  if (
+    value?.type === 'outcome' &&
+    records.some((item) => item.type === 'postpartum' && item.date < value.date)
+  ) {
+    throw new PregnancyChangeError('分娩日期不能晚于已有交接日期，请先更正交接记录。', 409);
+  }
+
   const updated = [...records.filter((item) => item.id !== id), ...(value ? [value] : [])];
+
+  if (
+    value &&
+    (value.type === 'outcome' || value.type === 'birthPlan') &&
+    records.some((item) => item.type === value.type && item.id !== value.id)
+  ) {
+    throw new PregnancyChangeError('这项记录已经存在，请编辑最新记录。', 409);
+  }
 
   if (
     data.profile?.quietMode &&
@@ -247,6 +424,13 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
 
   if (updated.filter((item) => item.type === 'contraction' && item.endedAt === null).length > 1) {
     throw new PregnancyChangeError('已有一次宫缩正在计时，请先结束它。', 409);
+  }
+
+  if (
+    value?.type === 'outcome' &&
+    records.some((item) => item.type === 'contraction' && item.endedAt === null)
+  ) {
+    throw new PregnancyChangeError('请先结束正在进行的宫缩计时，再保存孕期结束记录。', 409);
   }
 
   if (
@@ -271,6 +455,10 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
 
   return {
     ...data,
+    profile:
+      value?.type === 'outcome' && value.kind === 'ended' && data.profile
+        ? { ...data.profile, quietMode: true }
+        : data.profile,
     pregnancyRecords: updated,
     expenses: expense ? [expense, ...data.expenses] : data.expenses,
   };
@@ -519,6 +707,16 @@ export function validExpense(value: unknown): value is Expense {
   );
 }
 
+function validPregnancyLifecycle(records: PregnancyRecord[]): boolean {
+  const outcome = pregnancyOutcome(records);
+  const handoff = records.find((item) => item.type === 'postpartum');
+
+  return (
+    !(outcome && records.some((item) => item.type === 'contraction' && item.endedAt === null)) &&
+    (!handoff || (outcome?.kind === 'birth' && handoff.date >= outcome.date))
+  );
+}
+
 export function decodeFamily(raw: string): FamilyData {
   const value: unknown = JSON.parse(raw);
 
@@ -535,6 +733,8 @@ export function decodeFamily(raw: string): FamilyData {
         !value.pregnancyRecords.every(validPregnancyRecord) ||
         new Set(value.pregnancyRecords.map((item) => item.id)).size !==
           value.pregnancyRecords.length ||
+        !validPregnancyLifecycle(value.pregnancyRecords) ||
+        (value.profile === null && pregnancyOutcome(value.pregnancyRecords) !== null) ||
         value.pregnancyRecords.filter(
           (item) => item.type === 'contraction' && item.endedAt === null,
         ).length > 1)) ||

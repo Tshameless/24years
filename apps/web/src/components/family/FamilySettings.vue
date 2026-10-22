@@ -2,7 +2,12 @@
 import { computed, reactive, shallowRef, watch } from 'vue';
 import { useFamily } from '@/composables/useFamily';
 import { useFormDraft } from '@/composables/useFormDraft';
-import { dueDateFromGestation, localDate, pregnancyProgress } from '@/domain/family';
+import {
+  pregnancyOutcome,
+  dueDateFromGestation,
+  localDate,
+  pregnancyProgress,
+} from '@/domain/family';
 import AccountPanel from './AccountPanel.vue';
 import FamilyPairing from './FamilyPairing.vue';
 import FamilySetupChoice from './FamilySetupChoice.vue';
@@ -11,6 +16,7 @@ import type { FamilyMode, FamilyParentRole } from '@/domain/collaboration';
 
 const { data, saveProfile, profileLocked, canManage, cloud, identity } = useFamily();
 const { active, state } = cloud;
+const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
 const currentMember = computed(() =>
   state.value.family?.members.find((member) => member.id === state.value.user?.id),
 );
@@ -48,9 +54,11 @@ const draft = useFormDraft({
 const { dirty, restored, changedSource, storageError } = draft;
 
 const estimatedDueDate = computed(() =>
-  form.weeks.trim() && /^\d{4}-\d{2}-\d{2}$/.test(form.referenceDate)
-    ? dueDateFromGestation(Number(form.weeks), form.days, form.referenceDate)
-    : null,
+  outcome.value
+    ? (before.value?.dueDate ?? null)
+    : form.weeks.trim() && /^\d{4}-\d{2}-\d{2}$/.test(form.referenceDate)
+      ? dueDateFromGestation(Number(form.weeks), form.days, form.referenceDate)
+      : null,
 );
 
 const error = shallowRef('');
@@ -65,9 +73,7 @@ function reloadProfile() {
 
   before.value = data.value.profile;
   const referenceDate = localDate();
-  const progress = before.value
-    ? pregnancyProgress(before.value.dueDate, referenceDate)
-    : null;
+  const progress = before.value ? pregnancyProgress(before.value.dueDate, referenceDate) : null;
   Object.assign(form, {
     referenceDate,
     familyMode:
@@ -160,12 +166,8 @@ async function submit() {
       <form
         class="form-grid"
         @submit.prevent="submit"
-        @input="
-          saved = false;
-        "
-        @change="
-          saved = false;
-        "
+        @input="saved = false"
+        @change="saved = false"
       >
         <FamilySetupChoice
           v-model:mode="form.familyMode"
@@ -198,11 +200,28 @@ async function submit() {
             载入最新档案
           </button>
         </p>
-        <p v-if="restored || dirty" class="muted">
-          {{ restored ? '已恢复当前标签页草稿。' : '未保存输入已暂存在当前标签页。' }}草稿不会自动提交。
-          <button type="button" class="text-button" @click="reloadProfile">放弃草稿，载入最新档案</button>
+        <p
+          v-if="restored || dirty"
+          class="muted"
+        >
+          {{
+            restored ? '已恢复当前标签页草稿。' : '未保存输入已暂存在当前标签页。'
+          }}草稿不会自动提交。
+          <button
+            type="button"
+            class="text-button"
+            @click="reloadProfile"
+          >
+            放弃草稿，载入最新档案
+          </button>
         </p>
-        <p v-if="storageError" class="form-error" role="alert">{{ storageError }}</p>
+        <p
+          v-if="storageError"
+          class="form-error"
+          role="alert"
+        >
+          {{ storageError }}
+        </p>
         <label class="field">
           家庭名称
           <input
@@ -223,7 +242,17 @@ async function submit() {
             autocomplete="nickname"
           />
         </label>
-        <fieldset class="gestation-fields">
+        <p
+          v-if="outcome"
+          class="muted"
+        >
+          本次孕期已结束，原预产期 {{ data.profile?.dueDate }} 已保留。
+          <RouterLink to="/pregnancy?tab=outcome">查看或更正结束记录</RouterLink>
+        </p>
+        <fieldset
+          v-else
+          class="gestation-fields"
+        >
           <legend>怀孕时期</legend>
           <p
             id="gestation-help"

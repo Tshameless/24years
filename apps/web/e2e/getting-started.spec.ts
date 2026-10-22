@@ -30,11 +30,12 @@ test('建档后的指引可收起恢复，真实记录推进流程，分组保�
   await page.getByRole('button', { name: '保存产检安排' }).click();
   const navigation = page.getByRole('navigation', { name: '孕期记录类型' });
   await expect(navigation.getByRole('heading')).toHaveText([
+    '全周期管理',
     '日常陪伴',
     '产检与健康',
     '待产与应急',
   ]);
-  await expect(navigation.getByRole('link')).toHaveCount(8);
+  await expect(navigation.getByRole('link')).toHaveCount(12);
   await navigation.getByRole('link', { name: '就医卡', exact: true }).click();
   await page.reload();
   await expect(page.getByLabel('就诊医院', { exact: true })).toBeVisible();

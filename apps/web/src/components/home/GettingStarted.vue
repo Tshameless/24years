@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
+import { pregnancyOutcome } from '@/domain/family';
 import { useFamily } from '@/composables/useFamily';
 
 const { data, cloud } = useFamily();
 const { ready } = cloud;
 const dismissed = shallowRef(readDismissed());
 const guideAllowed = computed(
-  () => ready.value && Boolean(data.value.profile) && !data.value.profile?.quietMode,
+  () =>
+    ready.value &&
+    Boolean(data.value.profile) &&
+    !data.value.profile?.quietMode &&
+    !pregnancyOutcome(data.value.pregnancyRecords),
 );
 
 function readDismissed() {
