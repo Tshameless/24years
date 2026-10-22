@@ -7,6 +7,9 @@ const { server, db } = createApplication({
   staticDir: fileURLToPath(new URL('../dist', import.meta.url)),
   origin: process.env.APP_ORIGIN,
   secureCookie: process.env.COOKIE_SECURE === 'true',
+  trustedProxies: process.env.TRUSTED_PROXIES?.split(',')
+    .map((value) => value.trim())
+    .filter(Boolean),
 });
 const port = Number(process.env.API_PORT ?? 8787);
 

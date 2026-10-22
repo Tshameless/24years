@@ -86,6 +86,24 @@ function familyRole(value: unknown, mode: 'single' | 'couple'): FamilyParentRole
 }
 
 export function createService(db: DatabaseSync) {
+  function sessionTag(userId: string | null) {
+    const metadata = userId
+      ? db
+          .prepare(
+            `
+      SELECT a.id, a.username, a.nickname, m.family_id, m.role, m.family_role,
+        f.revision, i.expires_at
+      FROM accounts a LEFT JOIN members m ON m.user_id = a.id
+      LEFT JOIN families f ON f.id = m.family_id
+      LEFT JOIN invites i ON i.family_id = f.id AND i.expires_at > ? AND m.role = 'owner'
+      WHERE a.id = ?`,
+          )
+          .get(Date.now(), userId)
+      : null;
+
+    return `"${hash(JSON.stringify(metadata))}"`;
+  }
+
   function account(id: string): Account {
     return db
       .prepare('SELECT id, username, nickname FROM accounts WHERE id = ?')
@@ -500,12 +518,9 @@ export function createService(db: DatabaseSync) {
       family.id,
     );
     touch(family.id, userId);
-    db.prepare('INSERT INTO receipts VALUES (?, ?, ?, ?)').run(
-      userId,
-      body.operationId,
-      family.id,
-      payloadHash,
-    );
+    db.prepare(
+      'INSERT INTO receipts(user_id, operation_id, family_id, payload_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+    ).run(userId, body.operationId, family.id, payloadHash, Date.now());
   }
 
   function updateFamilyChoice(
@@ -751,15 +766,13 @@ export function createService(db: DatabaseSync) {
     ).run(family.id, JSON.stringify(family.data), new Date().toISOString());
     db.prepare('UPDATE families SET data = ? WHERE id = ?').run(JSON.stringify(data), family.id);
     touch(family.id, userId);
-    db.prepare('INSERT INTO receipts VALUES (?, ?, ?, ?)').run(
-      userId,
-      body.operationId,
-      family.id,
-      payloadHash,
-    );
+    db.prepare(
+      'INSERT INTO receipts(user_id, operation_id, family_id, payload_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+    ).run(userId, body.operationId, family.id, payloadHash, Date.now());
   }
 
   return {
+    sessionTag,
     authenticate,
     rotateRecovery,
     recover,

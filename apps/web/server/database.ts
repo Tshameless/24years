@@ -50,6 +50,7 @@ export function openDatabase(path: string) {
       operation_id TEXT NOT NULL,
       family_id TEXT NOT NULL REFERENCES families(id),
       payload_hash TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       PRIMARY KEY(user_id, operation_id)
     );
     CREATE TABLE IF NOT EXISTS import_backups (
@@ -67,8 +68,17 @@ export function openDatabase(path: string) {
     name: string;
   }>;
 
+  const receiptColumns = db.prepare('PRAGMA table_info(receipts)').all() as Array<{
+    name: string;
+  }>;
+
   if (!accountColumns.some((column) => column.name === 'recovery_hash')) {
     db.exec('ALTER TABLE accounts ADD COLUMN recovery_hash TEXT');
+  }
+
+  if (!receiptColumns.some((column) => column.name === 'created_at')) {
+    db.exec('ALTER TABLE receipts ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0');
+    db.prepare('UPDATE receipts SET created_at = ? WHERE created_at = 0').run(Date.now());
   }
 
   if (!columns.some((column) => column.name === 'family_role')) {

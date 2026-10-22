@@ -1,0 +1,13 @@
+{
+  "name": "24years",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --dir apps/web dev",
+    "dev:api": "pnpm --dir apps/web dev:api",
+    "build": "pnpm --dir apps/web build",
+    "lint": "pnpm --dir apps/web lint",
+    "test": "pnpm --dir apps/web test",
+    "test:api": "pnpm --dir apps/web test:api",
+    "test:e2e": "pnpm --dir apps/web test:e2e"
+  }
+}

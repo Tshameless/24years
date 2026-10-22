@@ -65,6 +65,9 @@ export function useCollaboration(enabled = true) {
   let generation = 0;
   let disposed = false;
   let interval: ReturnType<typeof setInterval>;
+  let etag = '';
+  let retryAt = 0;
+  let failures = 0;
   const pendingOperations = new Map<string, string>();
 
   try {
@@ -162,7 +165,7 @@ export function useCollaboration(enabled = true) {
   }
 
   async function refresh() {
-    if (fetching || busy.value || disposed) {
+    if (fetching || busy.value || disposed || (ready.value && document.hidden)) {
       return;
     }
 
@@ -170,11 +173,39 @@ export function useCollaboration(enabled = true) {
     const startedAt = generation;
 
     try {
-      const next = await request('session');
+      const response = await fetch('/api/session', {
+        credentials: 'same-origin',
+        headers: etag ? { 'If-None-Match': etag } : {},
+        cache: 'no-store',
+        signal: AbortSignal.timeout(10000),
+      });
 
       if (startedAt !== generation || disposed) {
         return;
       }
+
+      if (response.status === 304) {
+        online.value = true;
+        failures = 0;
+        retryAt = 0;
+        lastSynced.value = new Date().toLocaleTimeString('zh-CN');
+
+        return;
+      }
+
+      const next = await response.json();
+
+      if (startedAt !== generation || disposed) {
+        return;
+      }
+
+      if (!response.ok) {
+        throw new RequestError(response.status, next.message ?? '请求失败，请重试。');
+      }
+
+      etag = response.headers.get('ETag') ?? '';
+      failures = 0;
+      retryAt = 0;
 
       if (!next.user && active.value) {
         expired.value = true;
@@ -186,6 +217,9 @@ export function useCollaboration(enabled = true) {
         receive(next);
       }
     } catch (reason) {
+      failures = Math.min(failures + 1, 5);
+      retryAt = Date.now() + Math.min(60000, 2000 * 2 ** failures);
+
       if (active.value && startedAt === generation && !disposed) {
         failed(reason);
       }
@@ -202,6 +236,7 @@ export function useCollaboration(enabled = true) {
 
     busy.value = true;
     generation += 1;
+    etag = '';
     error.value = '';
     accountNotice.value = '';
 
@@ -277,9 +312,14 @@ export function useCollaboration(enabled = true) {
   onMounted(() => {
     if (enabled) {
       void refresh();
-      interval = setInterval(() => void refresh(), 2000);
+      interval = setInterval(() => {
+        if (!document.hidden && Date.now() >= retryAt) {
+          void refresh();
+        }
+      }, 2000);
       window.addEventListener('focus', refresh);
       window.addEventListener('online', refresh);
+      document.addEventListener('visibilitychange', refresh);
     }
   });
 
@@ -288,6 +328,7 @@ export function useCollaboration(enabled = true) {
     clearInterval(interval);
     window.removeEventListener('focus', refresh);
     window.removeEventListener('online', refresh);
+    document.removeEventListener('visibilitychange', refresh);
   });
 
   return {

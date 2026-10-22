@@ -3,6 +3,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
 import { ApiError, createService } from './service.ts';
 import { openDatabase } from './database.ts';
+import { clientAddress, createRateLimiter } from './rate-limit.ts';
 
 async function readBody(request: IncomingMessage): Promise<Record<string, unknown>> {
   if (!request.headers['content-type']?.startsWith('application/json')) {
@@ -36,10 +37,9 @@ async function readBody(request: IncomingMessage): Promise<Record<string, unknow
 }
 
 function json(response: ServerResponse, status: number, value: unknown) {
-  response.writeHead(status, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Cache-Control': 'no-store',
-  });
+  response.setHeader('Content-Type', 'application/json; charset=utf-8');
+  response.setHeader('Cache-Control', 'no-store');
+  response.writeHead(status);
   response.end(JSON.stringify(value));
 }
 
@@ -48,33 +48,34 @@ export function createApplication(options: {
   staticDir?: string;
   origin?: string;
   secureCookie?: boolean;
+  trustedProxies?: string[];
 }) {
   const db = openDatabase(options.database);
   const service = createService(db);
-  const attempts = new Map<string, { count: number; until: number }>();
-
-  function limit(key: string, maximum: number) {
-    const now = Date.now();
-
-    for (const [storedKey, value] of attempts) {
-      if (value.until <= now) {
-        attempts.delete(storedKey);
-      }
+  const limit = createRateLimiter(db);
+  const cleanup = () => {
+    db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
+    db.prepare('DELETE FROM invites WHERE expires_at <= ?').run(Date.now());
+    db.prepare('DELETE FROM rate_limits WHERE until <= ?').run(Date.now());
+  };
+  cleanup();
+  const maintenance = setInterval(() => {
+    try {
+      cleanup();
+    } catch (error) {
+      console.error('Database maintenance failed:', error);
     }
-
-    const entry = attempts.get(key) ?? { count: 0, until: now + 15 * 60000 };
-    entry.count += 1;
-    attempts.set(key, entry);
-
-    if (entry.count > maximum) {
-      throw new ApiError(429, '尝试次数过多，请 15 分钟后再试。');
-    }
-  }
+  }, 60 * 60000);
+  maintenance.unref();
 
   const server = createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'no-referrer');
     response.setHeader('X-Frame-Options', 'DENY');
+    response.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+    );
     const token =
       request.headers.cookie
         ?.split(';')
@@ -95,6 +96,18 @@ export function createApplication(options: {
       }
 
       if (path === '/api/session' && request.method === 'GET') {
+        const etag = service.sessionTag(userId);
+        response.setHeader('ETag', etag);
+        response.setHeader('Cache-Control', 'private, no-cache');
+        response.setHeader('Vary', 'Cookie');
+
+        if (request.headers['if-none-match'] === etag) {
+          response.writeHead(304);
+          response.end();
+
+          return;
+        }
+
         json(response, 200, userId ? service.snapshot(userId) : { user: null, family: null });
 
         return;
@@ -116,7 +129,12 @@ export function createApplication(options: {
         }
 
         const body = await readBody(request);
-        const ip = request.socket.remoteAddress ?? 'unknown';
+        const forwarded = request.headers['x-forwarded-for'];
+        const ip = clientAddress(
+          request.socket.remoteAddress ?? 'unknown',
+          typeof forwarded === 'string' ? forwarded : undefined,
+          options.trustedProxies ?? [],
+        );
 
         if (path === '/api/recover') {
           limit(`recovery-ip:${ip}`, 30);
@@ -207,6 +225,11 @@ export function createApplication(options: {
           existsSync(candidate) && statSync(candidate).isFile()
             ? candidate
             : resolve(root, 'index.html');
+
+        if (file !== candidate && (path.startsWith('/assets/') || path === '/version.json')) {
+          throw new ApiError(404, '资源不存在。');
+        }
+
         const mime: Record<string, string> = {
           '.html': 'text/html; charset=utf-8',
           '.js': 'text/javascript',
@@ -217,9 +240,25 @@ export function createApplication(options: {
         };
 
         if (existsSync(file)) {
+          const stat = statSync(file);
+          const etag = `W/"${stat.size}-${stat.mtimeMs}"`;
+          response.setHeader('ETag', etag);
+          response.setHeader(
+            'Cache-Control',
+            file === candidate && /^\/assets\/.+-[\w-]{8,}\.[\w]+$/.test(path)
+              ? 'public, max-age=31536000, immutable'
+              : 'no-cache',
+          );
+
+          if (request.headers['if-none-match'] === etag) {
+            response.writeHead(304);
+            response.end();
+
+            return;
+          }
+
           response.writeHead(200, {
             'Content-Type': mime[extname(file)] ?? 'application/octet-stream',
-            'Cache-Control': 'no-cache',
           });
           createReadStream(file).pipe(response);
 
@@ -242,6 +281,7 @@ export function createApplication(options: {
     }
   });
   server.requestTimeout = 15000;
+  server.once('close', () => clearInterval(maintenance));
 
   return { server, db };
 }

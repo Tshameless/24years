@@ -1,7 +1,8 @@
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { copyDatabase, verifyDatabase } from './backup.ts';
+import { pruneBackups } from './backup-retention.ts';
 
 const [command, source, target] = process.argv.slice(2);
 
@@ -15,8 +16,18 @@ try {
       throw new Error('请设置 BACKUP_DIR，为备份提供独立的持久化目录。');
     }
 
+    if (dirname(resolve(database)) === resolve(directory)) {
+      throw new Error('自动备份目录必须与在线数据库目录分离。');
+    }
+
     const filename = `family-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}.sqlite`;
-    console.log(JSON.stringify(copyDatabase(database, resolve(directory, filename))));
+    const result = copyDatabase(database, resolve(directory, filename));
+    const removed = pruneBackups(
+      directory,
+      result.path,
+      Number(process.env.BACKUP_RETENTION_DAYS ?? 30),
+    );
+    console.log(JSON.stringify({ ...result, removed }));
   } else if (command === 'verify' && source && !target) {
     console.log(JSON.stringify(verifyDatabase(resolve(source))));
   } else if ((command === 'backup' || command === 'restore') && source && target) {
