@@ -4,10 +4,11 @@ import { computed, shallowRef } from 'vue';
 import { useFamily, type ImportTarget } from '@/composables/useFamily';
 import { MAX_BACKUP_BYTES, readFamilyBackup } from '@/domain/backup';
 import type { FamilyData } from '@/domain/family';
+import { MAX_CLOUD_BYTES, familyBytes } from '@/domain/capacity';
 
 const store = useFamily();
 const { cloud } = store;
-const { active, busy, ready, expired, role, state } = cloud;
+const { active, busy, ready, online, expired, role, state } = cloud;
 const preview = shallowRef<{
   raw: string;
   data: FamilyData;
@@ -18,8 +19,12 @@ const loading = shallowRef(false);
 const error = shallowRef('');
 const message = shallowRef('');
 const confirmed = shallowRef(false);
+const usedBytes = computed(() =>
+  familyBytes(active.value ? (state.value.family?.data ?? store.data.value) : store.data.value),
+);
+const nearCapacity = computed(() => usedBytes.value >= MAX_CLOUD_BYTES * 0.9);
 const unavailable = computed(
-  () => !ready.value || busy.value || (active.value && (expired.value || role.value !== 'owner')),
+  () => !ready.value || busy.value || (active.value && (!online.value || expired.value || role.value !== 'owner')),
 );
 let selection = 0;
 
@@ -41,11 +46,28 @@ async function selectFile(event: Event) {
 
   try {
     if (file.size >= MAX_BACKUP_BYTES) {
-      throw new Error('请选择小于 800 KB 的 JSON 备份。');
+      throw new Error('请选择小于 32 MiB 的 JSON 备份。');
     }
 
     const raw = await file.text();
     const data = readFamilyBackup(raw);
+
+    if (active.value) {
+      const current = state.value.family;
+      const member = current?.members.find((item) => item.id === state.value.user?.id);
+      const cloudData = {
+        ...data,
+        theme: current?.data.theme ?? data.theme,
+        profile:
+          data.profile && current
+            ? { ...data.profile, familyMode: current.mode, parentRole: member?.familyRole }
+            : data.profile,
+      };
+
+      if (familyBytes(cloudData) >= MAX_CLOUD_BYTES) {
+        throw new Error('备份内容超过云端 800 KB 容量上限，可退出账号后恢复到本机。');
+      }
+    }
 
     if (attempt === selection) {
       preview.value = { raw, data, target, operationId: createId() };
@@ -109,6 +131,20 @@ async function downloadPrevious() {
         active
           ? '当前操作账号中的家庭记录，恢复结果会同步给家庭成员。'
           : '无需登录即可导入和导出。数据仅保存在当前浏览器，请定期导出 JSON 备份；换设备后可在这里导入恢复。账号与成员权限不包含在备份中，备份含个人记录，请妥善保管。'
+      }}
+    </p>
+    <p class="muted">
+      {{ active ? '云端容量' : '本机数据' }}：{{ (usedBytes / 1000).toFixed(1) }} KB
+      <template v-if="active">/ 800 KB</template>
+    </p>
+    <p
+      v-if="nearCapacity"
+      class="form-error"
+    >
+      {{
+        active
+          ? '云端容量接近上限。请先导出完整备份，再整理不再需要的记录；导出不会自动释放容量。'
+          : '本机数据接近或超过云端容量上限，仍可在本机使用及备份恢复，开启同步前需整理记录。'
       }}
     </p>
     <div class="backup-actions">

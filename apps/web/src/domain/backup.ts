@@ -1,10 +1,11 @@
 import { decodeFamily, type FamilyData } from './family';
+import { MAX_BACKUP_BYTES } from './capacity';
 
-export const MAX_BACKUP_BYTES = 800000;
+export { MAX_BACKUP_BYTES } from './capacity';
 
 export function readFamilyBackup(raw: string): FamilyData {
   if (new TextEncoder().encode(raw).length >= MAX_BACKUP_BYTES) {
-    throw new Error('备份超过 800 KB，请拆分整理后重试。');
+    throw new Error('备份文件需小于 32 MiB，原记录未修改。');
   }
 
   try {

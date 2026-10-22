@@ -58,7 +58,8 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     () =>
       !cloud.ready.value ||
       (cloud.active.value
-        ? !cloud.online.value || cloud.busy.value ||
+        ? !cloud.online.value ||
+          cloud.busy.value ||
           cloud.expired.value ||
           !cloud.state.value.family ||
           cloud.role.value === 'viewer'
@@ -71,7 +72,11 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     () =>
       !cloud.ready.value ||
       (cloud.active.value
-        ? !cloud.online.value || cloud.busy.value || cloud.expired.value || !cloud.state.value.user || !canManage.value
+        ? !cloud.online.value ||
+          cloud.busy.value ||
+          cloud.expired.value ||
+          !cloud.state.value.user ||
+          !canManage.value
         : localLocked.value),
   );
   const familyMode = computed(
@@ -218,7 +223,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
       const raw =
         localLocked.value && !cloud.active.value
           ? localStorage.getItem(STORAGE_KEY)
-          : JSON.stringify(data.value, null, 2);
+          : JSON.stringify(data.value);
       downloadBackup(raw ?? '{}', `24years-backup-${localDate()}.json`);
     } catch {
       localError.value = '暂时无法导出，请检查浏览器下载与存储权限。';
@@ -277,7 +282,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
       }
 
       downloadBackup(
-        JSON.stringify(cloud.backupData.value, null, 2),
+        JSON.stringify(cloud.backupData.value),
         `24years-before-import-${localDate()}.json`,
       );
     } else {

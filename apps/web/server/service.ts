@@ -26,6 +26,7 @@ import type {
   SharedFamily,
 } from '../src/domain/collaboration.ts';
 import { transaction } from './database.ts';
+import { MAX_CLOUD_BYTES, familyBytes } from '../src/domain/capacity.ts';
 
 export class ApiError extends Error {
   status: number;
@@ -422,7 +423,11 @@ export function createService(db: DatabaseSync) {
       data.profile = { ...data.profile, familyMode: body.mode, parentRole: selectedFamilyRole };
     }
 
-    requireValue(Buffer.byteLength(JSON.stringify(data)) < 800000, 413, '档案超过当前容量上限。');
+    requireValue(
+      familyBytes(data) < MAX_CLOUD_BYTES,
+      413,
+      '档案超过云端 800 KB 容量上限，可继续在本机保存。',
+    );
 
     const familyId = randomUUID();
     db.prepare('INSERT INTO families VALUES (?, ?, ?, 1, ?, ?)').run(
@@ -510,7 +515,7 @@ export function createService(db: DatabaseSync) {
     }
 
     requireValue(
-      Buffer.byteLength(JSON.stringify(family.data)) < 800000,
+      familyBytes(family.data) < MAX_CLOUD_BYTES,
       413,
       '家庭记录已达到当前容量上限，请先导出备份。',
     );
@@ -761,7 +766,11 @@ export function createService(db: DatabaseSync) {
     }
 
     data.theme = family.data.theme;
-    requireValue(Buffer.byteLength(JSON.stringify(data)) < 800000, 413, '备份超过当前容量上限。');
+    requireValue(
+      familyBytes(data) < MAX_CLOUD_BYTES,
+      413,
+      '备份内容超过云端 800 KB 容量上限，可退出账号后恢复到本机。',
+    );
     db.prepare(
       'INSERT INTO import_backups VALUES (?, ?, ?) ON CONFLICT(family_id) DO UPDATE SET data = excluded.data, created_at = excluded.created_at',
     ).run(family.id, JSON.stringify(family.data), new Date().toISOString());
