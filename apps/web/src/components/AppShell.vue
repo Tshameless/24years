@@ -1,12 +1,32 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted, shallowRef } from 'vue';
 import { useRoute } from 'vue-router';
 import { useFamily } from '@/composables/useFamily';
 import AppIcon from './AppIcon.vue';
 
 const { data, error, toggleTheme, exportBackup, cloud, familyMode } = useFamily();
-const { active, label, lastSynced, busy } = cloud;
+const { active, label, lastSynced, busy, online } = cloud;
 const route = useRoute();
+const browserOnline = shallowRef(navigator.onLine);
+const disconnected = computed(() => !browserOnline.value || (active.value && !online.value));
+
+function handleOnline() {
+  browserOnline.value = true;
+}
+
+function handleOffline() {
+  browserOnline.value = false;
+}
+
+onMounted(() => {
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('online', handleOnline);
+  window.removeEventListener('offline', handleOffline);
+});
 
 const navigation = [
   { to: '/', label: '今日陪伴', icon: 'home' },
@@ -140,6 +160,18 @@ const section = computed(
           </button>
         </div>
       </header>
+      <div
+        v-if="disconnected"
+        class="offline-notice"
+        role="status"
+        aria-live="polite"
+      >
+        {{
+          active
+            ? '无法连接云端：云端家庭数据未缓存，刷新后无法恢复云端记录；当前已加载内容可查看，保存需恢复连接。'
+            : '当前离线：已缓存的应用页面可以打开，本机记录仍保存在当前浏览器。'
+        }}
+      </div>
       <div
         v-if="error"
         class="storage-error"
@@ -444,6 +476,13 @@ const section = computed(
   font-size: 14px;
 }
 
+.offline-notice {
+  padding: 12px 32px;
+  background: var(--pink-light);
+  color: var(--primary-ink);
+  font-size: 13px;
+}
+
 .mobile-brand {
   display: none;
 }
@@ -533,6 +572,10 @@ const section = computed(
 
   .main-content {
     padding: 26px 18px 16px;
+  }
+
+  .offline-notice {
+    padding-inline: 18px;
   }
 
   .page-footer {

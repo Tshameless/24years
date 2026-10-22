@@ -8,6 +8,7 @@
     "lint": "pnpm --dir apps/web lint",
     "test": "pnpm --dir apps/web test",
     "test:api": "pnpm --dir apps/web test:api",
-    "test:e2e": "pnpm --dir apps/web test:e2e"
+    "test:e2e": "pnpm --dir apps/web test:e2e",
+    "test:e2e:pwa": "pnpm --dir apps/web test:e2e:pwa"
   }
 }

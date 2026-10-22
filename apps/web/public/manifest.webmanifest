@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "24Years · 把陪伴，写成时光",
+  "short_name": "24Years",
+  "description": "记录日常计划、孕期日历和家庭账目。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf9f6",
+  "theme_color": "#faf9f6",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

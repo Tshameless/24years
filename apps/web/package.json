@@ -22,7 +22,8 @@
     "db:backup": "node server/backup-cli.ts backup",
     "db:verify": "node server/backup-cli.ts verify",
     "db:restore": "node server/backup-cli.ts restore",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:pwa": "pnpm build && playwright test --config=playwright.pwa.config.ts"
   },
   "dependencies": {
     "@lucide/vue": "1.52.0",
