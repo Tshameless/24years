@@ -241,7 +241,6 @@ async function submit() {
                 type="text"
                 inputmode="numeric"
                 pattern="[0-9]{1,2}"
-                maxlength="2"
                 placeholder="例如：24"
                 aria-describedby="gestation-help"
                 required

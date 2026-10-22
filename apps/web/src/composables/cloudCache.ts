@@ -9,6 +9,7 @@ export function readCloudCache(): SessionState | null {
     const saved = JSON.parse(localStorage.getItem(CLOUD_CACHE_KEY) ?? 'null');
     const user = saved?.state?.user;
     const family = saved?.state?.family;
+
     if (
       saved?.version !== 1 || !Number.isFinite(saved.savedAt) ||
       saved.savedAt > Date.now() || Date.now() - saved.savedAt >= 30 * 86400000 ||
@@ -25,6 +26,7 @@ export function readCloudCache(): SessionState | null {
     ) {
       return null;
     }
+
     return {
       user: { id: user.id, username: user.username, nickname: user.nickname },
       family: { ...family, data: decodeFamily(JSON.stringify(family.data)) },

@@ -163,6 +163,7 @@ test('怀孕时期必填且只接受支持范围内的整数孕周', async ({ pa
   for (const value of ['', '-1', '24.5', '43']) {
     await weeks.fill(value);
     await page.getByRole('button', { name: '保存家庭档案' }).click();
+    await expect(weeks).toHaveValue(value);
     await expect(page.getByRole('status')).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem('24years.family.v1'))).toBeNull();
   }

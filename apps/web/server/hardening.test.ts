@@ -83,11 +83,12 @@ test('session validators track invite expiry, revisions and membership without d
 
 test('blocked attempts do not write and expired windows reset between cleanup passes', () => {
   const db = openDatabase(':memory:');
+
   try {
     const limit = createRateLimiter(db);
     limit('a', 1, 100);
     const changes = db.prepare('SELECT total_changes() AS n').get();
-    for (let i = 0; i < 20; i++) assert.throws(() => limit('a', 1, 101 + i));
+    for (let i = 0; i < 20; i++) {assert.throws(() => limit('a', 1, 101 + i));}
     assert.deepEqual(db.prepare('SELECT total_changes() AS n').get(), changes);
     limit('b', 1, 900000); // Maintenance runs just before a expires.
     limit('a', 1, 900101);
@@ -116,6 +117,7 @@ test('startup removes old receipts and retains indexed recent receipts', async (
   db.close();
   const app = createApplication({ database });
   await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+
   try {
     const receipts = app.db.prepare('SELECT operation_id FROM receipts').all() as Array<{ operation_id: string }>;
     assert.deepEqual(receipts.map((row) => row.operation_id), ['recent']);

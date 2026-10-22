@@ -76,6 +76,7 @@ export function useCollaboration(enabled = true) {
 
   try {
     active.value = enabled && localStorage.getItem(ACTIVE_KEY) === 'true';
+
     if (active.value) {
       state.value = readCloudCache() ?? state.value;
       online.value = false;
@@ -160,6 +161,7 @@ export function useCollaboration(enabled = true) {
       } else {
         localStorage.removeItem(CLOUD_CACHE_KEY);
       }
+
       cacheWarning.value = '';
     } catch {
       cacheWarning.value = '离线快照未能保存，请勿依赖断网刷新查看；可先导出备份。';
@@ -267,8 +269,10 @@ export function useCollaboration(enabled = true) {
     if (busy.value) {
       return false;
     }
+
     if (path.startsWith('family/') && (!ready.value || !online.value || expired.value)) {
       error.value = '当前为只读快照，请恢复连接并同步最新记录后再修改。';
+
       return false;
     }
 
@@ -351,11 +355,13 @@ export function useCollaboration(enabled = true) {
 
     rememberActive(false);
     expired.value = false;
+
     if (path !== 'recover') {
       recoveryKey.value = '';
     } else {
       recoveryUsername.value = (body as { username: string }).username;
     }
+
     accountNotice.value =
       path === 'recover'
         ? '密码已重置，旧密钥已失效。请先保存新恢复密钥，再用新密码登录。'
@@ -411,6 +417,7 @@ export function useCollaboration(enabled = true) {
     generation += 1;
     etag = '';
     online.value = false;
+
     if (identityChanged || !cached) {
       state.value = cached ?? { user: null, family: null };
       recoveryKey.value = '';

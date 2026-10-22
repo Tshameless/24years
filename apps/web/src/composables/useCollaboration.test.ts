@@ -8,6 +8,7 @@ import type { SessionState } from '@/domain/collaboration';
 
 function snapshot(id = 'user', revision = 1): SessionState {
   const user = { id, username: id, nickname: '家长' };
+
   return {
     user,
     family: {
@@ -27,8 +28,10 @@ function mountCloud() {
   let cloud!: ReturnType<typeof useCollaboration>;
   const wrapper = mount(defineComponent({ setup() {
     cloud = useCollaboration();
+
     return () => null;
   } }));
+
   return { cloud, wrapper };
 }
 
@@ -38,6 +41,7 @@ it('restores a read-only cloud snapshot on offline cold start and clears it on e
   const fetcher = vi.fn().mockRejectedValue(new TypeError('offline'));
   vi.stubGlobal('fetch', fetcher);
   const { cloud, wrapper } = mountCloud();
+
   try {
     expect(cloud.ready.value).toBe(true);
     expect(cloud.state.value).toEqual(state);
@@ -69,6 +73,7 @@ it('persists a successful session and removes its snapshot on logout', async () 
   const fetcher = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(state))));
   vi.stubGlobal('fetch', fetcher);
   const { cloud, wrapper } = mountCloud();
+
   try {
     await flushPromises();
     expect(readCloudCache()).toEqual(state);
@@ -86,6 +91,7 @@ it('ignores a stale in-flight response after another tab switches accounts', asy
     .mockRejectedValue(new TypeError('offline'));
   vi.stubGlobal('fetch', fetcher);
   const { cloud, wrapper } = mountCloud();
+
   try {
     cache(snapshot('new'));
     window.dispatchEvent(new StorageEvent('storage', { key: CLOUD_CACHE_KEY, newValue: localStorage.getItem(CLOUD_CACHE_KEY) }));
@@ -118,15 +124,7 @@ it('reuses ETag without decoding 304 and pauses hidden polling', async () => {
     )
     .mockResolvedValue({ status: 304, json: decode });
   vi.stubGlobal('fetch', fetcher);
-  const wrapper = mount(
-    defineComponent({
-      setup() {
-        useCollaboration();
-
-        return () => null;
-      },
-    }),
-  );
+  const { wrapper } = mountCloud();
 
   try {
     await flushPromises();

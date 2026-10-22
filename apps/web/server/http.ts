@@ -50,6 +50,7 @@ function json(response: ServerResponse, status: number, value: unknown) {
   const fields = new Set(String(vary ?? '').split(',').map((field) => field.trim()).filter(Boolean));
   fields.add('Accept-Encoding');
   response.setHeader('Vary', [...fields].join(', '));
+
   if (encoding) {
     response.setHeader('Content-Encoding', encoding);
     response.writeHead(status);
@@ -59,10 +60,12 @@ function json(response: ServerResponse, status: number, value: unknown) {
         ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: 4 } })
         : createGzip(),
       response,
-      (error) => { if (error) response.destroy(error); },
+      (error) => { if (error) {response.destroy(error);} },
     );
+
     return;
   }
+
   response.writeHead(status);
   response.end(payload);
 }
