@@ -9,6 +9,17 @@ import { createApplication } from './http.ts';
 import { createService } from './service.ts';
 import { emptyFamily } from '../src/domain/family.ts';
 import { pruneBackups } from './backup-retention.ts';
+import { compressionEncoding } from './compression.ts';
+
+test('compression negotiation respects quality, exclusions and identity', () => {
+  assert.equal(compressionEncoding(), undefined);
+  assert.equal(compressionEncoding('gzip, br'), 'br');
+  assert.equal(compressionEncoding('gzip;q=1, br;q=0.5'), 'gzip');
+  assert.equal(compressionEncoding('*;q=1, br;q=0'), 'gzip');
+  assert.equal(compressionEncoding('br;q=0, gzip;q=0'), undefined);
+  assert.equal(compressionEncoding('gzip;q=0.5, identity;q=1'), undefined);
+  assert.equal(compressionEncoding('br;q=invalid, gzip;q=2'), undefined);
+});
 
 test('only trusted proxies can supply an address; nearest appended IP wins', () => {
   assert.equal(clientAddress('10.0.0.1', '1.2.3.4', []), '10.0.0.1');
@@ -75,16 +86,38 @@ test('HTTP uses 304, immutable assets, CSP and 404 for missing chunks', async ()
   mkdirSync(join(directory, 'assets'));
   writeFileSync(join(directory, 'index.html'), '<html></html>');
   writeFileSync(join(directory, 'assets', 'index-12345678.js'), 'export {};');
+  const largeScript = 'export const value = "' + 'compressible-content '.repeat(200) + '";';
+  writeFileSync(join(directory, 'assets', 'large-12345678.js'), largeScript);
   const app = createApplication({ database: ':memory:', staticDir: directory });
   await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
   const address = app.server.address() as { port: number };
   const base = `http://127.0.0.1:${address.port}`;
 
   try {
+    for (const encoding of ['br', 'gzip', 'identity']) {
+      const response = await fetch(base + '/assets/large-12345678.js', {
+        headers: { 'Accept-Encoding': encoding },
+      });
+      assert.equal(
+        response.headers.get('content-encoding'),
+        encoding === 'identity' ? null : encoding,
+      );
+      assert.equal(response.headers.get('vary'), 'Accept-Encoding');
+      // Fetch decodes the compressed stream; invalid/truncated streams fail here.
+      assert.equal(await response.text(), largeScript);
+      const unchanged = await fetch(base + '/assets/large-12345678.js', {
+        headers: { 'Accept-Encoding': encoding, 'If-None-Match': response.headers.get('etag')! },
+      });
+      assert.equal(unchanged.status, 304);
+      assert.equal(unchanged.headers.get('vary'), 'Accept-Encoding');
+      assert.equal(unchanged.headers.get('content-encoding'), null);
+    }
+
     for (const path of ['/api/session', '/', '/assets/index-12345678.js']) {
       const first = await fetch(base + path);
       assert.equal(first.status, 200);
       assert.ok(first.headers.get('content-security-policy'));
+      assert.equal(first.headers.get('content-encoding'), null);
       const second = await fetch(base + path, {
         headers: { 'If-None-Match': first.headers.get('etag')! },
       });

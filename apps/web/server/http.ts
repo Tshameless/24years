@@ -1,9 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
+import { pipeline } from 'node:stream';
+import { constants, createBrotliCompress, createGzip } from 'node:zlib';
 import { ApiError, createService } from './service.ts';
 import { openDatabase } from './database.ts';
 import { clientAddress, createRateLimiter } from './rate-limit.ts';
+import { compressionEncoding } from './compression.ts';
 
 async function readBody(request: IncomingMessage): Promise<Record<string, unknown>> {
   if (!request.headers['content-type']?.startsWith('application/json')) {
@@ -244,6 +247,16 @@ export function createApplication(options: {
           const stat = statSync(file);
           const etag = `W/"${stat.size}-${stat.mtimeMs}"`;
           response.setHeader('ETag', etag);
+          const compressible = /\.(?:html|js|css|svg|json|webmanifest)$/.test(file);
+          const encoding =
+            compressible && stat.size >= 1024
+              ? compressionEncoding(request.headers['accept-encoding'])
+              : undefined;
+
+          if (compressible) {
+            response.setHeader('Vary', 'Accept-Encoding');
+          }
+
           response.setHeader(
             'Cache-Control',
             file === candidate && /^\/assets\/.+-[\w-]{8,}\.[\w]+$/.test(path)
@@ -260,8 +273,27 @@ export function createApplication(options: {
 
           response.writeHead(200, {
             'Content-Type': mime[extname(file)] ?? 'application/octet-stream',
+            ...(encoding ? { 'Content-Encoding': encoding } : {}),
           });
-          createReadStream(file).pipe(response);
+          const source = createReadStream(file);
+          const onError = (error: NodeJS.ErrnoException | null) => {
+            if (error && error.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
+              console.error('Static response failed:', error);
+            }
+          };
+
+          if (encoding) {
+            pipeline(
+              source,
+              encoding === 'br'
+                ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: 4 } })
+                : createGzip(),
+              response,
+              onError,
+            );
+          } else {
+            pipeline(source, response, onError);
+          }
 
           return;
         }
