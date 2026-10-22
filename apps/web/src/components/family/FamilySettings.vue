@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, shallowRef, watch } from 'vue';
 import { useFamily } from '@/composables/useFamily';
+import { useFormDraft } from '@/composables/useFormDraft';
 import { dueDateFromGestation, localDate, pregnancyProgress } from '@/domain/family';
 import AccountPanel from './AccountPanel.vue';
 import FamilyPairing from './FamilyPairing.vue';
@@ -8,7 +9,7 @@ import FamilySetupChoice from './FamilySetupChoice.vue';
 import DataBackupPanel from './DataBackupPanel.vue';
 import type { FamilyMode, FamilyParentRole } from '@/domain/collaboration';
 
-const { data, saveProfile, profileLocked, canManage, cloud } = useFamily();
+const { data, saveProfile, profileLocked, canManage, cloud, identity } = useFamily();
 const { active, state } = cloud;
 const currentMember = computed(() =>
   state.value.family?.members.find((member) => member.id === state.value.user?.id),
@@ -18,29 +19,37 @@ const initialMode =
   data.value.profile?.familyMode ??
   (data.value.profile ? 'single' : '');
 const before = shallowRef(data.value.profile);
-const dirty = shallowRef(false);
 
 // Anchor the draft to the displayed date; saving after midnight must not shift it.
-const referenceDate = shallowRef(localDate());
+const initialDate = localDate();
 const initialProgress = data.value.profile
-  ? pregnancyProgress(data.value.profile.dueDate, referenceDate.value)
+  ? pregnancyProgress(data.value.profile.dueDate, initialDate)
   : null;
 
 const form = reactive({
+  referenceDate: initialDate,
   familyMode: initialMode as FamilyMode | '',
   parentRole:
     (active.value ? currentMember.value?.familyRole : data.value.profile?.parentRole) ??
     ((initialMode === 'single' ? 'single_parent' : '') as FamilyParentRole | ''),
   name: data.value.profile?.name ?? '',
   nickname: data.value.profile?.nickname ?? '',
-  weeks: initialProgress?.weeks ?? ('' as number | ''),
+  weeks: initialProgress ? String(initialProgress.weeks) : '',
   days: initialProgress?.days ?? 0,
   quietMode: data.value.profile?.quietMode ?? false,
 });
 
+const draft = useFormDraft({
+  form,
+  scope: () => `${identity.value}:${cloud.role.value ?? 'local'}`,
+  name: 'family-profile',
+  baseline: () => data.value.profile,
+});
+const { dirty, restored, changedSource, storageError } = draft;
+
 const estimatedDueDate = computed(() =>
-  typeof form.weeks === 'number'
-    ? dueDateFromGestation(form.weeks, form.days, referenceDate.value)
+  form.weeks.trim() && /^\d{4}-\d{2}-\d{2}$/.test(form.referenceDate)
+    ? dueDateFromGestation(Number(form.weeks), form.days, form.referenceDate)
     : null,
 );
 
@@ -50,22 +59,27 @@ const saved = shallowRef(false);
 const stale = computed(() => JSON.stringify(before.value) !== JSON.stringify(data.value.profile));
 
 function reloadProfile() {
+  if (!draft.confirmDiscard()) {
+    return;
+  }
+
   before.value = data.value.profile;
-  referenceDate.value = localDate();
+  const referenceDate = localDate();
   const progress = before.value
-    ? pregnancyProgress(before.value.dueDate, referenceDate.value)
+    ? pregnancyProgress(before.value.dueDate, referenceDate)
     : null;
   Object.assign(form, {
+    referenceDate,
     familyMode:
       state.value.family?.mode ?? before.value?.familyMode ?? (before.value ? 'single' : ''),
     parentRole: (active.value ? currentMember.value?.familyRole : before.value?.parentRole) ?? '',
     name: before.value?.name ?? '',
     nickname: before.value?.nickname ?? '',
-    weeks: progress?.weeks ?? '',
+    weeks: progress ? String(progress.weeks) : '',
     days: progress?.days ?? 0,
     quietMode: before.value?.quietMode ?? false,
   });
-  dirty.value = false;
+  draft.accept();
   saved.value = false;
   cloud.clearError();
 }
@@ -82,6 +96,10 @@ watch(
 async function submit() {
   error.value = '';
   saved.value = false;
+
+  if (profileLocked.value || stale.value || changedSource.value) {
+    return;
+  }
 
   if (
     !form.familyMode ||
@@ -119,7 +137,7 @@ async function submit() {
 
   if (saved.value) {
     before.value = data.value.profile;
-    dirty.value = false;
+    draft.accept();
   }
 }
 </script>
@@ -144,11 +162,9 @@ async function submit() {
         @submit.prevent="submit"
         @input="
           saved = false;
-          dirty = true;
         "
         @change="
           saved = false;
-          dirty = true;
         "
       >
         <FamilySetupChoice
@@ -170,7 +186,7 @@ async function submit() {
           家庭档案由管理员维护，你可以查看最新信息。
         </p>
         <p
-          v-if="stale"
+          v-if="stale || changedSource"
           class="form-error"
         >
           档案已有更新。你的输入已保留，载入最新档案后可重新编辑。
@@ -182,6 +198,11 @@ async function submit() {
             载入最新档案
           </button>
         </p>
+        <p v-if="restored || dirty" class="muted">
+          {{ restored ? '已恢复当前标签页草稿。' : '未保存输入已暂存在当前标签页。' }}草稿不会自动提交。
+          <button type="button" class="text-button" @click="reloadProfile">放弃草稿，载入最新档案</button>
+        </p>
+        <p v-if="storageError" class="form-error" role="alert">{{ storageError }}</p>
         <label class="field">
           家庭名称
           <input
@@ -209,19 +230,18 @@ async function submit() {
             class="gestation-help"
           >
             <span v-if="form.parentRole === 'father'">请填写母亲的怀孕时期。</span>
-            按 {{ referenceDate }} 已满的孕周填写，例如 24 周 3 天。
+            按 {{ form.referenceDate }} 已满的孕周填写，例如 24 周 3 天。
           </p>
           <div class="form-row">
             <div class="field">
               <label for="gestation-weeks">孕周（周）</label>
               <input
                 id="gestation-weeks"
-                v-model.number="form.weeks"
-                type="number"
+                v-model="form.weeks"
+                type="text"
                 inputmode="numeric"
-                min="0"
-                max="42"
-                step="1"
+                pattern="[0-9]{1,2}"
+                maxlength="2"
                 placeholder="例如：24"
                 aria-describedby="gestation-help"
                 required
@@ -270,7 +290,7 @@ async function submit() {
         <div class="form-actions">
           <button
             class="button button-primary"
-            :disabled="profileLocked || stale"
+            :disabled="profileLocked || stale || changedSource"
           >
             保存家庭档案
           </button>

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
-import { pipeline } from 'node:stream';
+import { pipeline, Readable } from 'node:stream';
 import { constants, createBrotliCompress, createGzip } from 'node:zlib';
 import { ApiError, createService } from './service.ts';
 import { openDatabase } from './database.ts';
@@ -40,10 +40,31 @@ async function readBody(request: IncomingMessage): Promise<Record<string, unknow
 }
 
 function json(response: ServerResponse, status: number, value: unknown) {
+  const payload = JSON.stringify(value);
+  const encoding = Buffer.byteLength(payload) >= 1024
+    ? compressionEncoding(response.req.headers['accept-encoding'])
+    : undefined;
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.setHeader('Cache-Control', 'no-store');
+  const vary = response.getHeader('Vary');
+  const fields = new Set(String(vary ?? '').split(',').map((field) => field.trim()).filter(Boolean));
+  fields.add('Accept-Encoding');
+  response.setHeader('Vary', [...fields].join(', '));
+  if (encoding) {
+    response.setHeader('Content-Encoding', encoding);
+    response.writeHead(status);
+    pipeline(
+      Readable.from([payload]),
+      encoding === 'br'
+        ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: 4 } })
+        : createGzip(),
+      response,
+      (error) => { if (error) response.destroy(error); },
+    );
+    return;
+  }
   response.writeHead(status);
-  response.end(JSON.stringify(value));
+  response.end(payload);
 }
 
 export function createApplication(options: {
@@ -60,6 +81,8 @@ export function createApplication(options: {
     db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
     db.prepare('DELETE FROM invites WHERE expires_at <= ?').run(Date.now());
     db.prepare('DELETE FROM rate_limits WHERE until <= ?').run(Date.now());
+    // Retain receipts for 30 days, matching the maximum session lifetime.
+    db.prepare('DELETE FROM receipts WHERE created_at <= ?').run(Date.now() - 30 * 86400000);
   };
   cleanup();
   const maintenance = setInterval(() => {
@@ -102,7 +125,7 @@ export function createApplication(options: {
         const etag = service.sessionTag(userId);
         response.setHeader('ETag', etag);
         response.setHeader('Cache-Control', 'private, no-cache');
-        response.setHeader('Vary', 'Cookie');
+        response.setHeader('Vary', 'Cookie, Accept-Encoding');
 
         if (request.headers['if-none-match'] === etag) {
           response.writeHead(304);

@@ -81,6 +81,8 @@ export function openDatabase(path: string) {
     db.prepare('UPDATE receipts SET created_at = ? WHERE created_at = 0').run(Date.now());
   }
 
+  db.exec('CREATE INDEX IF NOT EXISTS receipts_created_at ON receipts(created_at)');
+
   if (!columns.some((column) => column.name === 'family_role')) {
     db.exec(`
       ALTER TABLE members ADD COLUMN family_role TEXT CHECK(family_role IN ('single_parent', 'mother', 'father'));

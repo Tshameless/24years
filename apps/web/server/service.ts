@@ -315,18 +315,19 @@ export function createService(db: DatabaseSync) {
     const salt = randomBytes(16).toString('hex');
     const key = await passwordHash(body.password, salt);
 
+    const recoveryKey = randomBytes(32).toString('base64url');
     transaction(db, () => {
       // Consume once after hashing; simultaneous recovery attempts cannot both succeed.
       const result = db
         .prepare(
-          'UPDATE accounts SET password_hash = ?, salt = ?, recovery_hash = NULL WHERE id = ? AND recovery_hash = ?',
+          'UPDATE accounts SET password_hash = ?, salt = ?, recovery_hash = ? WHERE id = ? AND recovery_hash = ?',
         )
-        .run(key.toString('hex'), salt, row.id, suppliedHash);
+        .run(key.toString('hex'), salt, hash(recoveryKey), row.id, suppliedHash);
       requireValue(result.changes === 1, 400, '恢复密钥已使用或已更新，请重新核对。');
       db.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.id);
     });
 
-    return { user: null, family: null };
+    return { user: null, family: null, recoveryKey };
   }
 
   async function deleteAccount(userId: string, body: Body) {

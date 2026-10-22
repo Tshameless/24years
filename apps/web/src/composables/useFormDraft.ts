@@ -27,7 +27,9 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
 }) {
   const router = useRouter();
   const initial = JSON.stringify(options.form);
-  const baseline = JSON.stringify(options.baseline ?? null);
+  const currentBaseline = () =>
+    JSON.stringify(typeof options.baseline === 'function' ? options.baseline() : options.baseline ?? null);
+  const baseline = currentBaseline();
   let draftBaseline = baseline;
   const scope = options.scope();
   const key = PREFIX + JSON.stringify([scope, options.name]);
@@ -106,7 +108,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
     clean.value = JSON.stringify(options.form);
     restored.value = false;
     changedSource.value = false;
-    draftBaseline = baseline;
+    draftBaseline = currentBaseline();
     id.value = createId();
     persist();
   }

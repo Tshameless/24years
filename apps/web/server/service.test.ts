@@ -507,6 +507,11 @@ test('恢复密钥仅存摘要、更新后旧密钥失效，并发恢复仅一�
       ),
     );
     assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
+    const recovered = results.find((result) => result.status === 'fulfilled')!;
+    assert.equal(recovered.status, 'fulfilled');
+    const nextKey = recovered.value.recoveryKey;
+    assert.match(nextKey, /^[\w-]{43}$/);
+    assert.notEqual(nextKey, rotated.recoveryKey);
     assert.equal(service.userForToken(registered.token), null);
     assert.equal(service.userForToken(another.token), null);
     await assert.rejects(() => service.authenticate(original, false), failsWith(401));
@@ -521,8 +526,15 @@ test('恢复密钥仅存摘要、更新后旧密钥失效，并发恢复仅一�
           recovery_hash: string | null;
         }
       ).recovery_hash,
-      null,
+      hash(nextKey),
     );
+    await assert.rejects(() => service.recover({
+      username: original.username, recoveryKey: rotated.recoveryKey, password: 'another-password',
+    }), failsWith(400));
+    const nextRecovery = await service.recover({
+      username: original.username, recoveryKey: nextKey, password: 'another-password',
+    });
+    assert.notEqual(nextRecovery.recoveryKey, nextKey);
   } finally {
     db.close();
   }
@@ -739,6 +751,9 @@ test('恢复与注销 HTTP 接口限制尝试次数、检查来源并清除会�
       password: 'replacement-password',
     });
     assert.equal(reset.status, 200);
+    const resetState = await reset.json();
+    assert.match(resetState.recoveryKey, /^[\w-]{43}$/);
+    assert.notEqual(resetState.recoveryKey, registered.recoveryKey);
     assert.match(reset.headers.get('set-cookie')!, /Max-Age=0/);
     assert.equal(
       (await post('account/recovery', { password: credentials.password }, { Cookie: cookie }))

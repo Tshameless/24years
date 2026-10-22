@@ -124,6 +124,19 @@ it('requires confirmation to discard and guards navigation and browser unload', 
   expect(after.defaultPrevented).toBe(false);
 });
 
+it('uses the latest source baseline after accepting a saved form', () => {
+  const baseline = shallowRef({ revision: 1 });
+  const first = setup(undefined, () => baseline.value);
+  first.form.title = 'saved';
+  baseline.value = { revision: 2 };
+  first.draft.accept();
+  first.form.title = 'next edit';
+  first.wrapper.unmount();
+  const second = setup(undefined, () => baseline.value);
+  expect(second.form.title).toBe('next edit');
+  expect(second.draft.changedSource.value).toBe(false);
+});
+
 it('warns on storage failure without discarding input', () => {
   vi.stubGlobal('sessionStorage', {
     getItem: () => null,

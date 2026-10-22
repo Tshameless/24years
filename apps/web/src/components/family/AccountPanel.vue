@@ -6,7 +6,7 @@ import AccountSecurity from './AccountSecurity.vue';
 
 const props = defineProps<{ initialMode?: 'login' | 'register' }>();
 const { cloud } = useFamily();
-const { state, busy, expired, active, accountNotice } = cloud;
+const { state, busy, expired, active, accountNotice, recoveryKey } = cloud;
 const register = shallowRef(
   props.initialMode ? props.initialMode === 'register' : !accountNotice.value,
 );
@@ -48,7 +48,7 @@ function logout() {
       <AccountSecurity />
     </template>
     <AccountRecovery
-      v-else-if="recovering"
+      v-else-if="recovering || recoveryKey"
       @cancel="
         recovering = false;
         register = false;

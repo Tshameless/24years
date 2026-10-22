@@ -7,6 +7,7 @@ import type {
   SessionState,
 } from '@/domain/collaboration';
 import type { FamilyData } from '@/domain/family';
+import { CLOUD_CACHE_KEY, readCloudCache } from './cloudCache';
 
 const ACTIVE_KEY = '24years.cloud.active';
 
@@ -58,10 +59,13 @@ export function useCollaboration(enabled = true) {
   const error = shallowRef('');
   const invitation = shallowRef<{ code: string; expiresAt: string } | null>(null);
   const recoveryKey = shallowRef('');
+  const recoveryUsername = shallowRef('');
   const backupData = shallowRef<FamilyData | null>(null);
   const accountNotice = shallowRef('');
   const lastSynced = shallowRef('');
+  const cacheWarning = shallowRef('');
   let fetching = false;
+  let refreshPending = false;
   let generation = 0;
   let disposed = false;
   let interval: ReturnType<typeof setInterval>;
@@ -72,6 +76,11 @@ export function useCollaboration(enabled = true) {
 
   try {
     active.value = enabled && localStorage.getItem(ACTIVE_KEY) === 'true';
+    if (active.value) {
+      state.value = readCloudCache() ?? state.value;
+      online.value = false;
+      ready.value = !!state.value.family;
+    }
   } catch {
     // Local storage protection is handled by the family store.
   }
@@ -93,7 +102,7 @@ export function useCollaboration(enabled = true) {
     }
 
     if (!online.value) {
-      return '连接中断 · 未同步';
+      return state.value.family ? '离线快照 · 仅查看' : '连接中断 · 未同步';
     }
 
     return busy.value ? '正在保存' : state.value.family ? '已同步' : '已登录 · 待加入家庭';
@@ -127,6 +136,7 @@ export function useCollaboration(enabled = true) {
     }
 
     state.value = { user: next.user, family: next.family };
+    persistSnapshot();
     lastSynced.value = new Date().toLocaleTimeString('zh-CN');
     online.value = true;
     expired.value = false;
@@ -140,6 +150,22 @@ export function useCollaboration(enabled = true) {
     }
   }
 
+  function persistSnapshot() {
+    try {
+      if (state.value.user && state.value.family) {
+        localStorage.setItem(
+          CLOUD_CACHE_KEY,
+          JSON.stringify({ version: 1, savedAt: Date.now(), state: state.value }),
+        );
+      } else {
+        localStorage.removeItem(CLOUD_CACHE_KEY);
+      }
+      cacheWarning.value = '';
+    } catch {
+      cacheWarning.value = '离线快照未能保存，请勿依赖断网刷新查看；可先导出备份。';
+    }
+  }
+
   function failed(reason: unknown) {
     if (reason instanceof RequestError) {
       if (reason.state) {
@@ -149,6 +175,7 @@ export function useCollaboration(enabled = true) {
       if (reason.status === 401 && active.value) {
         expired.value = true;
         state.value = { user: null, family: null };
+        persistSnapshot();
         recoveryKey.value = '';
         backupData.value = null;
       }
@@ -170,6 +197,7 @@ export function useCollaboration(enabled = true) {
     }
 
     fetching = true;
+    refreshPending = false;
     const startedAt = generation;
 
     try {
@@ -210,6 +238,7 @@ export function useCollaboration(enabled = true) {
       if (!next.user && active.value) {
         expired.value = true;
         state.value = { user: null, family: null };
+        persistSnapshot();
         recoveryKey.value = '';
         backupData.value = null;
         error.value = '登录已过期或已撤销，请在「我的家庭」重新登录。';
@@ -226,6 +255,11 @@ export function useCollaboration(enabled = true) {
     } finally {
       ready.value = true;
       fetching = false;
+
+      if (refreshPending && !disposed) {
+        refreshPending = false;
+        void refresh();
+      }
     }
   }
 
@@ -233,15 +267,25 @@ export function useCollaboration(enabled = true) {
     if (busy.value) {
       return false;
     }
+    if (path.startsWith('family/') && (!ready.value || !online.value || expired.value)) {
+      error.value = '当前为只读快照，请恢复连接并同步最新记录后再修改。';
+      return false;
+    }
 
     busy.value = true;
     generation += 1;
+    const startedAt = generation;
     etag = '';
     error.value = '';
     accountNotice.value = '';
 
     try {
       const next = await request(path, body);
+
+      if (startedAt !== generation || disposed) {
+        return false;
+      }
+
       receive(next);
 
       if (next.recoveryKey) {
@@ -258,12 +302,19 @@ export function useCollaboration(enabled = true) {
 
       return true;
     } catch (reason) {
-      failed(reason);
+      if (startedAt === generation && !disposed) {
+        failed(reason);
+      }
 
       return false;
     } finally {
       busy.value = false;
       ready.value = true;
+
+      if (refreshPending && !disposed) {
+        refreshPending = false;
+        void refresh();
+      }
     }
   }
 
@@ -300,13 +351,79 @@ export function useCollaboration(enabled = true) {
 
     rememberActive(false);
     expired.value = false;
-    recoveryKey.value = '';
+    if (path !== 'recover') {
+      recoveryKey.value = '';
+    } else {
+      recoveryUsername.value = (body as { username: string }).username;
+    }
     accountNotice.value =
       path === 'recover'
-        ? '密码已重置，请用新密码登录，并重新生成恢复密钥。'
+        ? '密码已重置，旧密钥已失效。请先保存新恢复密钥，再用新密码登录。'
         : '账号已注销，本机记录仍保留在此浏览器中。';
 
     return true;
+  }
+
+  function offline() {
+    online.value = false;
+  }
+
+  function storageChanged(event: StorageEvent) {
+    if (event.key !== ACTIVE_KEY && event.key !== CLOUD_CACHE_KEY && event.key !== null) {
+      return;
+    }
+
+    if (event.key === ACTIVE_KEY) {
+      const nextActive = event.newValue === 'true';
+      active.value = nextActive;
+
+      if (!nextActive) {
+        generation += 1;
+        etag = '';
+        state.value = { user: null, family: null };
+        recoveryKey.value = '';
+        invitation.value = null;
+        backupData.value = null;
+        pendingOperations.clear();
+        online.value = true;
+        expired.value = false;
+        refreshPending = false;
+
+        return;
+      }
+    }
+
+    const cached = readCloudCache();
+    const sameSnapshot =
+      cached?.user?.id === state.value.user?.id &&
+      cached?.family?.id === state.value.family?.id &&
+      cached?.family?.revision === state.value.family?.revision;
+
+    if (sameSnapshot && event.key === CLOUD_CACHE_KEY) {
+      return;
+    }
+
+    // Do not erase a good local snapshot on every write from a sibling tab.
+    // Identity transitions clear sensitive in-memory state before revalidation.
+    const identityChanged =
+      cached?.user?.id !== state.value.user?.id ||
+      cached?.family?.id !== state.value.family?.id;
+    generation += 1;
+    etag = '';
+    online.value = false;
+    if (identityChanged || !cached) {
+      state.value = cached ?? { user: null, family: null };
+      recoveryKey.value = '';
+      invitation.value = null;
+      backupData.value = null;
+      pendingOperations.clear();
+    } else if (cached.family && state.value.family && cached.family.revision > state.value.family.revision) {
+      // A newer read-only snapshot may be shown while the server is checked.
+      state.value = cached;
+    }
+
+    refreshPending = true;
+    void refresh();
   }
 
   onMounted(() => {
@@ -319,6 +436,8 @@ export function useCollaboration(enabled = true) {
       }, 2000);
       window.addEventListener('focus', refresh);
       window.addEventListener('online', refresh);
+      window.addEventListener('offline', offline);
+      window.addEventListener('storage', storageChanged);
       document.addEventListener('visibilitychange', refresh);
     }
   });
@@ -328,6 +447,8 @@ export function useCollaboration(enabled = true) {
     clearInterval(interval);
     window.removeEventListener('focus', refresh);
     window.removeEventListener('online', refresh);
+    window.removeEventListener('offline', offline);
+    window.removeEventListener('storage', storageChanged);
     document.removeEventListener('visibilitychange', refresh);
   });
 
@@ -339,9 +460,11 @@ export function useCollaboration(enabled = true) {
     online: readonly(online),
     expired: readonly(expired),
     error: readonly(error),
+    cacheWarning: readonly(cacheWarning),
     invitation: readonly(invitation),
     lastSynced: readonly(lastSynced),
     recoveryKey: readonly(recoveryKey),
+    recoveryUsername: readonly(recoveryUsername),
     backupData: readonly(backupData),
     accountNotice: readonly(accountNotice),
     role,
@@ -351,6 +474,7 @@ export function useCollaboration(enabled = true) {
     logout,
     dismissRecoveryKey: () => {
       recoveryKey.value = '';
+      recoveryUsername.value = '';
     },
     rotateRecovery: (password: string) => run('account/recovery', { password }),
     recover: (credentials: { username: string; recoveryKey: string; password: string }) =>

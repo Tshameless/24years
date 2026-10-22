@@ -53,12 +53,12 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
         theme: localData.value.theme,
       }) as FamilyData,
   );
-  const error = computed(() => cloud.error.value || localError.value);
+  const error = computed(() => cloud.error.value || cloud.cacheWarning.value || localError.value);
   const locked = computed(
     () =>
       !cloud.ready.value ||
       (cloud.active.value
-        ? cloud.busy.value ||
+        ? !cloud.online.value || cloud.busy.value ||
           cloud.expired.value ||
           !cloud.state.value.family ||
           cloud.role.value === 'viewer'
@@ -71,7 +71,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     () =>
       !cloud.ready.value ||
       (cloud.active.value
-        ? cloud.busy.value || cloud.expired.value || !cloud.state.value.user || !canManage.value
+        ? !cloud.online.value || cloud.busy.value || cloud.expired.value || !cloud.state.value.user || !canManage.value
         : localLocked.value),
   );
   const familyMode = computed(

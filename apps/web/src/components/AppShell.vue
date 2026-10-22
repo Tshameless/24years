@@ -5,7 +5,7 @@ import { useFamily } from '@/composables/useFamily';
 import AppIcon from './AppIcon.vue';
 
 const { data, error, toggleTheme, exportBackup, cloud, familyMode } = useFamily();
-const { active, label, lastSynced, busy, online } = cloud;
+const { active, label, lastSynced, busy, online, state } = cloud;
 const route = useRoute();
 const browserOnline = shallowRef(navigator.onLine);
 const disconnected = computed(() => !browserOnline.value || (active.value && !online.value));
@@ -168,7 +168,9 @@ const section = computed(
       >
         {{
           active
-            ? '无法连接云端：云端家庭数据未缓存，刷新后无法恢复云端记录；当前已加载内容可查看，保存需恢复连接。'
+            ? state.family
+              ? '无法连接云端：正在显示最近同步的只读快照，恢复连接后可同步最新记录。'
+              : '无法连接云端：没有可用的家庭快照；恢复连接后可同步记录。'
             : '当前离线：已缓存的应用页面可以打开，本机记录仍保存在当前浏览器。'
         }}
       </div>
