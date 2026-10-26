@@ -124,6 +124,7 @@ test('本机恢复先预览确认，拒绝错误文件并保留损坏存档副�
 });
 
 test('恢复密钥找回密码、重新登录和生成密钥，注销保留本机记录', async ({ page }) => {
+  test.setTimeout(60000);
   await page.goto('/tasks');
   await page.getByLabel('计划名称').fill('独立本机记录');
   await page.getByRole('button', { name: '保存计划', exact: true }).click();

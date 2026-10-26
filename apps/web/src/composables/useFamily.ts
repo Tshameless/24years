@@ -345,6 +345,8 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     today: readonly(today),
     todayTasks,
     cloud,
+    outboxCount: cloud.outboxCount,
+    flushOutbox: cloud.flushOutbox,
     canManage,
     profileLocked,
     familyMode,

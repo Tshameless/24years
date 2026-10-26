@@ -8,6 +8,13 @@ import {
   type SessionState,
 } from '@/domain/collaboration';
 import { canonicalJson, type FamilyData } from '@/domain/family';
+import {
+  clearFamilyOutbox,
+  enqueueOutboxEntry,
+  readOutbox,
+  removeOutboxEntry,
+  type OutboxEntry,
+} from '@/domain/outbox';
 import { CLOUD_CACHE_KEY, readCloudCache } from './cloudCache';
 import { parseCloudResponse, request, RequestError } from './cloudClient';
 
@@ -41,6 +48,14 @@ export function useCollaboration(enabled = true) {
   let retryAt = 0;
   let failures = 0;
   const pendingOperations = new Map<string, string>();
+  const outboxEntries = shallowRef<OutboxEntry[]>([]);
+  const outboxCount = computed(() => outboxEntries.value.length);
+  let flushingOutbox = false;
+
+  function refreshOutbox() {
+    const familyId = state.value.family?.id;
+    outboxEntries.value = familyId ? readOutbox(familyId) : [];
+  }
 
   function closeEventStream() {
     sseConnected = false;
@@ -77,6 +92,10 @@ export function useCollaboration(enabled = true) {
       const markConnected = () => {
         if (eventSource === source && !disposed) {
           sseConnected = true;
+
+          if (outboxEntries.value.length > 0) {
+            void flushOutbox();
+          }
         }
       };
       source.addEventListener('open', markConnected);
@@ -131,6 +150,7 @@ export function useCollaboration(enabled = true) {
       state.value = readCloudCache() ?? state.value;
       online.value = false;
       ready.value = !!state.value.family;
+      refreshOutbox();
     }
   } catch {
     // Local storage protection is handled by the family store.
@@ -187,6 +207,7 @@ export function useCollaboration(enabled = true) {
     }
 
     state.value = { user: next.user, family: next.family };
+    refreshOutbox();
     persistSnapshot();
     lastSynced.value = new Date().toLocaleTimeString('zh-CN');
     online.value = true;
@@ -201,6 +222,10 @@ export function useCollaboration(enabled = true) {
     }
 
     syncEventStream();
+
+    if (outboxEntries.value.length > 0) {
+      void flushOutbox();
+    }
   }
 
   function persistSnapshot() {
@@ -287,6 +312,10 @@ export function useCollaboration(enabled = true) {
         retryAt = 0;
         lastSynced.value = new Date().toLocaleTimeString('zh-CN');
         syncEventStream();
+
+        if (outboxEntries.value.length > 0) {
+          void flushOutbox();
+        }
 
         return;
       }
@@ -384,9 +413,59 @@ export function useCollaboration(enabled = true) {
     }
   }
 
+  async function flushOutbox(): Promise<boolean> {
+    if (flushingOutbox || disposed || !online.value || busy.value || !state.value.family) {
+      return false;
+    }
+
+    flushingOutbox = true;
+
+    try {
+      const familyId = state.value.family.id;
+      const entries = readOutbox(familyId);
+
+      if (entries.length === 0) {
+        outboxEntries.value = [];
+
+        return true;
+      }
+
+      for (const entry of entries) {
+        if (!online.value || disposed || state.value.family?.id !== familyId) {
+          break;
+        }
+
+        const success = await run('family/records', {
+          familyId: entry.familyId,
+          change: entry.change,
+          operationId: entry.operationId,
+        });
+
+        if (success) {
+          removeOutboxEntry(familyId, entry.id);
+          refreshOutbox();
+        } else if (expired.value || error.value.includes('重新编辑')) {
+          removeOutboxEntry(familyId, entry.id);
+          refreshOutbox();
+        } else {
+          break;
+        }
+      }
+
+      return outboxEntries.value.length === 0;
+    } finally {
+      flushingOutbox = false;
+    }
+  }
+
   async function applyChange(change: FamilyChange) {
     const task = mutationQueue.then(async () => {
       const familyId = state.value.family?.id;
+
+      if (!familyId) {
+        return false;
+      }
+
       const key = canonicalJson({ familyId, change });
       const operationId = pendingOperations.get(key) ?? createId();
       pendingOperations.set(key, operationId);
@@ -394,6 +473,18 @@ export function useCollaboration(enabled = true) {
 
       if (success) {
         pendingOperations.delete(key);
+        removeOutboxEntry(familyId, operationId);
+        refreshOutbox();
+      } else if (!online.value) {
+        enqueueOutboxEntry(familyId, {
+          id: createId(),
+          familyId,
+          operationId,
+          change,
+          createdAt: Date.now(),
+          retryCount: 1,
+        });
+        refreshOutbox();
       }
 
       return success;
@@ -404,11 +495,19 @@ export function useCollaboration(enabled = true) {
   }
 
   async function logout() {
+    const currentFamilyId = state.value.family?.id;
+
     if (await run('logout', {})) {
       rememberActive(false);
       expired.value = false;
       error.value = '';
       closeEventStream();
+
+      if (currentFamilyId) {
+        clearFamilyOutbox(currentFamilyId);
+      }
+
+      outboxEntries.value = [];
 
       return true;
     }
@@ -417,6 +516,8 @@ export function useCollaboration(enabled = true) {
   }
 
   async function endAccountAction(path: string, body: unknown) {
+    const currentFamilyId = state.value.family?.id;
+
     if (!(await run(path, body))) {
       return false;
     }
@@ -424,6 +525,12 @@ export function useCollaboration(enabled = true) {
     rememberActive(false);
     expired.value = false;
     closeEventStream();
+
+    if (currentFamilyId) {
+      clearFamilyOutbox(currentFamilyId);
+    }
+
+    outboxEntries.value = [];
 
     if (path !== 'recover') {
       recoveryKey.value = '';
@@ -470,6 +577,7 @@ export function useCollaboration(enabled = true) {
         invitation.value = null;
         backupData.value = null;
         pendingOperations.clear();
+        outboxEntries.value = [];
         online.value = true;
         expired.value = false;
         refreshPending = false;
@@ -512,8 +620,18 @@ export function useCollaboration(enabled = true) {
       state.value = cached;
     }
 
+    refreshOutbox();
+
     refreshPending = true;
     void refresh();
+  }
+
+  function handleOnline() {
+    void refresh();
+
+    if (outboxEntries.value.length > 0) {
+      void flushOutbox();
+    }
   }
 
   onMounted(() => {
@@ -528,7 +646,7 @@ export function useCollaboration(enabled = true) {
         }
       }, 2000);
       window.addEventListener('focus', refresh);
-      window.addEventListener('online', refresh);
+      window.addEventListener('online', handleOnline);
       window.addEventListener('offline', offline);
       window.addEventListener('storage', storageChanged);
       document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -540,7 +658,7 @@ export function useCollaboration(enabled = true) {
     closeEventStream();
     clearInterval(interval);
     window.removeEventListener('focus', refresh);
-    window.removeEventListener('online', refresh);
+    window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', offline);
     window.removeEventListener('storage', storageChanged);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -599,5 +717,7 @@ export function useCollaboration(enabled = true) {
     clearError: () => {
       error.value = '';
     },
+    outboxCount: readonly(outboxCount),
+    flushOutbox,
   };
 }

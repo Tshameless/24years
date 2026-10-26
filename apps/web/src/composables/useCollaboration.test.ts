@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { defineComponent } from 'vue';
 import { useCollaboration } from './useCollaboration';
 import { CLOUD_CACHE_KEY, readCloudCache } from './cloudCache';
+import { readOutbox } from '@/domain/outbox';
 import { emptyFamily } from '@/domain/family';
 import type { SessionState } from '@/domain/collaboration';
 
@@ -304,6 +305,67 @@ it('throttles polling while SSE is connected, syncs on server push and queues ra
     ]);
     expect(results).toEqual([true, true]);
     expect(cloud.state.value.family?.revision).toBe(4);
+  } finally {
+    wrapper.unmount();
+  }
+});
+
+it('persists failed mutations to outbox and automatically flushes when online', async () => {
+  const state = snapshot('outbox-user', 1);
+  let shouldFail = true;
+  const fetcher = vi.fn().mockImplementation((url: string) => {
+    if (url === '/api/session') {
+      return Promise.resolve(
+        new Response(JSON.stringify(state), {
+          headers: { ETag: `"rev-${state.family!.revision}"` },
+        }),
+      );
+    }
+
+    if (shouldFail) {
+      return Promise.reject(new TypeError('Failed to fetch'));
+    }
+
+    state.family!.revision += 1;
+
+    return Promise.resolve(new Response(JSON.stringify(state)));
+  });
+  vi.stubGlobal('fetch', fetcher);
+  const { cloud, wrapper } = mountCloud();
+
+  try {
+    await flushPromises();
+    expect(cloud.ready.value).toBe(true);
+    expect(cloud.outboxCount.value).toBe(0);
+
+    const task = {
+      id: 'outbox-task',
+      title: '离线待同步任务',
+      date: '2026-10-26',
+      time: '11:00',
+      repeat: 'once' as const,
+      completedDates: [],
+    };
+
+    // First attempt fails due to network disconnection
+    const result = await cloud.applyChange({ type: 'task', before: null, value: task });
+    expect(result).toBe(false);
+    expect(cloud.online.value).toBe(false);
+    expect(cloud.outboxCount.value).toBe(1);
+    const persisted = readOutbox(state.family!.id);
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]!.change).toEqual({ type: 'task', before: null, value: task });
+
+    // Restore network and flush
+    shouldFail = false;
+    await cloud.refresh();
+    expect(cloud.online.value).toBe(true);
+    await cloud.flushOutbox();
+    await flushPromises();
+
+    expect(cloud.outboxCount.value).toBe(0);
+    expect(readOutbox(state.family!.id)).toHaveLength(0);
+    expect(cloud.state.value.family?.revision).toBe(2);
   } finally {
     wrapper.unmount();
   }

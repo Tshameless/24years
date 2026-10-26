@@ -121,6 +121,21 @@ const section = computed(
           导出原始备份
         </button>
       </div>
+      <div
+        v-if="active && cloud.outboxCount.value > 0"
+        class="outbox-notice"
+        role="status"
+      >
+        <span>{{ cloud.outboxCount.value }} 条未同步记录已保存在本机，恢复联网后将自动同步。</span>
+        <button
+          v-if="online"
+          class="text-button"
+          :disabled="busy"
+          @click="cloud.flushOutbox"
+        >
+          立即同步
+        </button>
+      </div>
       <main
         id="main-content"
         class="main-content"
@@ -238,6 +253,17 @@ const section = computed(
   background: var(--pink-light);
   color: var(--primary-ink);
   font-size: 13px;
+}
+
+.outbox-notice {
+  padding: 10px 32px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .mobile-brand {
