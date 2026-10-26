@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   clearFamilyOutbox,
   enqueueOutboxEntry,
+  OutboxCapacityError,
   outboxStorageKey,
   readOutbox,
   removeOutboxEntry,
@@ -74,5 +75,19 @@ describe('outbox', () => {
     enqueueOutboxEntry(familyId, sampleEntry);
     clearFamilyOutbox(familyId);
     expect(readOutbox(familyId)).toEqual([]);
+  });
+
+  it('rejects a new entry instead of dropping the oldest one', () => {
+    const entries = Array.from({ length: 2 }, (_, index) => ({
+      ...sampleEntry,
+      id: `outbox-${index}`,
+      operationId: `op-${index}`,
+    }));
+    writeOutbox(familyId, entries);
+
+    expect(() => enqueueOutboxEntry(familyId, { ...sampleEntry, id: 'outbox-new', operationId: 'op-new' }, 2)).toThrow(
+      OutboxCapacityError,
+    );
+    expect(readOutbox(familyId).map((entry) => entry.id)).toEqual(['outbox-0', 'outbox-1']);
   });
 });

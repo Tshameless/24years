@@ -77,7 +77,7 @@ test('旧版大备份可恢复并紧凑导出，本机保留超过云端额度�
   await page.getByLabel('我理解恢复会替换当前记录').check();
   await page.getByRole('button', { name: '确认恢复备份' }).click();
   await expect(page.getByRole('status')).toContainText('备份已恢复');
-  await expect(page.getByText(/本机数据接近或超过云端容量上限/)).toBeVisible();
+  await expect(page.getByText(/本机数据接近或超过云端容量上限/)).not.toBeVisible();
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出我的数据' }).click();
   const stream = await (await downloading).createReadStream();

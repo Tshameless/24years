@@ -58,6 +58,8 @@ export {
 } from './child.ts';
 export {
   assessChildGrowth,
+  ageInMonthsAt,
+  correctedAgeMonths,
   getRecommendedMilestones,
   PEDIATRIC_MILESTONES,
   validGrowthRecord,
@@ -82,10 +84,10 @@ export function decodeFamily(raw: string): FamilyData {
     !isObject(value) ||
     value.version !== 1 ||
     !(value.profile === null || validProfile(value.profile)) ||
-    !Array.isArray(value.tasks) ||
-    !value.tasks.every(validTask) ||
-    !Array.isArray(value.expenses) ||
-    !value.expenses.every(validExpense) ||
+    (value.tasks !== undefined &&
+      (!Array.isArray(value.tasks) || !value.tasks.every(validTask))) ||
+    (value.expenses !== undefined &&
+      (!Array.isArray(value.expenses) || !value.expenses.every(validExpense))) ||
     (value.pregnancyRecords !== undefined &&
       (!Array.isArray(value.pregnancyRecords) ||
         !value.pregnancyRecords.every(validPregnancyRecord) ||
@@ -101,11 +103,16 @@ export function decodeFamily(raw: string): FamilyData {
         !value.children.every(validChild) ||
         new Set(value.children.map((item) => item.id)).size !== value.children.length)) ||
     !['light', 'dark'].includes(String(value.theme)) ||
-    new Set(value.tasks.map((task) => task.id)).size !== value.tasks.length ||
-    new Set(value.expenses.map((expense) => expense.id)).size !== value.expenses.length
+    new Set((value.tasks ?? []).map((task) => task.id)).size !== (value.tasks ?? []).length ||
+    new Set((value.expenses ?? []).map((expense) => expense.id)).size !==
+      (value.expenses ?? []).length
   ) {
     throw new Error('存档格式无法识别，原始数据已保留。');
   }
 
-  return value as unknown as FamilyData;
+  return {
+    ...value,
+    tasks: value.tasks ?? [],
+    expenses: value.expenses ?? [],
+  } as unknown as FamilyData;
 }

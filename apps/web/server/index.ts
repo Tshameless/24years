@@ -1,5 +1,12 @@
 import { fileURLToPath } from 'node:url';
 import { createApplication } from './http.ts';
+import { validateDeploymentOrigin } from './deployment.ts';
+
+validateDeploymentOrigin({
+  nodeEnv: process.env.NODE_ENV,
+  appOrigin: process.env.APP_ORIGIN,
+  secureCookie: process.env.COOKIE_SECURE,
+});
 
 const { server, db } = createApplication({
   database:

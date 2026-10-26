@@ -3,6 +3,8 @@ import { computed, reactive, shallowRef } from 'vue';
 import { createId } from '@/domain/id';
 import {
   assessChildGrowth,
+  ageInMonthsAt,
+  correctedAgeMonths,
   getRecommendedMilestones,
   localDate,
   type Child,
@@ -39,18 +41,6 @@ const latestRecord = computed<ChildGrowthRecord | null>(
   () => sortedRecords.value[sortedRecords.value.length - 1] ?? null,
 );
 
-const childAgeMonths = computed(() => {
-  const [bY, bM, bD] = props.child.birthDate.split('-').map(Number);
-  const [tY, tM, tD] = today.value.split('-').map(Number);
-  let months = (tY - bY) * 12 + (tM - bM);
-
-  if (tD < bD) {
-    months -= 1;
-  }
-
-  return Math.max(0, months);
-});
-
 const latestAssessment = computed(() => {
   if (!latestRecord.value) {
     return null;
@@ -62,11 +52,13 @@ const latestAssessment = computed(() => {
     return null;
   }
 
+  const chronologicalMonths = ageInMonthsAt(props.child.birthDate, latestRecord.value.date);
+
   return assessChildGrowth(
     activeMetric.value,
     val,
-    childAgeMonths.value,
-    props.child.gender ?? 'boy',
+    correctedAgeMonths(chronologicalMonths, props.child.birthGestationalWeeks),
+    props.child.gender ?? 'unknown',
   );
 });
 
@@ -211,7 +203,7 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
             type="number"
             step="0.01"
             min="0.5"
-            max="50"
+            max="40"
             placeholder="例如：6.40"
           />
         </label>
@@ -222,7 +214,7 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
             type="number"
             step="0.1"
             min="20"
-            max="150"
+            max="140"
             placeholder="例如：61.5"
           />
         </label>
@@ -233,7 +225,7 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
             type="number"
             step="0.1"
             min="20"
-            max="70"
+            max="60"
             placeholder="例如：40.5"
           />
         </label>
@@ -308,8 +300,19 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
             latestAssessment.p50
           }}) · P97 ({{ latestAssessment.p97 }})
         </p>
+        <p class="muted assessment-source">
+          标准 {{ latestAssessment.standardVersion }} · Z={{ latestAssessment.zScore }} ·
+          百分位约 {{ latestAssessment.percentile }}%。仅供记录与趋势参考，不替代儿科诊断。
+        </p>
       </div>
     </div>
+    <p
+      v-else-if="latestRecord"
+      class="muted assessment-unavailable"
+    >
+      当前测量暂不提供 WHO 0–5 岁评估：请补充男孩/女孩性别，且测量年龄需在 60 月内。
+      这不会影响记录和趋势图。
+    </p>
 
     <!-- SVG 趋势曲线 -->
     <div

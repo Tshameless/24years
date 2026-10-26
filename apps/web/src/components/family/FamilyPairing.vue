@@ -15,6 +15,7 @@ const currentMember = computed(() =>
   family.value?.members.find((member) => member.id === state.value.user?.id),
 );
 const code = shallowRef(new URLSearchParams(window.location.search).get('invite') ?? '');
+const inviteFamilyId = shallowRef(new URLSearchParams(window.location.search).get('family') ?? '');
 
 async function create() {
   if (localProfile.value) {
@@ -32,7 +33,7 @@ async function join() {
   if (
     window.confirm('加入后将与对方共享家庭档案、计划和完整账本；本机记录不会自动合并。确认加入？')
   ) {
-    if (await cloud.join(code.value.trim(), joinRole.value)) {
+    if (await cloud.join(code.value.trim(), joinRole.value, inviteFamilyId.value || undefined)) {
       window.history.replaceState({}, '', window.location.pathname);
       code.value = '';
     }
@@ -103,10 +104,10 @@ function disconnect(userId?: string) {
           <input
             v-model="code"
             required
-            inputmode="numeric"
-            pattern="[0-9]{6}"
-            maxlength="6"
-            placeholder="输入 6 位邀请码"
+            inputmode="text"
+            pattern="[A-Za-z0-9_-]{12}"
+            maxlength="12"
+            placeholder="输入 12 位邀请码"
           />
         </label>
         <button

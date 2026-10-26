@@ -10,6 +10,16 @@ import { createService } from './service.ts';
 import { emptyFamily } from '../src/domain/family.ts';
 import { pruneBackups } from './backup-retention.ts';
 import { compressionEncoding } from './compression.ts';
+import { validateDeploymentOrigin } from './deployment.ts';
+
+test('production and secure-cookie deployments require an explicit application origin', () => {
+  assert.throws(() => validateDeploymentOrigin({ nodeEnv: 'production' }), /APP_ORIGIN/);
+  assert.throws(() => validateDeploymentOrigin({ secureCookie: 'true' }), /APP_ORIGIN/);
+  assert.doesNotThrow(() => validateDeploymentOrigin({ nodeEnv: 'development' }));
+  assert.doesNotThrow(() =>
+    validateDeploymentOrigin({ nodeEnv: 'production', appOrigin: 'https://family.test' }),
+  );
+});
 
 test('compression negotiation respects quality, exclusions and identity', () => {
   assert.equal(compressionEncoding(), undefined);
@@ -313,6 +323,85 @@ test('HTTP uses 304, immutable assets, CSP and 404 for missing chunks', async ()
     );
     app.db.close();
     rmSync(directory, { recursive: true });
+  }
+});
+
+test('missing configured origin never trusts a request-supplied Host/Origin pair', async () => {
+  const app = createApplication({ database: ':memory:' });
+  await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+  const address = app.server.address() as { port: number };
+  const base = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const response = await fetch(base + '/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-24Years-Client': 'web',
+        Origin: `http://${address.port}.attacker.test`,
+      },
+      body: JSON.stringify({ username: 'nobody', password: 'password-12345' }),
+    });
+    assert.equal(response.status, 403);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      app.server.close((error) => (error ? reject(error) : resolve())),
+    );
+    app.db.close();
+  }
+});
+
+test('backup import accepts an archive over the ordinary API body limit', async () => {
+  const app = createApplication({ database: ':memory:', origin: 'http://trusted.test' });
+  await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+  const address = app.server.address() as { port: number };
+  const base = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const service = createService(app.db);
+    const registered = await service.authenticate(
+      { username: 'largebackup', nickname: 'User', password: 'password-12345' },
+      true,
+    );
+    const family = service.mutate(registered.state.user!.id, 'create', {
+      mode: 'single',
+      data: emptyFamily(),
+    }).family!;
+    const expenses = Array.from({ length: 9000 }, (_, index) => ({
+      id: `expense-${index}`,
+      title: '长期记录测试采购项目',
+      date: '2026-10-26',
+      kind: 'expense',
+      category: '其他',
+      amountCents: 100,
+      reimbursedCents: 0,
+    }));
+    const body = JSON.stringify({
+      familyId: family.id,
+      revision: family.revision,
+      operationId: 'large-backup-operation-001',
+      data: { ...emptyFamily(), expenses },
+    });
+    assert.ok(Buffer.byteLength(body) > 1024 * 1024);
+    const response = await fetch(base + '/api/family/import', {
+      method: 'POST',
+      headers: {
+        Cookie: `family_session=${registered.token}`,
+        'Content-Type': 'application/json',
+        'X-24Years-Client': 'web',
+        Origin: 'http://trusted.test',
+      },
+      body,
+    });
+
+    assert.equal(response.status, 200);
+    const imported = await response.json();
+    assert.equal(imported.family.data.expenses.length, expenses.length);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      app.server.close((error) => (error ? reject(error) : resolve())),
+    );
+    app.db.close();
   }
 });
 

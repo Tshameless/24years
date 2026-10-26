@@ -12,6 +12,20 @@ export interface OutboxEntry {
   lastError?: string;
 }
 
+export class OutboxCapacityError extends Error {
+  constructor() {
+    super('离线待同步队列已满。');
+    this.name = 'OutboxCapacityError';
+  }
+}
+
+export class OutboxStorageError extends Error {
+  constructor() {
+    super('离线待同步记录无法保存到本机。');
+    this.name = 'OutboxStorageError';
+  }
+}
+
 export function outboxStorageKey(familyId: string): string {
   return `${OUTBOX_STORAGE_PREFIX}${familyId}`;
 }
@@ -54,7 +68,7 @@ export function writeOutbox(familyId: string, entries: OutboxEntry[]): void {
       localStorage.setItem(outboxStorageKey(familyId), JSON.stringify(entries));
     }
   } catch {
-    // Ignore storage quota errors
+    throw new OutboxStorageError();
   }
 }
 
@@ -67,7 +81,12 @@ export function enqueueOutboxEntry(
   const filtered = current.filter(
     (item) => item.id !== entry.id && item.operationId !== entry.operationId,
   );
-  const updated = [...filtered, entry].slice(-maxEntries);
+
+  if (filtered.length >= maxEntries) {
+    throw new OutboxCapacityError();
+  }
+
+  const updated = [...filtered, entry];
   writeOutbox(familyId, updated);
 
   return updated;

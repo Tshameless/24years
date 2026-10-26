@@ -11,6 +11,8 @@ import { canonicalJson, type FamilyData } from '@/domain/family';
 import {
   clearFamilyOutbox,
   enqueueOutboxEntry,
+  OutboxCapacityError,
+  OutboxStorageError,
   readOutbox,
   removeOutboxEntry,
   type OutboxEntry,
@@ -28,7 +30,7 @@ export function useCollaboration(enabled = true) {
   const online = shallowRef(true);
   const expired = shallowRef(false);
   const error = shallowRef('');
-  const invitation = shallowRef<{ code: string; expiresAt: string } | null>(null);
+  const invitation = shallowRef<{ code: string; expiresAt: string; familyId: string } | null>(null);
   const recoveryKey = shallowRef('');
   const recoveryUsername = shallowRef('');
   const backupData = shallowRef<FamilyData | null>(null);
@@ -173,7 +175,11 @@ export function useCollaboration(enabled = true) {
     }
 
     if (!online.value) {
-      return state.value.family ? '离线快照 · 仅查看' : '连接中断 · 未同步';
+      if (outboxEntries.value.length > 0) {
+        return `离线 · ${outboxEntries.value.length} 条待同步`;
+      }
+
+      return state.value.family ? '离线快照 · 可排队保存' : '连接中断 · 未同步';
     }
 
     return busy.value ? '正在保存' : state.value.family ? '已同步' : '已登录 · 待加入家庭';
@@ -339,6 +345,10 @@ export function useCollaboration(enabled = true) {
         closeEventStream();
         error.value = '登录已过期或已撤销，请在「我的家庭」重新登录。';
       } else {
+        if ('delta' in next) {
+          throw new TypeError('Invalid session payload');
+        }
+
         receive(next);
       }
     } catch (reason) {
@@ -384,18 +394,31 @@ export function useCollaboration(enabled = true) {
         return false;
       }
 
-      receive(next);
+      if ('delta' in next) {
+        const current = state.value.family;
+        const patched = current ? applyFamilyDelta(current, next.delta) : null;
 
-      if (next.recoveryKey) {
-        recoveryKey.value = next.recoveryKey;
-      }
+        if (!patched) {
+          refreshPending = true;
 
-      if (next.backupData) {
-        backupData.value = next.backupData;
-      }
+          return true;
+        }
 
-      if (next.invitation) {
-        invitation.value = next.invitation;
+        receive({ user: next.user ?? state.value.user, family: patched });
+      } else {
+        receive(next);
+
+        if (next.recoveryKey) {
+          recoveryKey.value = next.recoveryKey;
+        }
+
+        if (next.backupData) {
+          backupData.value = next.backupData;
+        }
+
+        if (next.invitation) {
+          invitation.value = next.invitation;
+        }
       }
 
       return true;
@@ -476,15 +499,24 @@ export function useCollaboration(enabled = true) {
         removeOutboxEntry(familyId, operationId);
         refreshOutbox();
       } else if (!online.value) {
-        enqueueOutboxEntry(familyId, {
-          id: createId(),
-          familyId,
-          operationId,
-          change,
-          createdAt: Date.now(),
-          retryCount: 1,
-        });
-        refreshOutbox();
+        try {
+          enqueueOutboxEntry(familyId, {
+            id: createId(),
+            familyId,
+            operationId,
+            change,
+            createdAt: Date.now(),
+            retryCount: 1,
+          });
+          refreshOutbox();
+        } catch (reason) {
+          pendingOperations.delete(key);
+          error.value =
+            reason instanceof OutboxCapacityError || reason instanceof OutboxStorageError
+              ? reason.message
+              : '离线修改未能保存，请恢复连接后重试。';
+          refreshOutbox();
+        }
       }
 
       return success;
@@ -707,7 +739,8 @@ export function useCollaboration(enabled = true) {
     ) => run(register ? 'register' : 'login', credentials),
     create: (mode: FamilyMode, data: FamilyData, familyRole: FamilyParentRole) =>
       run('family/create', { mode, data, familyRole }),
-    join: (code: string, familyRole: FamilyParentRole) => run('family/join', { code, familyRole }),
+    join: (code: string, familyRole: FamilyParentRole, familyId?: string) =>
+      run('family/join', { code, familyRole, ...(familyId ? { familyId } : {}) }),
     manage: (action: string, body: Record<string, unknown> = {}) =>
       run(`family/${action}`, {
         ...body,

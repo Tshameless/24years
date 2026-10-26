@@ -6,8 +6,12 @@ import { openDatabase } from './database.ts';
 import { clientAddress, createRateLimiter } from './rate-limit.ts';
 import { compressionEncoding } from './compression.ts';
 import { serveStatic } from './static.ts';
+import { MAX_BACKUP_BYTES } from '../src/domain/capacity.ts';
 
-async function readBody(request: IncomingMessage): Promise<Record<string, unknown>> {
+async function readBody(
+  request: IncomingMessage,
+  maxBytes = 1024 * 1024,
+): Promise<Record<string, unknown>> {
   if (!request.headers['content-type']?.startsWith('application/json')) {
     throw new ApiError(415, '请使用 JSON 提交。');
   }
@@ -18,7 +22,7 @@ async function readBody(request: IncomingMessage): Promise<Record<string, unknow
   for await (const chunk of request) {
     size += chunk.length;
 
-    if (size > 1024 * 1024) {
+    if (size > maxBytes) {
       throw new ApiError(413, '提交内容过大。');
     }
 
@@ -91,13 +95,8 @@ export function createApplication(options: {
   const limit = createRateLimiter(db);
   const selectAccountByUsername = db.prepare('SELECT id FROM accounts WHERE username = ?');
   const eventClients = new Set<{ userId: string; response: ServerResponse }>();
-
-  function familyUsers(userId: string): string[] {
-    const state = service.snapshot(userId);
-    const members = state.family?.members.map((member) => member.id) ?? [];
-
-    return [...new Set([userId, ...members])];
-  }
+  const maxEventsPerUser = 4;
+  const maxEventClients = 1000;
 
   function notifyUsers(userIds: Iterable<string>, fromRevision?: number) {
     const targets = new Set(userIds);
@@ -198,6 +197,12 @@ export function createApplication(options: {
           throw new ApiError(401, '登录已过期，请重新登录后继续。');
         }
 
+        const userConnections = [...eventClients].filter((client) => client.userId === userId);
+
+        if (userConnections.length >= maxEventsPerUser || eventClients.size >= maxEventClients) {
+          throw new ApiError(429, '实时同步连接数已达到上限，请关闭重复页面后重试。');
+        }
+
         request.socket.setTimeout(0);
         request.socket.setNoDelay(true);
         response.writeHead(200, {
@@ -242,7 +247,11 @@ export function createApplication(options: {
         }
 
         // The custom header cannot be sent by a cross-origin HTML form. No CORS is enabled.
-        const allowedOrigin = options.origin ?? `http://${request.headers.host}`;
+        // Never derive the trust boundary from the request's Host header. Host is
+        // attacker-controlled on many deployments (and can be rewritten by a
+        // proxy), so an omitted configured origin must mean same-origin requests
+        // without an Origin header only—not that every supplied Origin is valid.
+        const allowedOrigin = options.origin;
 
         if (
           request.headers['x-24years-client'] !== 'web' ||
@@ -251,7 +260,10 @@ export function createApplication(options: {
           throw new ApiError(403, '请求来源不受信任。');
         }
 
-        const body = await readBody(request);
+        const body = await readBody(
+          request,
+          path === '/api/family/import' ? MAX_BACKUP_BYTES + 1024 * 1024 : undefined,
+        );
         const forwarded = request.headers['x-forwarded-for'];
         const ip = clientAddress(
           request.socket.remoteAddress ?? 'unknown',
@@ -318,7 +330,7 @@ export function createApplication(options: {
           path === '/api/account/delete'
         ) {
           limit(`security:${userId}`, 6);
-          const affectedUsers = familyUsers(userId);
+          const affectedUsers = service.familyContext(userId).userIds;
           const result = path.endsWith('/recovery')
             ? await service.rotateRecovery(userId, body)
             : path.endsWith('/change-password')
@@ -347,13 +359,21 @@ export function createApplication(options: {
         if (action === 'join' || action === 'invite') {
           limit(`pair:${userId}`, 12);
           limit(`pair-ip:${ip}`, 60);
+          limit('pair-global', 500);
+
+          if (action === 'join' && typeof body.familyId === 'string') {
+            limit(`pair-family:${body.familyId}`, 12);
+          }
         }
 
-        const beforeFamily = service.snapshot(userId).family;
-        const beforeUsers = familyUsers(userId);
-        const result = service.mutate(userId, action, body);
-        const afterUsers = result.family?.members.map((member) => member.id) ?? [];
-        notifyUsers([...beforeUsers, ...afterUsers], beforeFamily?.revision);
+        const beforeContext = service.familyContext(userId);
+        const beforeUsers = beforeContext.userIds;
+        const result =
+          action === 'records'
+            ? service.mutateCompact(userId, action, body)
+            : service.mutate(userId, action, body);
+        const afterContext = service.familyContext(userId);
+        notifyUsers([...beforeUsers, ...afterContext.userIds], beforeContext.revision ?? undefined);
         json(response, 200, result);
 
         return;

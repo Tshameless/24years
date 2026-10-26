@@ -26,6 +26,7 @@ const form = reactive({
   birthWeightGrams: '',
   birthLengthCm: '',
   headCircumferenceCm: '',
+  birthGestationalWeeks: '',
   notes: '',
 });
 
@@ -38,6 +39,7 @@ function openAddModal() {
   form.birthWeightGrams = '';
   form.birthLengthCm = '';
   form.headCircumferenceCm = '';
+  form.birthGestationalWeeks = '';
   form.notes = '';
   formError.value = '';
   showModal.value = true;
@@ -52,6 +54,9 @@ function openEditModal(child: Child) {
   form.birthWeightGrams = child.birthWeightGrams ? String(child.birthWeightGrams) : '';
   form.birthLengthCm = child.birthLengthCm ? String(child.birthLengthCm) : '';
   form.headCircumferenceCm = child.headCircumferenceCm ? String(child.headCircumferenceCm) : '';
+  form.birthGestationalWeeks = child.birthGestationalWeeks
+    ? String(child.birthGestationalWeeks)
+    : '';
   form.notes = child.notes ?? '';
   formError.value = '';
   showModal.value = true;
@@ -85,11 +90,16 @@ function saveChildForm() {
   const headCircumferenceCm = form.headCircumferenceCm
     ? Number(form.headCircumferenceCm)
     : undefined;
+  const birthGestationalWeeks = form.birthGestationalWeeks
+    ? Number(form.birthGestationalWeeks)
+    : undefined;
 
   if (
     (birthWeightGrams !== undefined && (isNaN(birthWeightGrams) || birthWeightGrams <= 0)) ||
     (birthLengthCm !== undefined && (isNaN(birthLengthCm) || birthLengthCm <= 0)) ||
-    (headCircumferenceCm !== undefined && (isNaN(headCircumferenceCm) || headCircumferenceCm <= 0))
+    (headCircumferenceCm !== undefined && (isNaN(headCircumferenceCm) || headCircumferenceCm <= 0)) ||
+    (birthGestationalWeeks !== undefined &&
+      (!Number.isInteger(birthGestationalWeeks) || birthGestationalWeeks < 20 || birthGestationalWeeks > 45))
   ) {
     formError.value = '出生测量数据必须为有效正数。';
 
@@ -104,6 +114,7 @@ function saveChildForm() {
     ...(birthWeightGrams !== undefined ? { birthWeightGrams } : {}),
     ...(birthLengthCm !== undefined ? { birthLengthCm } : {}),
     ...(headCircumferenceCm !== undefined ? { headCircumferenceCm } : {}),
+    ...(birthGestationalWeeks !== undefined ? { birthGestationalWeeks } : {}),
     ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
   };
 
@@ -311,6 +322,18 @@ const genderLabels: Record<string, string> = {
               />
             </label>
           </div>
+
+          <label class="field">
+            出生孕周（周，可选）
+            <input
+              v-model="form.birthGestationalWeeks"
+              type="number"
+              step="1"
+              min="20"
+              max="45"
+              placeholder="早产儿用于矫正月龄计算"
+            />
+          </label>
 
           <div class="form-row">
             <label class="field">

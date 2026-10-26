@@ -13,6 +13,7 @@ export interface Child {
   birthWeightGrams?: number;
   birthLengthCm?: number;
   headCircumferenceCm?: number;
+  birthGestationalWeeks?: number;
   notes?: string;
   growthRecords?: readonly ChildGrowthRecord[];
 }
@@ -31,6 +32,7 @@ export function validChild(value: unknown): value is Child {
     birthWeightGrams,
     birthLengthCm,
     headCircumferenceCm,
+    birthGestationalWeeks,
     notes,
     growthRecords,
   } = value as Record<string, unknown>;
@@ -45,6 +47,16 @@ export function validChild(value: unknown): value is Child {
     gender !== 'girl' &&
     gender !== 'other' &&
     gender !== 'unknown'
+  ) {
+    return false;
+  }
+
+  if (
+    birthGestationalWeeks !== undefined &&
+    (typeof birthGestationalWeeks !== 'number' ||
+      !Number.isInteger(birthGestationalWeeks) ||
+      birthGestationalWeeks < 20 ||
+      birthGestationalWeeks > 45)
   ) {
     return false;
   }

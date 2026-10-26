@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { MAX_CLOUD_BYTES, familyBytes } from './capacity';
+import { MAX_CLOUD_BYTES, familyBlobBytes, familyBytes } from './capacity';
 import { emptyFamily } from './family';
 import { readFamilyBackup, MAX_BACKUP_BYTES } from './backup';
 
@@ -30,6 +30,7 @@ it('restores legacy indented exports exceeding the cloud limit without losing re
 it('allows local archives larger than the cloud quota', () => {
   const data = archive(6500);
   expect(familyBytes(data)).toBeGreaterThan(MAX_CLOUD_BYTES);
+  expect(familyBlobBytes(data)).toBeLessThan(MAX_CLOUD_BYTES);
   expect(readFamilyBackup('\uFEFF' + JSON.stringify(data))).toEqual(data);
 });
 

@@ -81,54 +81,129 @@ export function initRelationalSchema(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS family_changes_created_at ON family_changes(created_at);
   `);
 
-  const rows = db.prepare('SELECT id, data, revision, updated_at FROM families').all() as Array<{
-    id: string;
-    data: string;
-    revision: number;
-    updated_at: string;
-  }>;
-
-  for (const row of rows) {
-    try {
-      const data = decodeFamily(row.data);
-      const taskCount = (
-        db
-          .prepare('SELECT count(*) AS count FROM family_tasks WHERE family_id = ?')
-          .get(row.id) as { count: number }
-      ).count;
-      const expenseCount = (
-        db
-          .prepare('SELECT count(*) AS count FROM family_expenses WHERE family_id = ?')
-          .get(row.id) as { count: number }
-      ).count;
-      const pregnancyCount = (
-        db
-          .prepare('SELECT count(*) AS count FROM family_pregnancy_records WHERE family_id = ?')
-          .get(row.id) as { count: number }
-      ).count;
-      const childCount = (
-        db
-          .prepare('SELECT count(*) AS count FROM family_children WHERE family_id = ?')
-          .get(row.id) as { count: number }
-      ).count;
-
-      if (
-        taskCount !== data.tasks.length ||
-        expenseCount !== data.expenses.length ||
-        pregnancyCount !== (data.pregnancyRecords?.length ?? 0) ||
-        childCount !== (data.children?.length ?? 0)
-      ) {
-        syncFamilyTables(db, row.id, data, row.updated_at);
-        recordResetChange(db, row.id, row.revision);
-      }
-    } catch {
-      // Invalid or corrupted test fixtures are left untouched for validator tests.
-    }
-  }
-
   db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (2, ?)').run(
     new Date().toISOString(),
   );
+  const migrated = db.prepare('SELECT 1 FROM schema_migrations WHERE version = 3').get();
+
+  if (!migrated) {
+    db.exec('BEGIN IMMEDIATE');
+
+    try {
+      const rows = db
+        .prepare('SELECT id, data, revision, updated_at FROM families')
+        .all() as Array<{
+        id: string;
+        data: string;
+        revision: number;
+        updated_at: string;
+      }>;
+      const failures: string[] = [];
+
+      for (const row of rows) {
+        try {
+          const data = decodeFamily(row.data);
+          const relational = readRelationalRecords(db, row.id);
+
+          // A compact blob is the post-migration format. Once the collection
+          // fields are absent, the relational rows are authoritative and must
+          // never be replaced with empty legacy defaults on restart.
+          const hasLegacyCollections =
+            Array.isArray((data as Partial<FamilyData>).tasks) ||
+            Array.isArray((data as Partial<FamilyData>).expenses) ||
+            Array.isArray((data as Partial<FamilyData>).pregnancyRecords) ||
+            Array.isArray((data as Partial<FamilyData>).children);
+
+          if (hasLegacyCollections) {
+            const differs =
+              JSON.stringify(relational.tasks) !== JSON.stringify(data.tasks ?? []) ||
+              JSON.stringify(relational.expenses) !== JSON.stringify(data.expenses ?? []) ||
+              JSON.stringify(relational.pregnancyRecords) !==
+                JSON.stringify(data.pregnancyRecords ?? []) ||
+              JSON.stringify(relational.children) !== JSON.stringify(data.children ?? []);
+
+            // During the compatibility window the legacy blob is the source
+            // of truth. Record a reset when it repairs a divergent relation.
+            if (differs) {
+              syncFamilyTables(db, row.id, data, row.updated_at);
+              recordResetChange(db, row.id, row.revision);
+            }
+          }
+
+          const compactData = JSON.stringify(familyBlobData(data));
+
+          if (compactData !== row.data) {
+            db.prepare('UPDATE families SET data = ? WHERE id = ?').run(compactData, row.id);
+          }
+        } catch (error) {
+          failures.push(`${row.id}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+
+      if (failures.length > 0) {
+        throw new Error(`家庭关系数据迁移失败：${failures.join('; ')}`);
+      }
+
+      db.prepare('INSERT INTO schema_migrations(version, applied_at) VALUES (3, ?)').run(
+        new Date().toISOString(),
+      );
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+}
+
+export function familyBlobData(data: FamilyData): Omit<
+  FamilyData,
+  'tasks' | 'expenses' | 'pregnancyRecords' | 'children'
+> {
+  const blob = { ...(data as unknown as Record<string, unknown>) };
+  delete blob.tasks;
+  delete blob.expenses;
+  delete blob.pregnancyRecords;
+  delete blob.children;
+
+  return blob as Omit<FamilyData, 'tasks' | 'expenses' | 'pregnancyRecords' | 'children'>;
+}
+
+export function readRelationalRecords(
+  db: DatabaseSync,
+  familyId: string,
+): Pick<FamilyData, 'tasks' | 'expenses' | 'pregnancyRecords' | 'children'> {
+  const parseRows = <T>(sql: string): T[] =>
+    (db.prepare(sql).all(familyId) as Array<{ data: string }>).map(
+      (row) => JSON.parse(row.data) as T,
+    );
+
+  return {
+    tasks: parseRows<FamilyTask>(
+      'SELECT data FROM family_tasks WHERE family_id = ? ORDER BY position, id',
+    ),
+    expenses: parseRows<Expense>(
+      'SELECT data FROM family_expenses WHERE family_id = ? ORDER BY position, id',
+    ),
+    pregnancyRecords: parseRows<PregnancyRecord>(
+      'SELECT data FROM family_pregnancy_records WHERE family_id = ? ORDER BY position, id',
+    ),
+    children: parseRows<Child>(
+      'SELECT data FROM family_children WHERE family_id = ? ORDER BY position, id',
+    ),
+  };
+}
+
+export function readRelationalRecord<T>(
+  db: DatabaseSync,
+  table: 'family_tasks' | 'family_expenses' | 'family_pregnancy_records' | 'family_children',
+  familyId: string,
+  id: string,
+): { value: T; position: number } | null {
+  const row = db
+    .prepare(`SELECT data, position FROM ${table} WHERE family_id = ? AND id = ?`)
+    .get(familyId, id) as { data: string; position: number } | undefined;
+
+  return row ? { value: JSON.parse(row.data) as T, position: row.position } : null;
 }
 
 function recordDate(record: PregnancyRecord): string | null {
@@ -217,11 +292,12 @@ export function upsertTaskRow(
   id: string,
   value: FamilyTask | null,
   updatedAt = new Date().toISOString(),
+  position?: number,
 ) {
   db.prepare('DELETE FROM family_tasks WHERE family_id = ? AND id = ?').run(familyId, id);
 
   if (value) {
-    const nextPos = (
+    const nextPos = position ?? (
       db
         .prepare(
           'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_tasks WHERE family_id = ?',
@@ -250,11 +326,12 @@ export function upsertExpenseRow(
   value: Expense | null,
   prepend = false,
   updatedAt = new Date().toISOString(),
+  position?: number,
 ) {
   db.prepare('DELETE FROM family_expenses WHERE family_id = ? AND id = ?').run(familyId, id);
 
   if (value) {
-    const nextPos = prepend
+    const nextPos = position ?? (prepend
       ? (
           db
             .prepare(
@@ -268,7 +345,7 @@ export function upsertExpenseRow(
               'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_expenses WHERE family_id = ?',
             )
             .get(familyId) as { next: number }
-        ).next;
+        ).next);
     db.prepare(
       'INSERT INTO family_expenses(family_id, id, position, date, category, kind, amount_cents, reimbursed_cents, data, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(
@@ -292,6 +369,7 @@ export function upsertPregnancyRow(
   id: string,
   value: PregnancyRecord | null,
   updatedAt = new Date().toISOString(),
+  position?: number,
 ) {
   db.prepare('DELETE FROM family_pregnancy_records WHERE family_id = ? AND id = ?').run(
     familyId,
@@ -299,7 +377,7 @@ export function upsertPregnancyRow(
   );
 
   if (value) {
-    const nextPos = (
+    const nextPos = position ?? (
       db
         .prepare(
           'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_pregnancy_records WHERE family_id = ?',
@@ -326,11 +404,12 @@ export function upsertChildRow(
   id: string,
   value: Child | null,
   updatedAt = new Date().toISOString(),
+  position?: number,
 ) {
   db.prepare('DELETE FROM family_children WHERE family_id = ? AND id = ?').run(familyId, id);
 
   if (value) {
-    const nextPos = (
+    const nextPos = position ?? (
       db
         .prepare(
           'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_children WHERE family_id = ?',

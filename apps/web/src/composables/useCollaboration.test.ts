@@ -352,6 +352,7 @@ it('persists failed mutations to outbox and automatically flushes when online', 
     expect(result).toBe(false);
     expect(cloud.online.value).toBe(false);
     expect(cloud.outboxCount.value).toBe(1);
+    expect(cloud.label.value).toContain('1 条待同步');
     const persisted = readOutbox(state.family!.id);
     expect(persisted).toHaveLength(1);
     expect(persisted[0]!.change).toEqual({ type: 'task', before: null, value: task });

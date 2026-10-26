@@ -75,6 +75,22 @@ export interface FamilyDelta {
   entries: FamilyDeltaEntry[];
 }
 
+function replaceRecord<T extends { id: string }>(records: T[], id: string, value: T | null): T[] {
+  const index = records.findIndex((item) => item.id === id);
+
+  if (index >= 0) {
+    records.splice(index, 1);
+
+    if (value) {
+      records.splice(index, 0, value);
+    }
+  } else if (value) {
+    records.push(value);
+  }
+
+  return records;
+}
+
 export function applyFamilyDelta(current: SharedFamily, delta: FamilyDelta): SharedFamily | null {
   if (
     delta.reset ||
@@ -97,32 +113,26 @@ export function applyFamilyDelta(current: SharedFamily, delta: FamilyDelta): Sha
     if (entry.recordType === 'profile') {
       profile = (entry.value as FamilyProfile | null) ?? null;
     } else if (entry.recordType === 'task') {
-      tasks = [
-        ...tasks.filter((item) => item.id !== entry.recordId),
-        ...(entry.value ? [entry.value as FamilyTask] : []),
-      ];
+      tasks = replaceRecord(tasks, entry.recordId, (entry.value as FamilyTask | null) ?? null);
     } else if (entry.recordType === 'expense') {
-      expenses = [
-        ...expenses.filter((item) => item.id !== entry.recordId),
-        ...(entry.value ? [entry.value as Expense] : []),
-      ];
+      expenses = replaceRecord(expenses, entry.recordId, (entry.value as Expense | null) ?? null);
     } else if (entry.recordType === 'expense_prepend') {
-      expenses = [
-        ...(entry.value ? [entry.value as Expense] : []),
-        ...expenses.filter((item) => item.id !== entry.recordId),
-      ];
+      const expense = (entry.value as Expense | null) ?? null;
+      expenses = expenses.filter((item) => item.id !== entry.recordId);
+
+      if (expense) {
+        expenses.unshift(expense);
+      }
     } else if (entry.recordType === 'pregnancy') {
       const base = pregnancyRecords ?? [];
-      pregnancyRecords = [
-        ...base.filter((item) => item.id !== entry.recordId),
-        ...(entry.value ? [entry.value as PregnancyRecord] : []),
-      ];
+      pregnancyRecords = replaceRecord(
+        base,
+        entry.recordId,
+        (entry.value as PregnancyRecord | null) ?? null,
+      );
     } else if (entry.recordType === 'child') {
       const base = children ?? [];
-      children = [
-        ...base.filter((item) => item.id !== entry.recordId),
-        ...(entry.value ? [entry.value as Child] : []),
-      ];
+      children = replaceRecord(base, entry.recordId, (entry.value as Child | null) ?? null);
     } else {
       return null;
     }

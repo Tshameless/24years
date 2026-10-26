@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'no
 import type { DatabaseSync } from 'node:sqlite';
 import type { Account, SessionState } from '../src/domain/collaboration.ts';
 import { transaction } from './database.ts';
-import { deleteFamilyTables, recordDeltaEntries } from './records-store.ts';
+import { deleteFamilyTables, familyBlobData, recordDeltaEntries } from './records-store.ts';
 
 export class ApiError extends Error {
   status: number;
@@ -257,10 +257,12 @@ export function createAccountHandlers(
         const member = family.members.find((item) => item.id === userId)!;
         const remaining = family.members.find((item) => item.id !== userId);
         db.prepare('DELETE FROM invites WHERE family_id = ?').run(family.id);
+        db.prepare('DELETE FROM family_invite_security WHERE family_id = ?').run(family.id);
         db.prepare('DELETE FROM members WHERE user_id = ?').run(userId);
 
         if (!remaining) {
           deleteFamilyTables(db, family.id);
+          db.prepare('DELETE FROM invite_audit WHERE family_id = ?').run(family.id);
           db.prepare('DELETE FROM receipts WHERE family_id = ?').run(family.id);
           db.prepare('DELETE FROM import_backups WHERE family_id = ?').run(family.id);
           db.prepare('DELETE FROM families WHERE id = ?').run(family.id);
@@ -279,7 +281,7 @@ export function createAccountHandlers(
               }
 
               db.prepare('UPDATE families SET data = ? WHERE id = ?').run(
-                JSON.stringify(family.data),
+                JSON.stringify(familyBlobData(family.data)),
                 family.id,
               );
             }
@@ -296,6 +298,7 @@ export function createAccountHandlers(
 
       db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
       db.prepare('DELETE FROM receipts WHERE user_id = ?').run(userId);
+      db.prepare('DELETE FROM invite_audit WHERE user_id = ?').run(userId);
       db.prepare('DELETE FROM accounts WHERE id = ?').run(userId);
 
       return { user: null, family: null };

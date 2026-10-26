@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { closeSync, existsSync, mkdirSync, openSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { decodeFamily } from '../src/domain/family.ts';
+import { readRelationalRecords } from './records-store.ts';
 
 // Runtime requires Node 24.9+. The project's Node 22 type definitions predate readOnly.
 const readOnlyOptions = { open: true, readOnly: true };
@@ -54,28 +55,12 @@ export function verifyDatabase(path: string) {
       }
 
       if (hasRelationalTables) {
-        const taskRows = (
-          db
-            .prepare('SELECT count(*) AS count FROM family_tasks WHERE family_id = ?')
-            .get(family.id) as { count: number }
-        ).count;
-        const expenseRows = (
-          db
-            .prepare('SELECT count(*) AS count FROM family_expenses WHERE family_id = ?')
-            .get(family.id) as { count: number }
-        ).count;
-        const pregnancyRows = (
-          db
-            .prepare('SELECT count(*) AS count FROM family_pregnancy_records WHERE family_id = ?')
-            .get(family.id) as { count: number }
-        ).count;
+        const relational = readRelationalRecords(db, family.id);
 
-        if (
-          taskRows !== decoded.tasks.length ||
-          expenseRows !== decoded.expenses.length ||
-          pregnancyRows !== (decoded.pregnancyRecords?.length ?? 0)
-        ) {
-          throw new Error('家庭关系表数据与主档案不一致。');
+        try {
+          decodeFamily(JSON.stringify({ ...decoded, ...relational }));
+        } catch {
+          throw new Error('家庭关系表中包含无效记录。');
         }
       }
     }
@@ -121,7 +106,9 @@ export function copyDatabase(source: string, destination: string, restore = fals
 
       try {
         // Restoring old sessions or invites would resurrect revoked access.
-        restored.exec('BEGIN; DELETE FROM sessions; DELETE FROM invites; COMMIT;');
+        restored.exec(
+          'BEGIN; DELETE FROM sessions; DELETE FROM invites; DELETE FROM family_invite_security; DELETE FROM invite_audit; COMMIT;',
+        );
         const columns = restored.prepare('PRAGMA table_info(accounts)').all() as Array<{
           name: string;
         }>;

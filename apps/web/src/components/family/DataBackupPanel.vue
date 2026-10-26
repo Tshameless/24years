@@ -4,7 +4,7 @@ import { computed, shallowRef } from 'vue';
 import { useFamily, type ImportTarget } from '@/composables/useFamily';
 import { MAX_BACKUP_BYTES, readFamilyBackup } from '@/domain/backup';
 import type { FamilyData } from '@/domain/family';
-import { MAX_CLOUD_BYTES, familyBytes } from '@/domain/capacity';
+import { MAX_CLOUD_BYTES, familyBlobBytes, familyBytes } from '@/domain/capacity';
 
 const store = useFamily();
 const { cloud } = store;
@@ -20,9 +20,13 @@ const error = shallowRef('');
 const message = shallowRef('');
 const confirmed = shallowRef(false);
 const usedBytes = computed(() =>
-  familyBytes(active.value ? (state.value.family?.data ?? store.data.value) : store.data.value),
+  active.value
+    ? familyBlobBytes(state.value.family?.data ?? store.data.value)
+    : familyBytes(store.data.value),
 );
-const nearCapacity = computed(() => usedBytes.value >= MAX_CLOUD_BYTES * 0.9);
+const nearCapacity = computed(
+  () => active.value && usedBytes.value >= MAX_CLOUD_BYTES * 0.9,
+);
 const unavailable = computed(
   () =>
     !ready.value ||
@@ -67,8 +71,8 @@ async function selectFile(event: Event) {
             : data.profile,
       };
 
-      if (familyBytes(cloudData) >= MAX_CLOUD_BYTES) {
-        throw new Error('备份内容超过云端 800 KB 容量上限，可退出账号后恢复到本机。');
+      if (familyBlobBytes(cloudData) >= MAX_CLOUD_BYTES) {
+        throw new Error('家庭档案字段超过云端 800 KB 容量上限，可退出账号后恢复到本机。');
       }
     }
 
@@ -137,18 +141,14 @@ async function downloadPrevious() {
       }}
     </p>
     <p class="muted">
-      {{ active ? '云端容量' : '本机数据' }}：{{ (usedBytes / 1000).toFixed(1) }} KB
+      {{ active ? '云端档案字段' : '本机数据' }}：{{ (usedBytes / 1000).toFixed(1) }} KB
       <template v-if="active">/ 800 KB</template>
     </p>
     <p
       v-if="nearCapacity"
       class="form-error"
     >
-      {{
-        active
-          ? '云端容量接近上限。请先导出完整备份，再整理不再需要的记录；导出不会自动释放容量。'
-          : '本机数据接近或超过云端容量上限，仍可在本机使用及备份恢复，开启同步前需整理记录。'
-      }}
+      云端家庭档案字段接近上限；计划、账目、孕期记录和孩子资料存于关系表，不计入此容量。
     </p>
     <div class="backup-actions">
       <button

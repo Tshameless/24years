@@ -1,11 +1,13 @@
-import type { SessionState } from '@/domain/collaboration';
+import type { FamilyDelta, SessionState } from '@/domain/collaboration';
 import { isObject, type FamilyData } from '@/domain/family';
 
-export type CloudResponse = SessionState & {
-  invitation?: { code: string; expiresAt: string };
-  recoveryKey?: string;
-  backupData?: FamilyData;
-};
+export type CloudResponse =
+  | (SessionState & {
+      invitation?: { code: string; expiresAt: string; familyId: string };
+      recoveryKey?: string;
+      backupData?: FamilyData;
+    })
+  | { user: SessionState['user']; delta: FamilyDelta };
 
 export class RequestError extends Error {
   status: number;
@@ -45,7 +47,15 @@ export async function parseCloudResponse(response: Response): Promise<CloudRespo
     throw new RequestError(response.status, '请求失败，请重试。');
   }
 
-  if (!isObject(result) || !('user' in result) || !('family' in result)) {
+  if (!isObject(result) || !('user' in result)) {
+    throw new TypeError('Invalid session payload');
+  }
+
+  if ('delta' in result && isObject(result.delta)) {
+    return result as unknown as CloudResponse;
+  }
+
+  if (!('family' in result)) {
     throw new TypeError('Invalid session payload');
   }
 

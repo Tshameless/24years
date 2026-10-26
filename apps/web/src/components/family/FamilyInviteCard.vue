@@ -7,7 +7,13 @@ const { state, busy, invitation } = cloud;
 const family = computed(() => state.value.family);
 const copied = shallowRef('');
 const inviteLink = computed(() =>
-  invitation.value ? `${window.location.origin}/family?invite=${invitation.value.code}` : '',
+  invitation.value
+    ? window.location.origin +
+      '/family?invite=' +
+      invitation.value.code +
+      '&family=' +
+      invitation.value.familyId
+    : '',
 );
 
 async function copyLink() {
@@ -23,7 +29,7 @@ async function copyLink() {
 <template>
   <div class="invite-card">
     <h3>为另一位，留一个位置</h3>
-    <p class="muted">邀请码 24 小时内有效，仅能使用一次。请只交给你的伴侣。</p>
+    <p class="muted">邀请码 15 分钟内有效，仅能使用一次。请只交给你的伴侣。</p>
     <template v-if="invitation && family?.inviteExpiresAt">
       <p
         class="invite-code"

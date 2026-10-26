@@ -46,6 +46,20 @@ export function openDatabase(path: string) {
       family_id TEXT UNIQUE NOT NULL REFERENCES families(id),
       expires_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS family_invite_security (
+      family_id TEXT PRIMARY KEY REFERENCES families(id),
+      failed_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE TABLE IF NOT EXISTS invite_audit (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      family_id TEXT REFERENCES families(id),
+      user_id TEXT REFERENCES accounts(id),
+      outcome TEXT NOT NULL CHECK(outcome IN ('failed', 'locked', 'expired', 'success')),
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS invite_audit_family ON invite_audit(family_id, created_at);
     CREATE TABLE IF NOT EXISTS receipts (
       user_id TEXT NOT NULL REFERENCES accounts(id),
       operation_id TEXT NOT NULL,

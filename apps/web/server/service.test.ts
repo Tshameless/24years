@@ -399,12 +399,38 @@ test('数据库重启后账号、会话与家庭数据仍在，旧档案上传�
       true,
     );
     const data = { ...emptyFamily(), tasks: [task('旧计划')] };
-    service.mutate(state.user!.id, 'create', { mode: 'single', data });
+    const created = service.mutate(state.user!.id, 'create', { mode: 'single', data });
+    const familyId = created.family!.id;
+    const compactData = db
+      .prepare('SELECT data FROM families WHERE id = ?')
+      .get(familyId) as { data: string };
+    assert.equal('tasks' in JSON.parse(compactData.data), false);
+
+    // Simulate a database created before migration 3: records still live in the
+    // JSON blob, while relational tables have not been populated yet.
+    db.prepare('UPDATE families SET data = ? WHERE id = ?').run(JSON.stringify(data), familyId);
+    db.prepare('DELETE FROM family_tasks WHERE family_id = ?').run(familyId);
+    db.prepare('DELETE FROM schema_migrations WHERE version = 3').run();
     db.close();
     db = openDatabase(file);
     service = createService(db);
     assert.equal(service.userForToken(token), state.user!.id);
     assert.equal(service.snapshot(state.user!.id).family!.data.tasks[0].title, '旧计划');
+    const migratedData = db
+      .prepare('SELECT data FROM families WHERE id = ?')
+      .get(familyId) as { data: string };
+    assert.equal('tasks' in JSON.parse(migratedData.data), false);
+
+    // Once migrated, a stale blob must not overwrite the relational source.
+    db.prepare('UPDATE families SET data = ? WHERE id = ?').run(
+      JSON.stringify({ version: 1, profile: null, theme: 'light' }),
+      familyId,
+    );
+    db.close();
+    db = openDatabase(file);
+    service = createService(db);
+    assert.equal(service.snapshot(state.user!.id).family!.data.tasks[0].title, '旧计划');
+
     const login = await service.authenticate(
       { username: 'PERSIST', password: 'persist-password' },
       false,

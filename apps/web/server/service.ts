@@ -9,7 +9,7 @@ import type {
 } from '../src/domain/collaboration.ts';
 import { ApiError, createAccountHandlers, hash, requireValue, type Body } from './auth.ts';
 import { createFamilyMutations } from './family-mutations.ts';
-import { readDeltaChanges } from './records-store.ts';
+import { readDeltaChanges, readRelationalRecords } from './records-store.ts';
 
 export { ApiError, hash };
 
@@ -66,11 +66,22 @@ export function createService(db: DatabaseSync) {
     const invite = db
       .prepare('SELECT expires_at FROM invites WHERE family_id = ? AND expires_at > ?')
       .get(row.id, Date.now()) as { expires_at: number } | undefined;
+    const baseData = decodeFamily(row.data);
+    const relational = readRelationalRecords(db, row.id);
     const family: SharedFamily = {
       id: row.id,
       mode: row.mode,
       revision: row.revision,
-      data: decodeFamily(row.data),
+      data: {
+        ...baseData,
+        ...relational,
+        ...((relational.pregnancyRecords?.length ?? 0) > 0 || baseData.pregnancyRecords
+          ? { pregnancyRecords: relational.pregnancyRecords ?? [] }
+          : {}),
+        ...((relational.children?.length ?? 0) > 0 || baseData.children
+          ? { children: relational.children ?? [] }
+          : {}),
+      },
       members: db
         .prepare(
           "SELECT a.id, a.username, a.nickname, m.role, m.family_role AS familyRole FROM members m JOIN accounts a ON a.id = m.user_id WHERE m.family_id = ? ORDER BY m.role = 'owner' DESC, a.id",
@@ -153,6 +164,26 @@ export function createService(db: DatabaseSync) {
     };
   }
 
+  function familyContext(userId: string): { userIds: string[]; revision: number | null } {
+    const member = membership(userId);
+
+    if (!member) {
+      return { userIds: [userId], revision: null };
+    }
+
+    const members = db
+      .prepare('SELECT user_id FROM members WHERE family_id = ?')
+      .all(member.family_id) as Array<{ user_id: string }>;
+    const family = db
+      .prepare('SELECT revision FROM families WHERE id = ?')
+      .get(member.family_id) as { revision: number } | undefined;
+
+    return {
+      userIds: [...new Set([userId, ...members.map((item) => item.user_id)])],
+      revision: family?.revision ?? null,
+    };
+  }
+
   const accountHandlers = createAccountHandlers(db, account, snapshot);
   const { mutate } = createFamilyMutations({
     db,
@@ -163,11 +194,28 @@ export function createService(db: DatabaseSync) {
     authorize,
   });
 
+  function mutateCompact(userId: string, action: string, body: Body) {
+    const beforeRevision = action === 'records' ? familyContext(userId).revision ?? undefined : undefined;
+    const result = mutate(userId, action, body);
+
+    if (action === 'records' && beforeRevision !== undefined) {
+      const delta = changesSince(userId, beforeRevision);
+
+      if (delta && !delta.reset) {
+        return { user: result.user, delta };
+      }
+    }
+
+    return result;
+  }
+
   return {
     sessionTag,
     ...accountHandlers,
     snapshot,
     changesSince,
+    familyContext,
     mutate,
+    mutateCompact,
   };
 }
