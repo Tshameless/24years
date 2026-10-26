@@ -3,13 +3,14 @@ import { computed, toRef } from 'vue';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
-import { localDate, type PregnancyRecord } from '@/domain/family';
+import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
 import MovementCounter from './MovementCounter.vue';
 import MovementTimer from './MovementTimer.vue';
 import { useObservationTimer } from '@/composables/useObservationTimer';
 
 type Movement = Extract<PregnancyRecord, { type: 'movement' }>;
-const { records, disabled, quietMode, save, remove, error, message } = usePregnancyRecords();
+const { records, disabled, quietMode, save, remove, error, reportError, message } =
+  usePregnancyRecords();
 const entries = computed(() =>
   records.value
     .filter((item): item is Movement => item.type === 'movement')
@@ -65,6 +66,8 @@ async function submit() {
     return;
   }
 
+  reportError('');
+
   const value: Movement = {
     id: before.value?.id ?? draft.id.value,
     type: 'movement',
@@ -74,6 +77,12 @@ async function submit() {
     count: Number(form.count),
     notes: form.notes.trim(),
   };
+
+  if (!validPregnancyRecord(value) || value.date > localDate()) {
+    reportError('请检查观察日期（不晚于今天）、开始时间、观察时长与次数。');
+
+    return;
+  }
 
   if (await save({ type: 'pregnancy', before: before.value, value })) {
     reset();

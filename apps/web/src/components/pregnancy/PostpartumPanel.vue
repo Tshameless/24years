@@ -47,6 +47,8 @@ async function submit() {
     return;
   }
 
+  reportError('');
+
   const value: Postpartum = {
     id: 'postpartum-plan',
     type: 'postpartum',

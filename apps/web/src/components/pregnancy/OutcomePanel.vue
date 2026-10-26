@@ -53,6 +53,8 @@ async function submit() {
     return;
   }
 
+  reportError('');
+
   const value = {
     id: 'pregnancy-outcome',
     type: 'outcome',

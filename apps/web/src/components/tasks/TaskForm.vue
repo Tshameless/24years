@@ -3,15 +3,9 @@ import { computed, reactive, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
 import { useFormDraft } from '@/composables/useFormDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
+import WeekdayPicker from './WeekdayPicker.vue';
 import { taskTemplates } from '@/domain/taskReminders';
-import {
-  isDate,
-  localDate,
-  sameValue,
-  weekDays,
-  validTask,
-  type FamilyTask,
-} from '@/domain/family';
+import { isDate, localDate, sameValue, validTask, type FamilyTask } from '@/domain/family';
 
 const props = defineProps<{ task?: FamilyTask }>();
 const emit = defineEmits<{ saved: []; cancel: [] }>();
@@ -72,13 +66,6 @@ function applyTemplate() {
 }
 
 const selectedDays = computed(() => (form.weekdays ? form.weekdays.split(',').map(Number) : []));
-
-function toggleWeekday(day: number) {
-  const next = selectedDays.value.includes(day)
-    ? selectedDays.value.filter((value) => value !== day)
-    : [...selectedDays.value, day];
-  form.weekdays = next.sort((a, b) => a - b).join(',');
-}
 
 const draftBlocked = computed(
   () =>
@@ -251,25 +238,10 @@ async function submit() {
     <small>
       负责人表示分工，不改变编辑权限；任一可编辑成员仍可代为完成。尚不支持双方分别确认。
     </small>
-    <fieldset
+    <WeekdayPicker
       v-if="form.repeat === 'weekly'"
-      class="weekday-picker"
-    >
-      <legend>重复星期（至少选一天）</legend>
-      <div class="weekday-options">
-        <button
-          v-for="day in weekDays"
-          :key="day.value"
-          type="button"
-          :aria-pressed="selectedDays.includes(day.value)"
-          :class="{ selected: selectedDays.includes(day.value) }"
-          @click="toggleWeekday(day.value)"
-        >
-          {{ day.label }}
-        </button>
-      </div>
-      <p class="muted">从开始日期起，仅在选定星期出现在今日计划中。修改周期不会删除历史打卡。</p>
-    </fieldset>
+      v-model="form.weekdays"
+    />
     <p
       v-if="error"
       class="form-error"
@@ -293,46 +265,3 @@ async function submit() {
     </button>
   </form>
 </template>
-
-<style scoped>
-.weekday-picker {
-  min-width: 0;
-  margin: 0;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.weekday-picker legend {
-  font-size: 13px;
-  padding: 0 6px;
-}
-
-.weekday-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.weekday-options button {
-  min-height: 44px;
-  min-width: 44px;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text-secondary);
-}
-
-.weekday-options .selected {
-  background: var(--green-light);
-  color: var(--green);
-  border-color: var(--green);
-}
-
-.weekday-picker p {
-  font-size: 12px;
-  line-height: 1.8;
-  margin: 12px 0 0;
-}
-</style>

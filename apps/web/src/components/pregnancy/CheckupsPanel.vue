@@ -8,7 +8,8 @@ import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
 
 type Checkup = Extract<PregnancyRecord, { type: 'checkup' }>;
-const { records, disabled, message, error, reportError, save, remove } = usePregnancyRecords();
+const { records, disabled, message, error, reportError, save, remove, hasExpense } =
+  usePregnancyRecords();
 const checkups = computed(() =>
   records.value
     .filter((item): item is Checkup => item.type === 'checkup')
@@ -53,6 +54,10 @@ const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
     reimbursed: '0',
   }),
 });
+const linkedExpense = computed(() => !!before.value && hasExpense('checkup-' + before.value.id));
+const canRecordExpense = computed(
+  () => !!before.value && !before.value.completed && form.completed && !linkedExpense.value,
+);
 
 async function submit() {
   if (disabled.value || stale.value) {
@@ -77,19 +82,13 @@ async function submit() {
   };
   let expense: Expense | undefined;
 
-  if (
-    before.value &&
-    !before.value.completed &&
-    form.completed &&
-    !form.amount.trim() &&
-    parseMoney(form.reimbursed) !== 0
-  ) {
+  if (canRecordExpense.value && !form.amount.trim() && parseMoney(form.reimbursed) !== 0) {
     reportError('填写报销金额时，请同时填写本次费用。');
 
     return;
   }
 
-  if (before.value && !before.value.completed && form.completed && form.amount.trim()) {
+  if (canRecordExpense.value && form.amount.trim()) {
     const amount = parseMoney(form.amount);
     const reimbursed = parseMoney(form.reimbursed);
 
@@ -259,7 +258,7 @@ async function submit() {
             />
             本次产检已完成
           </label>
-          <template v-if="before && !before.completed && form.completed">
+          <template v-if="canRecordExpense">
             <label class="field">
               本次费用（元，可留空）
               <input
@@ -279,6 +278,12 @@ async function submit() {
             </label>
             <p class="muted">费用与完成状态一起保存到家庭账本。之后可在账本中编辑费用。</p>
           </template>
+          <p
+            v-if="linkedExpense"
+            class="muted"
+          >
+            已有关联账目，金额请在家庭账本修改。删除产检记录不会删除账目。
+          </p>
           <button class="button button-primary">
             {{ before ? '保存产检修改' : '保存产检安排' }}
           </button>

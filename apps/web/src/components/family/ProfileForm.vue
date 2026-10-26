@@ -10,6 +10,7 @@ import {
   sameValue,
 } from '@/domain/family';
 import FamilySetupChoice from './FamilySetupChoice.vue';
+import GestationFields from './GestationFields.vue';
 import type { FamilyMode, FamilyParentRole } from '@/domain/collaboration';
 
 const { data, saveProfile, profileLocked, canManage, cloud, identity } = useFamily();
@@ -246,55 +247,14 @@ async function submit() {
         本次孕期已结束，原预产期 {{ data.profile?.dueDate }} 已保留。
         <RouterLink to="/pregnancy?tab=outcome">查看或更正结束记录</RouterLink>
       </p>
-      <fieldset
+      <GestationFields
         v-else
-        class="gestation-fields"
-      >
-        <legend>怀孕时期</legend>
-        <p
-          id="gestation-help"
-          class="gestation-help"
-        >
-          <span v-if="form.parentRole === 'father'">请填写母亲的怀孕时期。</span>
-          按 {{ form.referenceDate }} 已满的孕周填写，例如 24 周 3 天。
-        </p>
-        <div class="form-row">
-          <div class="field">
-            <label for="gestation-weeks">孕周（周）</label>
-            <input
-              id="gestation-weeks"
-              v-model="form.weeks"
-              type="text"
-              inputmode="numeric"
-              pattern="[0-9]{1,2}"
-              placeholder="例如：24"
-              aria-describedby="gestation-help"
-              required
-            />
-          </div>
-          <div class="field">
-            <label for="gestation-days">天数（天）</label>
-            <select
-              id="gestation-days"
-              v-model.number="form.days"
-            >
-              <option
-                v-for="day in 7"
-                :key="day"
-                :value="day - 1"
-              >
-                {{ day - 1 }} 天
-              </option>
-            </select>
-          </div>
-        </div>
-        <p
-          v-if="estimatedDueDate"
-          class="gestation-help"
-        >
-          预计预产期：{{ estimatedDueDate }}。按 40 周估算，仅作日历参考，以医生评估为准。
-        </p>
-      </fieldset>
+        v-model:weeks="form.weeks"
+        v-model:days="form.days"
+        :reference-date="form.referenceDate"
+        :parent-role="form.parentRole"
+        :estimated-due-date="estimatedDueDate"
+      />
       <label class="quiet-option">
         <input
           v-model="form.quietMode"
@@ -367,19 +327,6 @@ async function submit() {
 .saved-next-steps p {
   margin: 0;
   font-size: 13px;
-}
-
-.gestation-fields {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-}
-
-.gestation-fields legend {
-  padding: 0;
-  font-size: 13px;
-  font-weight: 500;
 }
 
 .gestation-help {

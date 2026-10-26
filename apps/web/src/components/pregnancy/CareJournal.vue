@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { localDate, type PregnancyRecord } from '@/domain/family';
+import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
@@ -8,7 +8,7 @@ import FormDraftNotice from '@/components/FormDraftNotice.vue';
 type Entry = Extract<PregnancyRecord, { type: 'bonding' | 'mood' }>;
 const { kind } = defineProps<{ kind: Entry['type'] }>();
 const labels = { bonding: '陪伴记录', mood: '心情日记' };
-const { records, disabled, save, remove, error, message } = usePregnancyRecords();
+const { records, disabled, save, remove, error, reportError, message } = usePregnancyRecords();
 const entries = computed(() =>
   records.value
     .filter((item): item is Entry => item.type === kind)
@@ -36,6 +36,8 @@ async function submit() {
     return;
   }
 
+  reportError('');
+
   const base = {
     id: before.value?.id ?? draft.id.value,
     date: form.date,
@@ -46,6 +48,12 @@ async function submit() {
     kind === 'bonding'
       ? { ...base, type: 'bonding', minutes: Number(form.minutes) }
       : { ...base, type: 'mood' };
+
+  if (!validPregnancyRecord(value) || value.date > localDate()) {
+    reportError('请检查内容、不晚于今天的记录日期与陪伴时长（1–1440 分钟整数）。');
+
+    return;
+  }
 
   if (await save({ type: 'pregnancy', before: before.value, value })) {
     reset();
