@@ -2,10 +2,11 @@
 import { computed, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
 import { roleLabels, familyRoleLabels, type FamilyParentRole } from '@/domain/collaboration';
+import FamilyInviteCard from './FamilyInviteCard.vue';
 import FamilySetupChoice from './FamilySetupChoice.vue';
 
 const { cloud, uploadLocal, localProfile } = useFamily();
-const { state, busy, role, invitation, expired } = cloud;
+const { state, busy, role, expired } = cloud;
 const family = computed(() => state.value.family);
 const joinMode = shallowRef<'couple'>('couple');
 const joinRole = shallowRef<FamilyParentRole | ''>('');
@@ -14,10 +15,6 @@ const currentMember = computed(() =>
   family.value?.members.find((member) => member.id === state.value.user?.id),
 );
 const code = shallowRef(new URLSearchParams(window.location.search).get('invite') ?? '');
-const copied = shallowRef('');
-const inviteLink = computed(() =>
-  invitation.value ? `${window.location.origin}/family?invite=${invitation.value.code}` : '',
-);
 
 async function create() {
   if (localProfile.value) {
@@ -49,15 +46,6 @@ function disconnect(userId?: string) {
     )
   ) {
     void cloud.manage(userId ? 'remove' : 'leave', userId ? { userId } : {});
-  }
-}
-
-async function copyLink() {
-  try {
-    await navigator.clipboard.writeText(inviteLink.value);
-    copied.value = '邀请链接已复制';
-  } catch {
-    copied.value = '请选中下方链接并手动复制';
   }
 }
 </script>
@@ -199,65 +187,9 @@ async function copyLink() {
       <p class="muted">
         管理员管理档案、邀请和权限。共同编辑成员可添加、编辑、删除计划与账目；仅查看成员可查看全部共享记录，但不能修改。
       </p>
-      <div
+      <FamilyInviteCard
         v-if="role === 'owner' && family.mode === 'couple' && family.members.length === 1"
-        class="invite-card"
-      >
-        <h3>为另一位，留一个位置</h3>
-        <p class="muted">邀请码 24 小时内有效，仅能使用一次。请只交给你的伴侣。</p>
-        <template v-if="invitation && family.inviteExpiresAt">
-          <p
-            class="invite-code"
-            data-testid="invite-code"
-          >
-            {{ invitation.code }}
-          </p>
-          <p class="muted">有效至 {{ new Date(invitation.expiresAt).toLocaleString('zh-CN') }}</p>
-          <label class="field">
-            配对链接
-            <input
-              :value="inviteLink"
-              readonly
-              @focus="($event.target as HTMLInputElement).select()"
-            />
-          </label>
-          <button
-            class="button button-secondary"
-            @click="copyLink"
-          >
-            复制邀请链接
-          </button>
-          <p
-            v-if="copied"
-            class="success-message"
-          >
-            {{ copied }}
-          </p>
-        </template>
-        <p
-          v-else-if="family.inviteExpiresAt"
-          class="muted"
-        >
-          已有有效邀请。为了保护邀请信息，刷新后请重新生成再分享，旧码将失效。
-        </p>
-        <div class="mode-actions">
-          <button
-            class="button button-primary"
-            :disabled="busy"
-            @click="cloud.manage('invite')"
-          >
-            {{ family.inviteExpiresAt ? '重新生成邀请码' : '生成邀请码' }}
-          </button>
-          <button
-            v-if="family.inviteExpiresAt"
-            class="text-button"
-            :disabled="busy"
-            @click="cloud.manage('revoke')"
-          >
-            撤销邀请
-          </button>
-        </div>
-      </div>
+      />
       <button
         v-if="role !== 'owner'"
         class="text-button"
@@ -285,13 +217,6 @@ async function copyLink() {
 .mode-description {
   color: var(--green);
   font-size: 13px;
-}
-
-.mode-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 16px;
 }
 
 .member-list {
@@ -342,22 +267,5 @@ async function copyLink() {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-}
-
-.invite-card {
-  background: var(--green-light);
-  padding: 20px;
-  border-radius: 12px;
-}
-
-.invite-code {
-  font-size: 32px;
-  letter-spacing: 7px;
-  color: var(--green);
-  margin: 20px 0;
-}
-
-.invite-card .field {
-  margin-bottom: 16px;
 }
 </style>

@@ -8,6 +8,7 @@ import {
   localDate,
   parseMoney,
   isDate,
+  sameValue,
   type ExpenseCategory,
   type Expense,
 } from '@/domain/family';
@@ -18,9 +19,7 @@ const { data, addExpense, updateExpense, locked, cloud, identity } = useFamily()
 const before = props.expense ? { ...props.expense } : undefined;
 const stale = computed(
   () =>
-    before &&
-    JSON.stringify(data.value.expenses.find((item) => item.id === before.id)) !==
-      JSON.stringify(before),
+    before && !sameValue(data.value.expenses.find((item) => item.id === before.id) ?? null, before),
 );
 
 const form = reactive({

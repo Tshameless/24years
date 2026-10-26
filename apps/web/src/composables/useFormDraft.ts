@@ -1,4 +1,5 @@
 import { createId } from '@/domain/id';
+import { sameValue } from '@/domain/family';
 import { computed, onUnmounted, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -72,7 +73,10 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
       Object.assign(options.form, saved.form);
       id.value = saved.id;
       restored.value = true;
-      changedSource.value = saved.baseline !== baseline;
+      changedSource.value = !sameValue(
+        JSON.parse(saved.baseline),
+        typeof options.baseline === 'function' ? options.baseline() : (options.baseline ?? null),
+      );
       draftBaseline = saved.baseline;
     }
   } catch {

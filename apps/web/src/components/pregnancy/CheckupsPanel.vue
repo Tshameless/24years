@@ -20,11 +20,14 @@ const template = shallowRef('');
 function applyTemplate() {
   const selected = checkupTemplates[Number(template.value)];
 
-  if (template.value === '' || !selected || disabled.value || before.value) {
+  if (template.value === '' || !selected || disabled.value || before.value || stale.value) {
     return;
   }
 
-  if ((form.title || form.notes) && !window.confirm('用模板替换产检名称和备注？')) {
+  if (
+    (draft.dirty.value || form.title || form.notes) &&
+    !window.confirm('用模板替换产检名称和备注？')
+  ) {
     return;
   }
 

@@ -4,7 +4,14 @@ import { useFamily } from '@/composables/useFamily';
 import { useFormDraft } from '@/composables/useFormDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
 import { taskTemplates } from '@/domain/taskReminders';
-import { isDate, localDate, weekDays, validTask, type FamilyTask } from '@/domain/family';
+import {
+  isDate,
+  localDate,
+  sameValue,
+  weekDays,
+  validTask,
+  type FamilyTask,
+} from '@/domain/family';
 
 const props = defineProps<{ task?: FamilyTask }>();
 const emit = defineEmits<{ saved: []; cancel: [] }>();
@@ -12,9 +19,7 @@ const { data, addTask, updateTask, locked, cloud, identity } = useFamily();
 const before = props.task ? (JSON.parse(JSON.stringify(props.task)) as FamilyTask) : undefined;
 const stale = computed(
   () =>
-    before &&
-    JSON.stringify(data.value.tasks.find((item) => item.id === before.id)) !==
-      JSON.stringify(before),
+    before && !sameValue(data.value.tasks.find((item) => item.id === before.id) ?? null, before),
 );
 
 const form = reactive({
@@ -48,7 +53,14 @@ const template = shallowRef('');
 function applyTemplate() {
   const selected = taskTemplates[Number(template.value)];
 
-  if (template.value === '' || !selected) {
+  if (
+    template.value === '' ||
+    !selected ||
+    locked.value ||
+    before ||
+    stale.value ||
+    draftBlocked.value
+  ) {
     return;
   }
 
@@ -170,7 +182,7 @@ async function submit() {
       <button
         type="button"
         class="button button-secondary"
-        :disabled="locked || template === ''"
+        :disabled="locked || !!stale || draftBlocked || template === ''"
         @click="applyTemplate"
       >
         填入模板

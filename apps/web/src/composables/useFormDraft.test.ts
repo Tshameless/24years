@@ -89,14 +89,17 @@ it('isolates identities and stops old forms writing after a scope change', () =>
 });
 
 it('retains stale baseline across repeated restores and further typing', () => {
-  const first = setup(undefined, { title: 'old' });
+  const first = setup(undefined, { title: 'old', date: '2026-10-21' });
   first.form.title = 'my edit';
   first.wrapper.unmount();
-  const second = setup(undefined, { title: 'changed remotely' });
+  const reordered = setup(undefined, { date: '2026-10-21', title: 'old' });
+  expect(reordered.draft.changedSource.value).toBe(false);
+  reordered.wrapper.unmount();
+  const second = setup(undefined, { title: 'changed remotely', date: '2026-10-21' });
   expect(second.draft.changedSource.value).toBe(true);
   second.form.title = 'continued edit';
   second.wrapper.unmount();
-  const third = setup(undefined, { title: 'changed remotely' });
+  const third = setup(undefined, { title: 'changed remotely', date: '2026-10-21' });
   expect(third.form.title).toBe('continued edit');
   expect(third.draft.changedSource.value).toBe(true);
 });

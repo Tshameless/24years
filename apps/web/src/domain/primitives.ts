@@ -35,3 +35,27 @@ export const shortText = (value: unknown, max: number): value is string =>
 
 export const cents = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 9999999999;
+
+export function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true;
+  }
+
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, index) => sameValue(item, b[index]));
+  }
+
+  if (isObject(a) && isObject(b)) {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+
+    return (
+      keysA.length === keysB.length &&
+      keysA.every(
+        (key) => Object.prototype.hasOwnProperty.call(b, key) && sameValue(a[key], b[key]),
+      )
+    );
+  }
+
+  return false;
+}

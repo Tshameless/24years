@@ -1,4 +1,4 @@
-import { isDate, isObject, localDate, shortText } from './primitives.ts';
+import { isDate, isObject, localDate, sameValue, shortText } from './primitives.ts';
 import { validExpense, type Expense } from './ledger.ts';
 import type { FamilyProfile } from './profile.ts';
 import type { FamilyTask } from './tasks.ts';
@@ -301,20 +301,6 @@ export class PregnancyChangeError extends Error {
   }
 }
 
-// Records are flat objects. Compare fields independently of JSON property ordering.
-function sameRecord(a: PregnancyRecord | null, b: PregnancyRecord | null): boolean {
-  if (!a || !b) {
-    return a === b;
-  }
-
-  return (
-    Object.keys(a).length === Object.keys(b).length &&
-    Object.entries(a).every(
-      ([key, value]) => (b as unknown as Record<string, unknown>)[key] === value,
-    )
-  );
-}
-
 export function applyPregnancyChange(data: FamilyData, change: PregnancyChange): FamilyData {
   const { before, value, expense } = change;
 
@@ -330,7 +316,7 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
   const id = (before ?? value)!.id;
   const records = data.pregnancyRecords ?? [];
 
-  if (!sameRecord(records.find((item) => item.id === id) ?? null, before)) {
+  if (!sameValue(records.find((item) => item.id === id) ?? null, before)) {
     throw new PregnancyChangeError('这条记录已变化，请重新打开最新记录，输入已保留。', 409);
   }
 

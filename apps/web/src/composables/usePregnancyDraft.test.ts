@@ -107,3 +107,21 @@ it('rejects malformed source snapshots', () => {
   expect(second.editor.stale.value).toBe(true);
   expect(second.editor.before.value).toBeNull();
 });
+it('treats identical records with different property ordering as fresh', () => {
+  const first = setup();
+  first.editor.edit(original);
+  first.editor.form.title = '修改后';
+  first.wrapper.unmount();
+  records.value = [
+    {
+      completed: original.completed,
+      notes: original.notes,
+      title: original.title,
+      date: original.date,
+      type: original.type,
+      id: original.id,
+    },
+  ];
+  const second = setup();
+  expect(second.editor.stale.value).toBe(false);
+});

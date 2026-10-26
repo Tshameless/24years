@@ -16,6 +16,7 @@ export {
   isDate,
   isObject,
   localDate,
+  sameValue,
   shortText,
 } from './primitives.ts';
 export {

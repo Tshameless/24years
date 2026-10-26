@@ -7,6 +7,7 @@ import {
   dueDateFromGestation,
   localDate,
   pregnancyProgress,
+  sameValue,
 } from '@/domain/family';
 import FamilySetupChoice from './FamilySetupChoice.vue';
 import type { FamilyMode, FamilyParentRole } from '@/domain/collaboration';
@@ -61,7 +62,7 @@ const estimatedDueDate = computed(() =>
 const error = shallowRef('');
 const saved = shallowRef(false);
 
-const stale = computed(() => JSON.stringify(before.value) !== JSON.stringify(data.value.profile));
+const stale = computed(() => !sameValue(before.value, data.value.profile));
 
 function reloadProfile() {
   if (!draft.confirmDiscard()) {

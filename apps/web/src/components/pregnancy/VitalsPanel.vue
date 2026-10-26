@@ -2,13 +2,13 @@
 import { computed } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import VitalTrends from './VitalTrends.vue';
-import { localDate, type PregnancyRecord } from '@/domain/family';
+import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
 
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
 
 type Vital = Extract<PregnancyRecord, { type: 'vital' }>;
-const { records, disabled, message, error, save, remove } = usePregnancyRecords();
+const { records, disabled, message, error, reportError, save, remove } = usePregnancyRecords();
 const labels = { weight: '体重（kg）', bloodPressure: '血压（mmHg）', glucose: '血糖（mmol/L）' };
 const entries = computed(() =>
   records.value
@@ -43,6 +43,8 @@ async function submit() {
     return;
   }
 
+  reportError('');
+
   const value: Vital = {
     id: before.value?.id ?? draft.id.value,
     type: 'vital',
@@ -54,6 +56,12 @@ async function submit() {
     secondary: form.metric === 'bloodPressure' ? Number(form.secondary) : null,
     notes: form.notes.trim(),
   };
+
+  if (!validPregnancyRecord(value) || value.date > localDate()) {
+    reportError('请填写不晚于今天的测量日期和有效测量数值。');
+
+    return;
+  }
 
   if (await save({ type: 'pregnancy', before: before.value, value })) {
     reset();

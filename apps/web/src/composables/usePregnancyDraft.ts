@@ -1,7 +1,7 @@
 import { computed, reactive, watch } from 'vue';
 import { useFamily } from './useFamily';
 import { useFormDraft } from './useFormDraft';
-import { validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
+import { sameValue, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
 
 /** One recoverable editor per record category, including its original conflict snapshot. */
 export function usePregnancyDraft<
@@ -59,8 +59,7 @@ export function usePregnancyDraft<
               : draft.id.value;
 
     return original
-      ? JSON.stringify(records.find((item) => item.id === original.id) ?? null) !==
-          JSON.stringify(original)
+      ? !sameValue(records.find((item) => item.id === original.id) ?? null, original)
       : records.some((item) => item.id === fixedId);
   });
 
