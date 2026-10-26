@@ -3,6 +3,8 @@ import { computed, shallowRef } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { checkupTemplates } from '@/domain/preparationTemplates';
 import { isDate, localDate, parseMoney, type PregnancyRecord, type Expense } from '@/domain/family';
+import { prenatalSchedule, scheduleDate, hasScheduledCheckup, type PrenatalScheduleItem } from '@/domain/prenatalSchedule';
+import { useFamily } from '@/composables/useFamily';
 
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
@@ -10,6 +12,7 @@ import FormDraftNotice from '@/components/FormDraftNotice.vue';
 type Checkup = Extract<PregnancyRecord, { type: 'checkup' }>;
 const { records, disabled, message, error, reportError, save, remove, hasExpense } =
   usePregnancyRecords();
+const { data } = useFamily();
 const checkups = computed(() =>
   records.value
     .filter((item): item is Checkup => item.type === 'checkup')
@@ -54,6 +57,25 @@ const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
     reimbursed: '0',
   }),
 });
+
+const schedule = computed(() =>
+  prenatalSchedule.map((item) => ({
+    ...item,
+    date: scheduleDate(data.value.profile?.dueDate ?? localDate(), item.offsetWeeks),
+    added: hasScheduledCheckup(records.value, item),
+  })),
+);
+
+function addScheduledCheckup(item: PrenatalScheduleItem & { date: string }) {
+  if (disabled.value || before.value || stale.value) return;
+  Object.assign(form, {
+    title: item.title,
+    date: item.date,
+    notes: `${item.guidance}\n\n实际项目、日期与准备要求请向医院确认。`,
+    completed: false,
+  });
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
 const linkedExpense = computed(() => !!before.value && hasExpense('checkup-' + before.value.id));
 const canRecordExpense = computed(
   () => !!before.value && !before.value.completed && form.completed && !linkedExpense.value,
@@ -130,6 +152,32 @@ async function submit() {
       <div class="panel-heading">
         <h2>产检安排</h2>
         <span class="tag">{{ checkups.length }} 次记录</span>
+      </div>
+      <div class="schedule-card">
+        <div class="schedule-heading">
+          <div>
+            <h3>孕周产检参考时间轴</h3>
+            <p>根据当前预产期估算，仅用于提前整理；最终项目和日期以医院安排为准。</p>
+          </div>
+          <span class="tag">{{ data.profile?.dueDate ? `预产期 ${data.profile.dueDate}` : '未设置预产期' }}</span>
+        </div>
+        <ol class="schedule-list">
+          <li v-for="item in schedule" :key="item.title">
+            <div>
+              <strong>{{ item.week }} · {{ item.title }}</strong>
+              <small>预计 {{ item.date }}</small>
+              <p>{{ item.guidance }}</p>
+            </div>
+            <button
+              type="button"
+              class="text-button"
+              :disabled="disabled || item.added"
+              @click="addScheduledCheckup(item)"
+            >
+              {{ item.added ? '已在安排中' : '加入安排' }}
+            </button>
+          </li>
+        </ol>
       </div>
       <p
         v-if="!checkups.length"
@@ -322,3 +370,77 @@ async function submit() {
     </section>
   </div>
 </template>
+
+<style scoped>
+.schedule-card {
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--green-light);
+}
+
+.schedule-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-heading h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.schedule-heading p,
+.schedule-list p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.schedule-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedule-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--green) 20%, transparent);
+}
+
+.schedule-list strong,
+.schedule-list small {
+  display: block;
+}
+
+.schedule-list strong {
+  font-size: 13px;
+}
+
+.schedule-list small {
+  margin: 3px 0;
+  color: var(--green);
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .schedule-heading,
+  .schedule-list li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .schedule-list .text-button {
+    justify-content: flex-start;
+  }
+}
+</style>

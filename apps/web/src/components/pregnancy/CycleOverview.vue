@@ -32,6 +32,7 @@ const stages = [
       { label: '待产清单', to: '/pregnancy?tab=packing' },
       { label: '分娩沟通计划', to: '/pregnancy?tab=birth-plan' },
       { label: '宫缩计时', to: '/pregnancy?tab=contractions' },
+      { label: '异常与急救', to: '/pregnancy?tab=emergency' },
     ],
   },
   {

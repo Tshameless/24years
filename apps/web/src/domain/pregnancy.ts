@@ -31,6 +31,37 @@ export type PregnancyRecord =
   | { id: string; type: 'mood'; date: string; title: string; notes: string }
   | {
       id: string;
+      type: 'nutrition';
+      date: string;
+      water: boolean;
+      protein: boolean;
+      vegetables: boolean;
+      supplement: boolean;
+      notes: string;
+    }
+  | {
+      id: 'mental-screening';
+      type: 'mentalScreening';
+      date: string;
+      score: number;
+      selfHarm: boolean;
+      notes: string;
+    }
+  | {
+      id: string;
+      type: 'ultrasound';
+      date: string;
+      gestationWeeks: number;
+      bpd?: number;
+      fl?: number;
+      ac?: number;
+      hc?: number;
+      afi?: number;
+      umbilicalSd?: number;
+      notes: string;
+    }
+  | {
+      id: string;
       type: 'packing';
       date: string;
       title: string;
@@ -136,6 +167,38 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
       return (
         isDate(value.date) &&
         ['愉悦', '平静', '烦躁', '低落', '疲惫'].includes(String(value.title)) &&
+        note(value.notes)
+      );
+    case 'nutrition':
+      return (
+        isDate(value.date) &&
+        typeof value.water === 'boolean' &&
+        typeof value.protein === 'boolean' &&
+        typeof value.vegetables === 'boolean' &&
+        typeof value.supplement === 'boolean' &&
+        note(value.notes)
+      );
+    case 'mentalScreening':
+      return (
+        value.id === 'mental-screening' &&
+        isDate(value.date) &&
+        typeof value.score === 'number' &&
+        Number.isInteger(value.score) &&
+        value.score >= 0 &&
+        value.score <= 30 &&
+        typeof value.selfHarm === 'boolean' &&
+        note(value.notes)
+      );
+    case 'ultrasound':
+      return (
+        isDate(value.date) &&
+        typeof value.gestationWeeks === 'number' &&
+        Number.isInteger(value.gestationWeeks) &&
+        value.gestationWeeks >= 0 &&
+        value.gestationWeeks <= 42 &&
+        ['bpd', 'fl', 'ac', 'hc', 'afi', 'umbilicalSd'].every((key) =>
+          value[key] === undefined || (typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0),
+        ) &&
         note(value.notes)
       );
     case 'packing':

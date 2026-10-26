@@ -25,12 +25,24 @@ const ContractionsPanel = defineAsyncComponent(
 const MedicalCardPanel = defineAsyncComponent(
   () => import('@/components/pregnancy/MedicalCardPanel.vue'),
 );
+const EmergencyGuidePanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/EmergencyGuidePanel.vue'),
+);
 const BondingPanel = defineAsyncComponent(() => import('@/components/pregnancy/BondingPanel.vue'));
 const PackingPanel = defineAsyncComponent(() => import('@/components/pregnancy/PackingPanel.vue'));
 const MovementsPanel = defineAsyncComponent(
   () => import('@/components/pregnancy/MovementsPanel.vue'),
 );
 const CareJournal = defineAsyncComponent(() => import('@/components/pregnancy/CareJournal.vue'));
+const NutritionPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/NutritionPanel.vue'),
+);
+const MentalScreeningPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/MentalScreeningPanel.vue'),
+);
+const UltrasoundPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/UltrasoundPanel.vue'),
+);
 
 const { data, locked, cloud } = useFamily();
 const route = useRoute();
@@ -54,6 +66,8 @@ const tabGroups = [
     tabs: [
       { id: 'bonding', label: '胎教陪伴', component: BondingPanel },
       { id: 'mood', label: '心情日记', component: CareJournal },
+      { id: 'nutrition', label: '营养与补剂', component: NutritionPanel },
+      { id: 'mental', label: '心理自查', component: MentalScreeningPanel },
       { id: 'movements', label: '胎动记录', component: MovementsPanel },
     ],
   },
@@ -64,6 +78,7 @@ const tabGroups = [
     tabs: [
       { id: 'checkups', label: '产检安排', component: CheckupsPanel },
       { id: 'vitals', label: '体征记录', component: VitalsPanel },
+      { id: 'ultrasound', label: '超声指标', component: UltrasoundPanel },
     ],
   },
   {
@@ -75,6 +90,7 @@ const tabGroups = [
       { id: 'packing', label: '待产清单', component: PackingPanel },
       { id: 'contractions', label: '宫缩计时', component: ContractionsPanel },
       { id: 'medical', label: '就医卡', component: MedicalCardPanel },
+      { id: 'emergency', label: '异常与急救', component: EmergencyGuidePanel },
     ],
   },
 ];

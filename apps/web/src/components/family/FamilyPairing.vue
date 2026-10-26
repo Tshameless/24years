@@ -261,6 +261,9 @@ function disconnect(userId?: string) {
 }
 
 .member-detail select {
+  display: block;
+  width: 100%;
+  max-width: 100%;
   margin: 10px 12px 0 0;
   min-height: 44px;
   padding: 6px;

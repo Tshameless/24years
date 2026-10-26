@@ -556,6 +556,12 @@ const genderLabels: Record<string, string> = {
   gap: 0.75rem;
 }
 
+@media (max-width: 480px) {
+  .modal-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .modal-actions {
   display: flex;
   gap: 0.75rem;

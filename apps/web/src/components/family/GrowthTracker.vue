@@ -510,6 +510,10 @@ function addReminder() {
 }
 
 @media (max-width: 700px) {
+  .growth-form .form-row {
+    grid-template-columns: 1fr;
+  }
+
   .reminder-form {
     grid-template-columns: 1fr 1fr;
   }

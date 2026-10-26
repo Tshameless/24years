@@ -111,7 +111,7 @@ async function toggle() {
           class="pattern-actions"
         >
           <RouterLink
-            to="/pregnancy?tab=medicalCard"
+            to="/pregnancy?tab=medical"
             class="button button-primary"
           >
             就医卡 / 医院电话
