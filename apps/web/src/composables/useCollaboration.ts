@@ -1,10 +1,11 @@
 import { createId } from '@/domain/id';
 import { computed, onMounted, onUnmounted, readonly, shallowRef } from 'vue';
-import type {
-  FamilyChange,
-  FamilyMode,
-  FamilyParentRole,
-  SessionState,
+import {
+  applyFamilyDelta,
+  type FamilyChange,
+  type FamilyMode,
+  type FamilyParentRole,
+  type SessionState,
 } from '@/domain/collaboration';
 import { canonicalJson, type FamilyData } from '@/domain/family';
 import { CLOUD_CACHE_KEY, readCloudCache } from './cloudCache';
@@ -80,9 +81,36 @@ export function useCollaboration(enabled = true) {
       };
       source.addEventListener('open', markConnected);
       source.addEventListener('ready', markConnected);
-      source.addEventListener('sync', () => {
+      source.addEventListener('sync', (event) => {
         if (eventSource === source && !disposed) {
           retryAt = 0;
+
+          if (event instanceof MessageEvent && typeof event.data === 'string') {
+            try {
+              const payload = JSON.parse(event.data);
+
+              if (
+                !fetching &&
+                !busy.value &&
+                state.value.user &&
+                state.value.family &&
+                payload?.delta &&
+                typeof payload.etag === 'string'
+              ) {
+                const patched = applyFamilyDelta(state.value.family, payload.delta);
+
+                if (patched) {
+                  etag = payload.etag;
+                  receive({ user: state.value.user, family: patched });
+
+                  return;
+                }
+              }
+            } catch {
+              // Fall back to full session refresh when event data is not a delta payload.
+            }
+          }
+
           void refresh();
         }
       });
@@ -193,6 +221,8 @@ export function useCollaboration(enabled = true) {
   }
 
   function failed(reason: unknown) {
+    refreshPending = false;
+
     if (reason instanceof RequestError) {
       if (reason.state) {
         receive(reason.state);
@@ -224,9 +254,13 @@ export function useCollaboration(enabled = true) {
       return;
     }
 
-    if (fetching || busy.value) {
+    if (fetching) {
       refreshPending = true;
 
+      return;
+    }
+
+    if (busy.value) {
       return;
     }
 
@@ -337,6 +371,8 @@ export function useCollaboration(enabled = true) {
 
       return true;
     } catch (reason) {
+      refreshPending = false;
+
       if (startedAt === generation && !disposed) {
         failed(reason);
       }
@@ -345,11 +381,6 @@ export function useCollaboration(enabled = true) {
     } finally {
       busy.value = false;
       ready.value = true;
-
-      if (refreshPending && !disposed) {
-        refreshPending = false;
-        void refresh();
-      }
     }
   }
 

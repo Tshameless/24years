@@ -9,6 +9,7 @@ import { openDatabase } from './database.ts';
 import { ApiError, createService, hash } from './service.ts';
 import { createApplication } from './http.ts';
 import { emptyFamily, type FamilyTask } from '../src/domain/family.ts';
+import { applyFamilyDelta } from '../src/domain/collaboration.ts';
 
 async function fixture() {
   const db = openDatabase(':memory:');
@@ -872,5 +873,80 @@ test('恢复与注销 HTTP 接口限制尝试次数、检查来源并清除会�
   } finally {
     await new Promise<void>((resolve) => app.server.close(() => resolve()));
     app.db.close();
+  }
+});
+
+test('关系型分表与增量变更日志同步，客户端可按版本号增量合并并在导入后要求重置', async () => {
+  const f = await fixture();
+
+  try {
+    const initial = f.service.snapshot(f.owner).family!;
+    const firstTask = task('增量计划');
+    f.change(f.owner, 'task', firstTask, null);
+    const checkup = {
+      id: 'delta-checkup',
+      type: 'checkup' as const,
+      title: 'NT产检',
+      date: '2026-10-26',
+      notes: '',
+      completed: false,
+    };
+    f.change(f.owner, 'pregnancy', checkup, null);
+    f.service.mutate(f.owner, 'records', {
+      familyId: f.familyId,
+      operationId: randomUUID(),
+      change: {
+        type: 'pregnancy',
+        before: checkup,
+        value: { ...checkup, completed: true },
+        expense: {
+          id: 'checkup-delta-checkup',
+          title: 'NT产检',
+          date: checkup.date,
+          kind: 'expense',
+          category: '产检医疗',
+          amountCents: 18000,
+          reimbursedCents: 5000,
+        },
+      },
+    });
+
+    const taskCount = (
+      f.db
+        .prepare('SELECT count(*) AS count FROM family_tasks WHERE family_id = ?')
+        .get(f.familyId) as { count: number }
+    ).count;
+    const expenseCount = (
+      f.db
+        .prepare('SELECT count(*) AS count FROM family_expenses WHERE family_id = ?')
+        .get(f.familyId) as { count: number }
+    ).count;
+    const pregnancyCount = (
+      f.db
+        .prepare('SELECT count(*) AS count FROM family_pregnancy_records WHERE family_id = ?')
+        .get(f.familyId) as { count: number }
+    ).count;
+    assert.equal(taskCount, 1);
+    assert.equal(expenseCount, 1);
+    assert.equal(pregnancyCount, 1);
+
+    const delta = f.service.changesSince(f.owner, initial.revision)!;
+    assert.equal(delta.reset, false);
+    assert.equal(delta.fromRevision, 1);
+    assert.equal(delta.revision, 4);
+    const patched = applyFamilyDelta(initial, delta);
+    assert.deepEqual(patched, f.service.snapshot(f.owner).family);
+
+    f.service.mutate(f.owner, 'import', {
+      familyId: f.familyId,
+      revision: delta.revision,
+      operationId: randomUUID(),
+      data: emptyFamily(),
+    });
+    const afterImport = f.service.changesSince(f.owner, initial.revision)!;
+    assert.equal(afterImport.reset, true);
+    assert.equal(applyFamilyDelta(initial, afterImport), null);
+  } finally {
+    f.db.close();
   }
 });

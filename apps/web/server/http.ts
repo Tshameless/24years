@@ -99,12 +99,19 @@ export function createApplication(options: {
     return [...new Set([userId, ...members])];
   }
 
-  function notifyUsers(userIds: Iterable<string>) {
+  function notifyUsers(userIds: Iterable<string>, fromRevision?: number) {
     const targets = new Set(userIds);
 
     for (const client of eventClients) {
       if (targets.has(client.userId) && !client.response.writableEnded) {
-        client.response.write(`event: sync\ndata: ${Date.now()}\n\n`);
+        const payload =
+          fromRevision !== undefined
+            ? JSON.stringify({
+                delta: service.changesSince(client.userId, fromRevision),
+                etag: service.sessionTag(client.userId),
+              })
+            : String(Date.now());
+        client.response.write(`event: sync\ndata: ${payload}\n\n`);
       }
     }
   }
@@ -113,8 +120,9 @@ export function createApplication(options: {
     db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
     db.prepare('DELETE FROM invites WHERE expires_at <= ?').run(Date.now());
     db.prepare('DELETE FROM rate_limits WHERE until <= ?').run(Date.now());
-    // Retain receipts for 30 days, matching the maximum session lifetime.
+    // Retain receipts and incremental change logs for 30 days, matching the maximum session lifetime.
     db.prepare('DELETE FROM receipts WHERE created_at <= ?').run(Date.now() - 30 * 86400000);
+    db.prepare('DELETE FROM family_changes WHERE created_at <= ?').run(Date.now() - 30 * 86400000);
     // An import backup is an undo safety net, not an archive. Retain it for 30 days.
     db.prepare('DELETE FROM import_backups WHERE created_at <= ?').run(
       new Date(Date.now() - 30 * 86400000).toISOString(),
@@ -155,12 +163,32 @@ export function createApplication(options: {
     let userId: string | null = null;
 
     try {
-      const path = new URL(request.url ?? '/', 'http://localhost').pathname;
+      const requestUrl = new URL(request.url ?? '/', 'http://localhost');
+      const path = requestUrl.pathname;
       userId = service.userForToken(token);
 
       if (path === '/api/health' && request.method === 'GET') {
         db.prepare('SELECT 1').get();
         json(response, 200, { ok: true });
+
+        return;
+      }
+
+      if (path === '/api/family/changes' && request.method === 'GET') {
+        if (!userId) {
+          throw new ApiError(401, '登录已过期，请重新登录后继续。');
+        }
+
+        const since = Number(requestUrl.searchParams.get('since'));
+
+        if (!Number.isInteger(since) || since < 1) {
+          throw new ApiError(400, '请提供有效的起始版本号。');
+        }
+
+        json(response, 200, {
+          delta: service.changesSince(userId, since),
+          etag: service.sessionTag(userId),
+        });
 
         return;
       }
@@ -321,10 +349,11 @@ export function createApplication(options: {
           limit(`pair-ip:${ip}`, 60);
         }
 
+        const beforeFamily = service.snapshot(userId).family;
         const beforeUsers = familyUsers(userId);
         const result = service.mutate(userId, action, body);
         const afterUsers = result.family?.members.map((member) => member.id) ?? [];
-        notifyUsers([...beforeUsers, ...afterUsers]);
+        notifyUsers([...beforeUsers, ...afterUsers], beforeFamily?.revision);
         json(response, 200, result);
 
         return;

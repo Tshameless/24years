@@ -9,11 +9,14 @@ import {
   validExpense,
   validProfile,
   validTask,
+  type Expense,
   type FamilyData,
+  type FamilyTask,
   type PregnancyChange,
 } from '../src/domain/family.ts';
 import type {
   Account,
+  FamilyDeltaRecordType,
   FamilyParentRole,
   Member,
   SessionState,
@@ -22,6 +25,14 @@ import type {
 import { familyBytes, MAX_CLOUD_BYTES } from '../src/domain/capacity.ts';
 import { transaction } from './database.ts';
 import { ApiError, hash, requireValue, type Body } from './auth.ts';
+import {
+  recordDeltaEntries,
+  recordResetChange,
+  syncFamilyTables,
+  upsertExpenseRow,
+  upsertPregnancyRow,
+  upsertTaskRow,
+} from './records-store.ts';
 
 function familyRole(value: unknown, mode: 'single' | 'couple'): FamilyParentRole {
   if (mode === 'single' && value === undefined) {
@@ -79,16 +90,20 @@ export function createFamilyMutations(options: {
     );
 
     const familyId = randomUUID();
+    const now = new Date().toISOString();
+    const initialData: FamilyData = { ...data, theme: 'light' };
     db.prepare('INSERT INTO families VALUES (?, ?, ?, 1, ?, ?)').run(
       familyId,
       body.mode,
-      JSON.stringify({ ...data, theme: 'light' }),
-      new Date().toISOString(),
+      JSON.stringify(initialData),
+      now,
       account(userId).nickname,
     );
     db.prepare(
       'INSERT INTO members(user_id, family_id, role, family_role) VALUES (?, ?, ?, ?)',
     ).run(userId, familyId, 'owner', selectedFamilyRole);
+    syncFamilyTables(db, familyId, initialData, now);
+    recordResetChange(db, familyId, 1);
   }
 
   function updateFamilyChoice(
@@ -137,6 +152,12 @@ export function createFamilyMutations(options: {
     const change = body.change as Body | null;
     requireValue(change && typeof change === 'object', 400, '修改内容无效。');
     const { before, value } = change;
+    const now = new Date().toISOString();
+    const deltaEntries: Array<{
+      recordType: FamilyDeltaRecordType;
+      recordId: string;
+      value: unknown;
+    }> = [];
 
     if (change.type === 'profile') {
       requireValue(member.role === 'owner', 403, '只有管理员可以修改家庭档案。');
@@ -154,15 +175,51 @@ export function createFamilyMutations(options: {
       );
       updateFamilyChoice(userId, family, mode, selectedRole);
       family.data.profile = { ...value, familyMode: mode, parentRole: selectedRole };
+      deltaEntries.push({ recordType: 'profile', recordId: 'profile', value: family.data.profile });
     } else if (change.type === 'pregnancy') {
+      const previousProfile = family.data.profile;
+      const pregnancyChange = change as unknown as PregnancyChange;
+
       try {
-        family.data = applyPregnancyChange(family.data, change as unknown as PregnancyChange);
+        family.data = applyPregnancyChange(family.data, pregnancyChange);
       } catch (reason) {
         if (reason instanceof PregnancyChangeError) {
           throw new ApiError(reason.status, reason.message);
         }
 
         throw reason;
+      }
+
+      const recordId = (pregnancyChange.before ?? pregnancyChange.value)!.id;
+      upsertPregnancyRow(db, family.id, recordId, pregnancyChange.value, now);
+      deltaEntries.push({
+        recordType: 'pregnancy',
+        recordId,
+        value: pregnancyChange.value,
+      });
+
+      if (pregnancyChange.expense) {
+        upsertExpenseRow(
+          db,
+          family.id,
+          pregnancyChange.expense.id,
+          pregnancyChange.expense,
+          true,
+          now,
+        );
+        deltaEntries.push({
+          recordType: 'expense_prepend',
+          recordId: pregnancyChange.expense.id,
+          value: pregnancyChange.expense,
+        });
+      }
+
+      if (!isDeepStrictEqual(previousProfile, family.data.profile)) {
+        deltaEntries.push({
+          recordType: 'profile',
+          recordId: 'profile',
+          value: family.data.profile,
+        });
       }
     } else {
       requireValue(change.type === 'task' || change.type === 'expense', 400, '不支持的记录类型。');
@@ -184,6 +241,14 @@ export function createFamilyMutations(options: {
       requireValue(isDeepStrictEqual(current, before), 409, '这条记录已被另一位成员修改或删除。');
       const updated = [...records.filter((item) => item.id !== id), ...(value ? [value] : [])];
       family.data = { ...family.data, [key]: updated as never };
+
+      if (change.type === 'task') {
+        upsertTaskRow(db, family.id, id, value as FamilyTask | null, now);
+        deltaEntries.push({ recordType: 'task', recordId: id, value });
+      } else {
+        upsertExpenseRow(db, family.id, id, value as Expense | null, false, now);
+        deltaEntries.push({ recordType: 'expense', recordId: id, value });
+      }
     }
 
     requireValue(
@@ -196,6 +261,7 @@ export function createFamilyMutations(options: {
       family.id,
     );
     touch(family.id, userId);
+    recordDeltaEntries(db, family.id, family.revision + 1, deltaEntries);
     db.prepare(
       'INSERT INTO receipts(user_id, operation_id, family_id, payload_hash, created_at) VALUES (?, ?, ?, ?, ?)',
     ).run(userId, body.operationId, family.id, payloadHash, Date.now());
@@ -265,6 +331,9 @@ export function createFamilyMutations(options: {
       );
       db.prepare('INSERT INTO invites VALUES (?, ?, ?)').run(hash(code), family.id, expiresAt);
       touch(family.id, userId);
+      recordDeltaEntries(db, family.id, family.revision + 1, [
+        { recordType: 'profile', recordId: 'profile', value: family.data.profile },
+      ]);
 
       return { code, expiresAt: new Date(expiresAt).toISOString() };
     } else if (action === 'revoke') {
@@ -289,6 +358,9 @@ export function createFamilyMutations(options: {
     }
 
     touch(family.id, userId);
+    recordDeltaEntries(db, family.id, family.revision + 1, [
+      { recordType: 'profile', recordId: 'profile', value: family.data.profile },
+    ]);
   }
 
   function join(userId: string, body: Body) {
@@ -303,9 +375,9 @@ export function createFamilyMutations(options: {
       .get(hash(body.code), Date.now()) as { family_id: string } | undefined;
     requireValue(invitation, 404, '邀请码无效、已过期或已被使用。');
     const familyId = String(invitation.family_id);
-    const family = db.prepare('SELECT mode FROM families WHERE id = ?').get(familyId) as
-      | { mode: string }
-      | undefined;
+    const family = db
+      .prepare('SELECT mode, revision, data FROM families WHERE id = ?')
+      .get(familyId) as { mode: string; revision: number; data: string } | undefined;
     const count = db
       .prepare('SELECT count(*) AS count FROM members WHERE family_id = ?')
       .get(familyId) as { count: number };
@@ -328,6 +400,13 @@ export function createFamilyMutations(options: {
     ).run(userId, familyId, 'editor', selectedFamilyRole);
     db.prepare('DELETE FROM invites WHERE family_id = ?').run(familyId);
     touch(familyId, userId);
+    recordDeltaEntries(db, familyId, family.revision + 1, [
+      {
+        recordType: 'profile',
+        recordId: 'profile',
+        value: decodeFamily(family.data).profile,
+      },
+    ]);
   }
 
   function importFamily(userId: string, body: Body) {
@@ -382,11 +461,14 @@ export function createFamilyMutations(options: {
       413,
       '备份内容超过云端 800 KB 容量上限，可退出账号后恢复到本机。',
     );
+    const now = new Date().toISOString();
     db.prepare(
       'INSERT INTO import_backups VALUES (?, ?, ?) ON CONFLICT(family_id) DO UPDATE SET data = excluded.data, created_at = excluded.created_at',
-    ).run(family.id, JSON.stringify(family.data), new Date().toISOString());
+    ).run(family.id, JSON.stringify(family.data), now);
     db.prepare('UPDATE families SET data = ? WHERE id = ?').run(JSON.stringify(data), family.id);
+    syncFamilyTables(db, family.id, data, now);
     touch(family.id, userId);
+    recordResetChange(db, family.id, family.revision + 1);
     db.prepare(
       'INSERT INTO receipts(user_id, operation_id, family_id, payload_hash, created_at) VALUES (?, ?, ?, ?, ?)',
     ).run(userId, body.operationId, family.id, payloadHash, Date.now());

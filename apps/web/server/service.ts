@@ -1,8 +1,15 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { decodeFamily } from '../src/domain/family.ts';
-import type { Account, Member, SessionState, SharedFamily } from '../src/domain/collaboration.ts';
+import type {
+  Account,
+  FamilyDelta,
+  Member,
+  SessionState,
+  SharedFamily,
+} from '../src/domain/collaboration.ts';
 import { ApiError, createAccountHandlers, hash, requireValue, type Body } from './auth.ts';
 import { createFamilyMutations } from './family-mutations.ts';
+import { readDeltaChanges } from './records-store.ts';
 
 export { ApiError, hash };
 
@@ -104,6 +111,48 @@ export function createService(db: DatabaseSync) {
     return member;
   }
 
+  function changesSince(userId: string, fromRevision: number): FamilyDelta | null {
+    const member = membership(userId);
+
+    if (!member) {
+      return null;
+    }
+
+    const row = db
+      .prepare('SELECT id, mode, revision, updated_at, updated_by FROM families WHERE id = ?')
+      .get(member.family_id) as Omit<FamilyRow, 'data'> | undefined;
+
+    if (!row) {
+      return null;
+    }
+
+    const invite = db
+      .prepare('SELECT expires_at FROM invites WHERE family_id = ? AND expires_at > ?')
+      .get(row.id, Date.now()) as { expires_at: number } | undefined;
+    const members = db
+      .prepare(
+        "SELECT a.id, a.username, a.nickname, m.role, m.family_role AS familyRole FROM members m JOIN accounts a ON a.id = m.user_id WHERE m.family_id = ? ORDER BY m.role = 'owner' DESC, a.id",
+      )
+      .all(row.id) as unknown as Member[];
+    const delta = readDeltaChanges(db, row.id, fromRevision, row.revision);
+
+    return {
+      familyId: row.id,
+      fromRevision,
+      revision: row.revision,
+      mode: row.mode,
+      members,
+      updatedAt: row.updated_at,
+      updatedBy: row.updated_by,
+      inviteExpiresAt:
+        member.role === 'owner' && invite
+          ? new Date(Number(invite.expires_at)).toISOString()
+          : null,
+      reset: delta.reset,
+      entries: delta.entries,
+    };
+  }
+
   const accountHandlers = createAccountHandlers(db, account, snapshot);
   const { mutate } = createFamilyMutations({
     db,
@@ -118,6 +167,7 @@ export function createService(db: DatabaseSync) {
     sessionTag,
     ...accountHandlers,
     snapshot,
+    changesSince,
     mutate,
   };
 }

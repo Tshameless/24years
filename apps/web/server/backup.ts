@@ -37,14 +37,46 @@ export function verifyDatabase(path: string) {
       data: string;
     }>;
 
+    const hasRelationalTables = Boolean(
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'family_tasks'")
+        .get(),
+    );
+
     for (const family of families) {
-      decodeFamily(String(family.data));
+      const decoded = decodeFamily(String(family.data));
       const owners = db
         .prepare("SELECT count(*) AS count FROM members WHERE family_id = ? AND role = 'owner'")
         .get(family.id) as { count: number };
 
       if (owners.count !== 1) {
         throw new Error('家庭管理员数据不完整。');
+      }
+
+      if (hasRelationalTables) {
+        const taskRows = (
+          db
+            .prepare('SELECT count(*) AS count FROM family_tasks WHERE family_id = ?')
+            .get(family.id) as { count: number }
+        ).count;
+        const expenseRows = (
+          db
+            .prepare('SELECT count(*) AS count FROM family_expenses WHERE family_id = ?')
+            .get(family.id) as { count: number }
+        ).count;
+        const pregnancyRows = (
+          db
+            .prepare('SELECT count(*) AS count FROM family_pregnancy_records WHERE family_id = ?')
+            .get(family.id) as { count: number }
+        ).count;
+
+        if (
+          taskRows !== decoded.tasks.length ||
+          expenseRows !== decoded.expenses.length ||
+          pregnancyRows !== (decoded.pregnancyRecords?.length ?? 0)
+        ) {
+          throw new Error('家庭关系表数据与主档案不一致。');
+        }
       }
     }
 

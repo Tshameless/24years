@@ -44,6 +44,7 @@ export function serveStatic(
   if (!stat?.isFile()) {
     return false;
   }
+
   const etag = `W/"${stat.size}-${stat.mtimeMs}"`;
   response.setHeader('ETag', etag);
   const compressible = /\.(?:html|js|css|svg|json|webmanifest)$/.test(file);

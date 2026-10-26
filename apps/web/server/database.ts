@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { initRelationalSchema } from './records-store.ts';
 
 export function openDatabase(path: string) {
   if (path !== ':memory:') {
@@ -98,6 +99,7 @@ export function openDatabase(path: string) {
   db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (1, ?)').run(
     new Date().toISOString(),
   );
+  initRelationalSchema(db);
 
   return db;
 }

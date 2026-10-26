@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'no
 import type { DatabaseSync } from 'node:sqlite';
 import type { Account, SessionState } from '../src/domain/collaboration.ts';
 import { transaction } from './database.ts';
+import { deleteFamilyTables, recordDeltaEntries } from './records-store.ts';
 
 export class ApiError extends Error {
   status: number;
@@ -259,6 +260,7 @@ export function createAccountHandlers(
         db.prepare('DELETE FROM members WHERE user_id = ?').run(userId);
 
         if (!remaining) {
+          deleteFamilyTables(db, family.id);
           db.prepare('DELETE FROM receipts WHERE family_id = ?').run(family.id);
           db.prepare('DELETE FROM import_backups WHERE family_id = ?').run(family.id);
           db.prepare('DELETE FROM families WHERE id = ?').run(family.id);
@@ -286,6 +288,9 @@ export function createAccountHandlers(
           db.prepare(
             'UPDATE families SET revision = revision + 1, updated_at = ?, updated_by = ? WHERE id = ?',
           ).run(new Date().toISOString(), '已注销成员', family.id);
+          recordDeltaEntries(db, family.id, family.revision + 1, [
+            { recordType: 'profile', recordId: 'profile', value: family.data.profile },
+          ]);
         }
       }
 

@@ -241,10 +241,45 @@ it('throttles polling while SSE is connected, syncs on server push and queues ra
     await vi.advanceTimersByTimeAsync(10000);
     expect(fetcher).toHaveBeenCalledTimes(1);
 
-    // Server push triggers an immediate session refresh.
+    // Server push triggers an immediate session refresh when no delta payload is attached.
     listeners.get('sync')?.();
     await flushPromises();
     expect(fetcher).toHaveBeenCalledTimes(2);
+
+    // Server push with a valid delta applies in-memory without an extra /api/session fetch.
+    const deltaTask = {
+      id: 'delta-task',
+      title: 'SSE增量任务',
+      date: '2026-10-26',
+      time: '08:00',
+      repeat: 'once' as const,
+      completedDates: [],
+    };
+    (listeners.get('sync') as unknown as (event: MessageEvent) => void)?.(
+      new MessageEvent('sync', {
+        data: JSON.stringify({
+          etag: '"rev-2"',
+          delta: {
+            familyId: state.family!.id,
+            fromRevision: 1,
+            revision: 2,
+            mode: state.family!.mode,
+            members: state.family!.members,
+            updatedAt: state.family!.updatedAt,
+            updatedBy: state.family!.updatedBy,
+            inviteExpiresAt: null,
+            reset: false,
+            entries: [
+              { revision: 2, recordType: 'task', recordId: deltaTask.id, value: deltaTask },
+            ],
+          },
+        }),
+      }),
+    );
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(cloud.state.value.family?.revision).toBe(2);
+    expect(cloud.state.value.family?.data.tasks).toEqual([deltaTask]);
+    state.family!.revision = 2;
 
     // Concurrent record mutations queue sequentially instead of dropping the second call.
     const firstTask = {
@@ -268,7 +303,7 @@ it('throttles polling while SSE is connected, syncs on server push and queues ra
       cloud.applyChange({ type: 'task', before: null, value: secondTask }),
     ]);
     expect(results).toEqual([true, true]);
-    expect(cloud.state.value.family?.revision).toBe(3);
+    expect(cloud.state.value.family?.revision).toBe(4);
   } finally {
     wrapper.unmount();
   }

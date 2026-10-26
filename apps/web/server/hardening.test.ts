@@ -249,7 +249,6 @@ test('HTTP uses 304, immutable assets, CSP and 404 for missing chunks', async ()
       assert.equal(unchanged.headers.get('vary'), 'Cookie, Accept-Encoding');
       assert.equal(await unchanged.text(), '');
     }
-    const session = await fetch(base + '/api/session', { headers: { Cookie: cookie } });
     const unauthEvents = await fetch(base + '/api/events');
     assert.equal(unauthEvents.status, 401);
     const abortController = new AbortController();
@@ -292,6 +291,14 @@ test('HTTP uses 304, immutable assets, CSP and 404 for missing chunks', async ()
     const syncChunk = decoder.decode((await syncRead).value);
     assert.match(syncChunk, /event: sync/);
     abortController.abort();
+
+    const changesResponse = await fetch(base + '/api/family/changes?since=1', {
+      headers: { Cookie: cookie },
+    });
+    assert.equal(changesResponse.status, 200);
+    const changesBody = await changesResponse.json();
+    assert.equal(changesBody.delta.reset, false);
+    assert.equal(changesBody.delta.entries[0].recordId, 'sse-task');
 
     const latestSession = await fetch(base + '/api/session', { headers: { Cookie: cookie } });
     service.logout(registered.token);
