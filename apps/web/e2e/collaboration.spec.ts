@@ -50,7 +50,9 @@ test('两个独立浏览器配对，共同编辑与权限变更实时同步', as
     await page.getByRole('button', { name: '生成邀请码', exact: true }).click();
     const code = (await page.getByTestId('invite-code').innerText()).trim();
     await expect(page.getByLabel('配对链接')).toHaveValue(
-      new RegExp(`${baseURL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/family\\?invite=${code}&family=`),
+      new RegExp(
+        `${baseURL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/family\\?invite=${code}&family=`,
+      ),
     );
     await register(partner, '小树');
     await partner.goto(`/family?invite=${code}`);

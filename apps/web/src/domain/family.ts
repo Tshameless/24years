@@ -57,16 +57,10 @@ export {
   type ChildGender,
 } from './child.ts';
 export {
-  assessChildGrowth,
   ageInMonthsAt,
-  correctedAgeMonths,
-  getRecommendedMilestones,
-  PEDIATRIC_MILESTONES,
   validGrowthRecord,
   type ChildGrowthRecord,
-  type GrowthAssessment,
   type GrowthMetric,
-  type PediatricMilestone,
 } from './growth.ts';
 
 export const emptyFamily = (): FamilyData => ({
@@ -84,8 +78,7 @@ export function decodeFamily(raw: string): FamilyData {
     !isObject(value) ||
     value.version !== 1 ||
     !(value.profile === null || validProfile(value.profile)) ||
-    (value.tasks !== undefined &&
-      (!Array.isArray(value.tasks) || !value.tasks.every(validTask))) ||
+    (value.tasks !== undefined && (!Array.isArray(value.tasks) || !value.tasks.every(validTask))) ||
     (value.expenses !== undefined &&
       (!Array.isArray(value.expenses) || !value.expenses.every(validExpense))) ||
     (value.pregnancyRecords !== undefined &&

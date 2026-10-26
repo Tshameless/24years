@@ -24,9 +24,7 @@ const usedBytes = computed(() =>
     ? familyBlobBytes(state.value.family?.data ?? store.data.value)
     : familyBytes(store.data.value),
 );
-const nearCapacity = computed(
-  () => active.value && usedBytes.value >= MAX_CLOUD_BYTES * 0.9,
-);
+const nearCapacity = computed(() => active.value && usedBytes.value >= MAX_CLOUD_BYTES * 0.9);
 const unavailable = computed(
   () =>
     !ready.value ||

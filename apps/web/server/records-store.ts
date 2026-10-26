@@ -155,10 +155,9 @@ export function initRelationalSchema(db: DatabaseSync) {
   }
 }
 
-export function familyBlobData(data: FamilyData): Omit<
-  FamilyData,
-  'tasks' | 'expenses' | 'pregnancyRecords' | 'children'
-> {
+export function familyBlobData(
+  data: FamilyData,
+): Omit<FamilyData, 'tasks' | 'expenses' | 'pregnancyRecords' | 'children'> {
   const blob = { ...(data as unknown as Record<string, unknown>) };
   delete blob.tasks;
   delete blob.expenses;
@@ -297,13 +296,15 @@ export function upsertTaskRow(
   db.prepare('DELETE FROM family_tasks WHERE family_id = ? AND id = ?').run(familyId, id);
 
   if (value) {
-    const nextPos = position ?? (
-      db
-        .prepare(
-          'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_tasks WHERE family_id = ?',
-        )
-        .get(familyId) as { next: number }
-    ).next;
+    const nextPos =
+      position ??
+      (
+        db
+          .prepare(
+            'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_tasks WHERE family_id = ?',
+          )
+          .get(familyId) as { next: number }
+      ).next;
     db.prepare(
       'INSERT INTO family_tasks(family_id, id, position, date, repeat, assignee, data, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(
@@ -331,21 +332,23 @@ export function upsertExpenseRow(
   db.prepare('DELETE FROM family_expenses WHERE family_id = ? AND id = ?').run(familyId, id);
 
   if (value) {
-    const nextPos = position ?? (prepend
-      ? (
-          db
-            .prepare(
-              'SELECT COALESCE(MIN(position), 1) - 1 AS next FROM family_expenses WHERE family_id = ?',
-            )
-            .get(familyId) as { next: number }
-        ).next
-      : (
-          db
-            .prepare(
-              'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_expenses WHERE family_id = ?',
-            )
-            .get(familyId) as { next: number }
-        ).next);
+    const nextPos =
+      position ??
+      (prepend
+        ? (
+            db
+              .prepare(
+                'SELECT COALESCE(MIN(position), 1) - 1 AS next FROM family_expenses WHERE family_id = ?',
+              )
+              .get(familyId) as { next: number }
+          ).next
+        : (
+            db
+              .prepare(
+                'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_expenses WHERE family_id = ?',
+              )
+              .get(familyId) as { next: number }
+          ).next);
     db.prepare(
       'INSERT INTO family_expenses(family_id, id, position, date, category, kind, amount_cents, reimbursed_cents, data, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(
@@ -377,13 +380,15 @@ export function upsertPregnancyRow(
   );
 
   if (value) {
-    const nextPos = position ?? (
-      db
-        .prepare(
-          'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_pregnancy_records WHERE family_id = ?',
-        )
-        .get(familyId) as { next: number }
-    ).next;
+    const nextPos =
+      position ??
+      (
+        db
+          .prepare(
+            'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_pregnancy_records WHERE family_id = ?',
+          )
+          .get(familyId) as { next: number }
+      ).next;
     db.prepare(
       'INSERT INTO family_pregnancy_records(family_id, id, position, type, date, data, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     ).run(
@@ -409,13 +414,15 @@ export function upsertChildRow(
   db.prepare('DELETE FROM family_children WHERE family_id = ? AND id = ?').run(familyId, id);
 
   if (value) {
-    const nextPos = position ?? (
-      db
-        .prepare(
-          'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_children WHERE family_id = ?',
-        )
-        .get(familyId) as { next: number }
-    ).next;
+    const nextPos =
+      position ??
+      (
+        db
+          .prepare(
+            'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_children WHERE family_id = ?',
+          )
+          .get(familyId) as { next: number }
+      ).next;
     db.prepare(
       'INSERT INTO family_children(family_id, id, position, name, birth_date, data, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     ).run(

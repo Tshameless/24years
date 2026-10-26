@@ -85,9 +85,9 @@ describe('outbox', () => {
     }));
     writeOutbox(familyId, entries);
 
-    expect(() => enqueueOutboxEntry(familyId, { ...sampleEntry, id: 'outbox-new', operationId: 'op-new' }, 2)).toThrow(
-      OutboxCapacityError,
-    );
+    expect(() =>
+      enqueueOutboxEntry(familyId, { ...sampleEntry, id: 'outbox-new', operationId: 'op-new' }, 2),
+    ).toThrow(OutboxCapacityError);
     expect(readOutbox(familyId).map((entry) => entry.id)).toEqual(['outbox-0', 'outbox-1']);
   });
 });

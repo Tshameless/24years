@@ -110,6 +110,7 @@ export function validChild(value: unknown): value is Child {
     growthRecords !== undefined &&
     (!Array.isArray(growthRecords) ||
       !growthRecords.every(validGrowthRecord) ||
+      !growthRecords.every((record) => record.date >= birthDate) ||
       new Set(growthRecords.map((r) => r.id)).size !== growthRecords.length)
   ) {
     return false;

@@ -195,7 +195,8 @@ export function createService(db: DatabaseSync) {
   });
 
   function mutateCompact(userId: string, action: string, body: Body) {
-    const beforeRevision = action === 'records' ? familyContext(userId).revision ?? undefined : undefined;
+    const beforeRevision =
+      action === 'records' ? (familyContext(userId).revision ?? undefined) : undefined;
     const result = mutate(userId, action, body);
 
     if (action === 'records' && beforeRevision !== undefined) {

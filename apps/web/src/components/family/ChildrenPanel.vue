@@ -97,9 +97,12 @@ function saveChildForm() {
   if (
     (birthWeightGrams !== undefined && (isNaN(birthWeightGrams) || birthWeightGrams <= 0)) ||
     (birthLengthCm !== undefined && (isNaN(birthLengthCm) || birthLengthCm <= 0)) ||
-    (headCircumferenceCm !== undefined && (isNaN(headCircumferenceCm) || headCircumferenceCm <= 0)) ||
+    (headCircumferenceCm !== undefined &&
+      (isNaN(headCircumferenceCm) || headCircumferenceCm <= 0)) ||
     (birthGestationalWeeks !== undefined &&
-      (!Number.isInteger(birthGestationalWeeks) || birthGestationalWeeks < 20 || birthGestationalWeeks > 45))
+      (!Number.isInteger(birthGestationalWeeks) ||
+        birthGestationalWeeks < 20 ||
+        birthGestationalWeeks > 45))
   ) {
     formError.value = '出生测量数据必须为有效正数。';
 
@@ -171,9 +174,7 @@ const genderLabels: Record<string, string> = {
     <div class="panel-heading">
       <div>
         <h2>孩子成长档案</h2>
-        <p class="muted">
-          记录家庭中孩子的成长轨迹、出生指标与发育曲线，支持多孩子独立管理与健康体检计划。
-        </p>
+        <p class="muted">记录孩子的出生资料和家庭测量数据，支持多孩子独立管理与趋势查看。</p>
       </div>
       <button
         class="button button-primary button-sm"
@@ -331,7 +332,7 @@ const genderLabels: Record<string, string> = {
               step="1"
               min="20"
               max="45"
-              placeholder="早产儿用于矫正月龄计算"
+              placeholder="仅作出生资料记录"
             />
           </label>
 

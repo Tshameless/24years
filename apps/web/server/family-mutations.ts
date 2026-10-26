@@ -85,10 +85,14 @@ export function createFamilyMutations(options: {
 
     const now = Date.now();
     const security = db
-      .prepare('SELECT failed_attempts, locked_until FROM family_invite_security WHERE family_id = ?')
+      .prepare(
+        'SELECT failed_attempts, locked_until FROM family_invite_security WHERE family_id = ?',
+      )
       .get(familyId) as { failed_attempts: number; locked_until: number } | undefined;
     const locked = Number(security?.locked_until ?? 0) > now;
-    const attempts = locked ? Number(security?.failed_attempts ?? inviteLockThreshold) : Number(security?.failed_attempts ?? 0) + 1;
+    const attempts = locked
+      ? Number(security?.failed_attempts ?? inviteLockThreshold)
+      : Number(security?.failed_attempts ?? 0) + 1;
     const lockedUntil = attempts >= inviteLockThreshold ? now + inviteLockDurationMs : 0;
     db.prepare(
       `INSERT INTO family_invite_security(family_id, failed_attempts, locked_until, updated_at)
@@ -96,23 +100,17 @@ export function createFamilyMutations(options: {
        ON CONFLICT(family_id) DO UPDATE SET failed_attempts = excluded.failed_attempts,
          locked_until = excluded.locked_until, updated_at = excluded.updated_at`,
     ).run(familyId, attempts, lockedUntil, now);
-    db.prepare('INSERT INTO invite_audit(family_id, user_id, outcome, created_at) VALUES (?, ?, ?, ?)').run(
-      familyId,
-      userId,
-      locked || lockedUntil > now ? 'locked' : outcome,
-      now,
-    );
+    db.prepare(
+      'INSERT INTO invite_audit(family_id, user_id, outcome, created_at) VALUES (?, ?, ?, ?)',
+    ).run(familyId, userId, locked || lockedUntil > now ? 'locked' : outcome, now);
   }
 
   function recordInviteSuccess(userId: string, familyId: string) {
     const now = Date.now();
     db.prepare('DELETE FROM family_invite_security WHERE family_id = ?').run(familyId);
-    db.prepare('INSERT INTO invite_audit(family_id, user_id, outcome, created_at) VALUES (?, ?, ?, ?)').run(
-      familyId,
-      userId,
-      'success',
-      now,
-    );
+    db.prepare(
+      'INSERT INTO invite_audit(family_id, user_id, outcome, created_at) VALUES (?, ?, ?, ?)',
+    ).run(familyId, userId, 'success', now);
   }
 
   function createFamily(userId: string, body: Body) {
@@ -248,14 +246,7 @@ export function createFamilyMutations(options: {
               .get(family.id, recordId) as { position: number } | undefined
           )?.position
         : undefined;
-      upsertPregnancyRow(
-        db,
-        family.id,
-        recordId,
-        pregnancyChange.value,
-        now,
-        currentPosition,
-      );
+      upsertPregnancyRow(db, family.id, recordId, pregnancyChange.value, now, currentPosition);
       deltaEntries.push({
         recordType: 'pregnancy',
         recordId,
@@ -304,14 +295,7 @@ export function createFamilyMutations(options: {
         409,
         '这条孩子记录已被另一位成员修改或删除。',
       );
-      upsertChildRow(
-        db,
-        family.id,
-        id,
-        value as Child | null,
-        now,
-        currentRow?.position,
-      );
+      upsertChildRow(db, family.id, id, value as Child | null, now, currentRow?.position);
       deltaEntries.push({ recordType: 'child', recordId: id, value });
     } else {
       requireValue(change.type === 'task' || change.type === 'expense', 400, '不支持的记录类型。');
@@ -333,14 +317,7 @@ export function createFamilyMutations(options: {
       requireValue(isDeepStrictEqual(current, before), 409, '这条记录已被另一位成员修改或删除。');
 
       if (change.type === 'task') {
-        upsertTaskRow(
-          db,
-          family.id,
-          id,
-          value as FamilyTask | null,
-          now,
-          currentRow?.position,
-        );
+        upsertTaskRow(db, family.id, id, value as FamilyTask | null, now, currentRow?.position);
         deltaEntries.push({ recordType: 'task', recordId: id, value });
       } else {
         upsertExpenseRow(
@@ -362,14 +339,16 @@ export function createFamilyMutations(options: {
       '家庭记录已达到当前容量上限，请先导出备份。',
     );
     const compactData = JSON.stringify(familyBlobData(family.data));
-    const storedData = db
-      .prepare('SELECT data FROM families WHERE id = ?')
-      .get(family.id) as { data: string } | undefined;
+    const storedData = db.prepare('SELECT data FROM families WHERE id = ?').get(family.id) as
+      | { data: string }
+      | undefined;
     // Task, expense, child and pregnancy collection edits are row-local. Only
     // persist the blob when low-frequency metadata (for example profile) changed.
+
     if (storedData?.data !== compactData) {
       db.prepare('UPDATE families SET data = ? WHERE id = ?').run(compactData, family.id);
     }
+
     touch(family.id, userId);
     recordDeltaEntries(db, family.id, family.revision + 1, deltaEntries);
     db.prepare(
@@ -524,7 +503,11 @@ export function createFamilyMutations(options: {
       .prepare('SELECT family_role FROM members WHERE family_id = ?')
       .get(familyId) as { family_role: string | null };
     const selectedFamilyRole = familyRole(body.familyRole, 'couple');
-    requireValue(selectedFamilyRole !== existingMember.family_role, 409, '家庭中已有相同家长身份，请选择另一位身份。');
+    requireValue(
+      selectedFamilyRole !== existingMember.family_role,
+      409,
+      '家庭中已有相同家长身份，请选择另一位身份。',
+    );
     requireValue(
       family?.mode === 'couple' && Number(count.count) < 2,
       409,
@@ -623,31 +606,31 @@ export function createFamilyMutations(options: {
   } {
     try {
       return transaction(db, () => {
-      let invitation;
+        let invitation;
 
-      if (action === 'import-backup') {
-        authorize(userId, body, 'owner');
-        const row = db
-          .prepare('SELECT data FROM import_backups WHERE family_id = ?')
-          .get(String(body.familyId)) as { data: string } | undefined;
-        requireValue(row, 404, '还没有导入前备份。');
+        if (action === 'import-backup') {
+          authorize(userId, body, 'owner');
+          const row = db
+            .prepare('SELECT data FROM import_backups WHERE family_id = ?')
+            .get(String(body.familyId)) as { data: string } | undefined;
+          requireValue(row, 404, '还没有导入前备份。');
 
-        return { ...snapshot(userId), backupData: decodeFamily(row.data) };
-      }
+          return { ...snapshot(userId), backupData: decodeFamily(row.data) };
+        }
 
-      if (action === 'create') {
-        createFamily(userId, body);
-      } else if (action === 'join') {
-        join(userId, body);
-      } else if (action === 'records') {
-        changeRecords(userId, body);
-      } else if (action === 'import') {
-        importFamily(userId, body);
-      } else {
-        invitation = manage(userId, action, body);
-      }
+        if (action === 'create') {
+          createFamily(userId, body);
+        } else if (action === 'join') {
+          join(userId, body);
+        } else if (action === 'records') {
+          changeRecords(userId, body);
+        } else if (action === 'import') {
+          importFamily(userId, body);
+        } else {
+          invitation = manage(userId, action, body);
+        }
 
-      return { ...snapshot(userId), invitation };
+        return { ...snapshot(userId), invitation };
       });
     } catch (error) {
       if (action === 'join') {

@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  assessChildGrowth,
-  ageInMonthsAt,
-  correctedAgeMonths,
-  getRecommendedMilestones,
-  validGrowthRecord,
-  type ChildGrowthRecord,
-} from './growth.ts';
+import { ageInMonthsAt, validGrowthRecord, type ChildGrowthRecord } from './growth.ts';
 
 describe('validGrowthRecord', () => {
   const baseRecord: ChildGrowthRecord = {
@@ -56,60 +49,10 @@ describe('validGrowthRecord', () => {
   });
 });
 
-describe('assessChildGrowth', () => {
-  it('correctly assesses typical median weight for 6-month boy', () => {
-    const assessment = assessChildGrowth('weightKg', 7.9, 6, 'boy');
-    expect(assessment!.status).toBe('normal');
-    expect(assessment!.percentileBand).toBe('P15 - P85');
-    expect(assessment!.p50).toBe(7.9);
-    expect(assessment!.zScore).toBe(0);
-    expect(assessment!.standardVersion).toContain('WHO');
-  });
-
-  it('flags low weight (< P3) for 6-month boy', () => {
-    const assessment = assessChildGrowth('weightKg', 5.5, 6, 'boy');
-    expect(assessment!.status).toBe('low');
-    expect(assessment!.percentileBand).toBe('< P3');
-    expect(assessment!.summary).toContain('低于 WHO 标准');
-  });
-
-  it('flags high height (> P97) for 12-month girl', () => {
-    const assessment = assessChildGrowth('heightCm', 82.0, 12, 'girl');
-    expect(assessment!.status).toBe('high');
-    expect(assessment!.percentileBand).toBe('> P97');
-    expect(assessment!.summary).toContain('高于 WHO 标准');
-  });
-
-  it('interpolates smoothly between month intervals', () => {
-    const assessment = assessChildGrowth('weightKg', 6.0, 2.5, 'boy');
-    expect(assessment!.status).toBe('normal');
-    expect(assessment!.p50).toBeGreaterThan(5.6);
-    expect(assessment!.p50).toBeLessThan(6.4);
-  });
-
-  it('does not assess unknown gender or ages beyond the supported range', () => {
-    expect(assessChildGrowth('weightKg', 7.9, 6, 'unknown')).toBeNull();
-    expect(assessChildGrowth('weightKg', 14, 25, 'boy')).not.toBeNull();
-    expect(assessChildGrowth('weightKg', 14, 61, 'boy')).toBeNull();
-  });
-
-  it('calculates measurement age and corrected preterm age', () => {
+describe('ageInMonthsAt', () => {
+  it('uses completed calendar months', () => {
     expect(ageInMonthsAt('2026-01-15', '2026-04-14')).toBe(2);
     expect(ageInMonthsAt('2026-01-15', '2026-04-15')).toBe(3);
-    expect(correctedAgeMonths(3, 32)).toBeCloseTo(1.16, 1);
-    expect(correctedAgeMonths(3, 40)).toBe(3);
-  });
-});
-
-describe('getRecommendedMilestones', () => {
-  it('calculates expected target dates from birth date', () => {
-    const milestones = getRecommendedMilestones('2026-05-01', '2026-10-26');
-    expect(milestones).toHaveLength(11);
-    expect(milestones[0].targetDate).toBe('2026-05-02');
-    expect(milestones[0].isOverdue).toBe(true);
-
-    const year1 = milestones.find((m) => m.id === 'year-1')!;
-    expect(year1.targetDate).toBe('2027-05-01');
-    expect(year1.isOverdue).toBe(false);
+    expect(ageInMonthsAt('2026-01-15', '2026-01-14')).toBe(0);
   });
 });

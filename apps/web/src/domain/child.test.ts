@@ -93,6 +93,13 @@ describe('validChild', () => {
         growthRecords: [{ id: 'g-1', date: 'bad-date', weightKg: 4.2 }],
       }),
     ).toBe(false);
+
+    expect(
+      validChild({
+        ...baseChild,
+        growthRecords: [{ id: 'g-before-birth', date: '2026-05-09', weightKg: 4.2 }],
+      }),
+    ).toBe(false);
   });
 });
 

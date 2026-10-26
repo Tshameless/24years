@@ -2,10 +2,7 @@
 import { computed, reactive, shallowRef } from 'vue';
 import { createId } from '@/domain/id';
 import {
-  assessChildGrowth,
-  ageInMonthsAt,
-  correctedAgeMonths,
-  getRecommendedMilestones,
+  dayDifference,
   localDate,
   type Child,
   type ChildGrowthRecord,
@@ -18,12 +15,16 @@ const props = defineProps<{
   child: Child;
 }>();
 
-const { updateChild, addTask, today } = useFamily();
+const { updateChild, addTask, locked, today } = useFamily();
 
 const activeMetric = shallowRef<GrowthMetric>('weightKg');
 const showRecordForm = shallowRef(false);
 const formError = shallowRef('');
 const taskNotice = shallowRef('');
+const reminderError = shallowRef('');
+const reminderTitle = shallowRef('');
+const reminderDate = shallowRef(localDate());
+const reminderTime = shallowRef('09:00');
 
 const form = reactive({
   date: localDate(),
@@ -37,52 +38,23 @@ const sortedRecords = computed<readonly ChildGrowthRecord[]>(() =>
   [...(props.child.growthRecords ?? [])].sort((a, b) => a.date.localeCompare(b.date)),
 );
 
-const latestRecord = computed<ChildGrowthRecord | null>(
-  () => sortedRecords.value[sortedRecords.value.length - 1] ?? null,
+const metricRecords = computed(() =>
+  sortedRecords.value.filter((record) => record[activeMetric.value] !== undefined),
 );
 
-const latestAssessment = computed(() => {
-  if (!latestRecord.value) {
-    return null;
-  }
+const latestMetricRecord = computed<ChildGrowthRecord | null>(
+  () => metricRecords.value[metricRecords.value.length - 1] ?? null,
+);
 
-  const val = latestRecord.value[activeMetric.value];
-
-  if (val === undefined) {
-    return null;
-  }
-
-  const chronologicalMonths = ageInMonthsAt(props.child.birthDate, latestRecord.value.date);
-
-  return assessChildGrowth(
-    activeMetric.value,
-    val,
-    correctedAgeMonths(chronologicalMonths, props.child.birthGestationalWeeks),
-    props.child.gender ?? 'unknown',
-  );
-});
-
-const milestones = computed(() => getRecommendedMilestones(props.child.birthDate, today.value));
+const reminderTitleLimit = computed(() => Math.max(1, 79 - props.child.name.length));
 
 // SVG Chart plotting points
 const plotData = computed(() => {
-  const points = sortedRecords.value
-    .filter((r) => r[activeMetric.value] !== undefined)
-    .map((r) => {
-      const [rY, rM, rD] = r.date.split('-').map(Number);
-      const [bY, bM, bD] = props.child.birthDate.split('-').map(Number);
-      let m = (rY - bY) * 12 + (rM - bM);
-
-      if (rD < bD) {
-        m -= 0.5;
-      }
-
-      return {
-        date: r.date,
-        month: Math.max(0, m),
-        value: Number(r[activeMetric.value]),
-      };
-    });
+  const points = metricRecords.value.map((record) => ({
+    date: record.date,
+    month: dayDifference(record.date, props.child.birthDate) / (365.2425 / 12),
+    value: Number(record[activeMetric.value]),
+  }));
 
   if (!points.length) {
     return null;
@@ -110,6 +82,12 @@ const plotData = computed(() => {
 
 function submitRecord() {
   formError.value = '';
+
+  if (form.date < props.child.birthDate || form.date > today.value) {
+    formError.value = '测量日期必须在出生日期至今天之间。';
+
+    return;
+  }
 
   const w = form.weightKg ? Number(form.weightKg) : undefined;
   const h = form.heightCm ? Number(form.heightCm) : undefined;
@@ -146,19 +124,36 @@ function submitRecord() {
   }
 }
 
-function addMilestoneToTasks(item: { title: string; targetDate: string; description: string }) {
+function addReminder() {
+  reminderError.value = '';
+  taskNotice.value = '';
+  const title = reminderTitle.value.trim();
+
+  if (!title) {
+    reminderError.value = '请填写提醒内容。';
+
+    return;
+  }
+
+  if (!reminderDate.value || reminderDate.value < today.value) {
+    reminderError.value = '提醒日期不能早于今天。';
+
+    return;
+  }
+
+  const taskTitle = `${props.child.name}：${title}`;
   const success = addTask({
-    title: `${props.child.name}：${item.title}`,
-    date: item.targetDate,
-    time: '09:00',
+    title: taskTitle,
+    date: reminderDate.value,
+    time: reminderTime.value,
     repeat: 'once',
   });
 
   if (success) {
-    taskNotice.value = `已添加提醒「${item.title}」至 ${item.targetDate} 日常计划！`;
-    setTimeout(() => {
-      taskNotice.value = '';
-    }, 4000);
+    taskNotice.value = `已添加「${taskTitle}」至日常计划。`;
+    reminderTitle.value = '';
+  } else {
+    reminderError.value = '添加失败，请检查提醒日期和时间。';
   }
 }
 </script>
@@ -166,7 +161,7 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
 <template>
   <div class="growth-tracker">
     <div class="tracker-header">
-      <h4>生长发育监测与健康体检</h4>
+      <h4>成长记录与变化趋势</h4>
       <button
         class="button button-secondary button-sm"
         type="button"
@@ -192,6 +187,7 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
           <input
             v-model="form.date"
             type="date"
+            :min="child.birthDate"
             :max="today"
             required
           />
@@ -284,34 +280,8 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
       </button>
     </div>
 
-    <!-- 评估简报 -->
-    <div
-      v-if="latestAssessment"
-      class="assessment-card"
-      :class="latestAssessment.status"
-    >
-      <div class="assessment-badge">
-        {{ latestAssessment.percentileBand }}
-      </div>
-      <div class="assessment-text">
-        <strong>{{ latestAssessment.summary }}</strong>
-        <p>
-          WHO 儿童生长标准参考：P3 ({{ latestAssessment.p3 }}) · 中位数 P50 ({{
-            latestAssessment.p50
-          }}) · P97 ({{ latestAssessment.p97 }})
-        </p>
-        <p class="muted assessment-source">
-          标准 {{ latestAssessment.standardVersion }} · Z={{ latestAssessment.zScore }} ·
-          百分位约 {{ latestAssessment.percentile }}%。仅供记录与趋势参考，不替代儿科诊断。
-        </p>
-      </div>
-    </div>
-    <p
-      v-else-if="latestRecord"
-      class="muted assessment-unavailable"
-    >
-      当前测量暂不提供 WHO 0–5 岁评估：请补充男孩/女孩性别，且测量年龄需在 60 月内。
-      这不会影响记录和趋势图。
+    <p class="muted growth-note">
+      此处只记录家庭测量与变化趋势，不提供生长标准评估或接种建议；相关安排请遵循医护人员和当地要求。
     </p>
 
     <!-- SVG 趋势曲线 -->
@@ -355,7 +325,7 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
       </svg>
       <div class="chart-labels">
         <span>出生</span>
-        <span>最新测量：{{ latestRecord?.[activeMetric] }}</span>
+        <span>最新测量：{{ latestMetricRecord?.[activeMetric] }}</span>
         <span>{{ plotData.maxMonth }} 月龄</span>
       </div>
     </div>
@@ -366,9 +336,9 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
       <p class="muted">暂未录入该项测量数据，点击上方“记录生长数据”开始追踪成长曲线。</p>
     </div>
 
-    <!-- 疫苗与体检里程碑计划 -->
-    <div class="milestones-section">
-      <h5>国家免疫规划与儿童健康体检建议</h5>
+    <section class="custom-reminder-section">
+      <h5>添加自定义计划</h5>
+      <p class="muted">按医护人员或当地安排填写。应用不会推荐疫苗接种日期或健康检查项目。</p>
       <p
         v-if="taskNotice"
         class="success-message"
@@ -376,30 +346,53 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
       >
         {{ taskNotice }}
       </p>
-      <div class="milestone-list">
-        <div
-          v-for="item in milestones.slice(0, 5)"
-          :key="item.id"
-          class="milestone-item"
-          :class="{ overdue: item.isOverdue }"
+      <form
+        class="reminder-form"
+        @submit.prevent="addReminder"
+      >
+        <label class="field">
+          提醒内容
+          <input
+            v-model="reminderTitle"
+            type="text"
+            :maxlength="reminderTitleLimit"
+            required
+            placeholder="例如：按医嘱复诊"
+          />
+        </label>
+        <label class="field">
+          日期
+          <input
+            v-model="reminderDate"
+            type="date"
+            :min="today"
+            required
+          />
+        </label>
+        <label class="field">
+          时间
+          <input
+            v-model="reminderTime"
+            type="time"
+            required
+          />
+        </label>
+        <button
+          class="button button-secondary button-sm"
+          type="submit"
+          :disabled="locked"
         >
-          <div class="milestone-info">
-            <span class="milestone-tag">
-              {{ item.ageLabel }} · {{ item.type === 'vaccine' ? '疫苗接种' : '健康体检' }}
-            </span>
-            <strong>{{ item.title }}</strong>
-            <small>{{ item.targetDate }} · {{ item.description }}</small>
-          </div>
-          <button
-            class="button button-secondary button-sm"
-            type="button"
-            @click="addMilestoneToTasks(item)"
-          >
-            添加至计划
-          </button>
-        </div>
-      </div>
-    </div>
+          添加到计划
+        </button>
+      </form>
+      <p
+        v-if="reminderError"
+        class="form-error"
+        role="alert"
+      >
+        {{ reminderError }}
+      </p>
+    </section>
   </div>
 </template>
 
@@ -464,36 +457,8 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
   border-color: var(--primary);
 }
 
-.assessment-card {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.65rem 0.85rem;
-  border-radius: 8px;
-  background: var(--pink-light);
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
-  margin-bottom: 0.75rem;
-  font-size: 0.85rem;
-}
-
-.assessment-badge {
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  background: var(--primary);
-  color: #fff;
-  font-weight: bold;
-  font-size: 0.75rem;
-}
-
-.assessment-text strong {
-  display: block;
-  color: var(--text-heading);
-}
-
-.assessment-text p {
-  margin: 0.2rem 0 0;
-  color: var(--text-muted);
-  font-size: 0.775rem;
+.growth-note {
+  margin: 0 0 0.75rem;
 }
 
 .chart-container {
@@ -527,42 +492,30 @@ function addMilestoneToTasks(item: { title: string; targetDate: string; descript
   margin-bottom: 1rem;
 }
 
-.milestones-section h5 {
+.custom-reminder-section h5 {
   margin: 0 0 0.5rem;
   font-size: 0.9rem;
   color: var(--text-heading);
 }
 
-.milestone-list {
+.custom-reminder-section > p {
+  margin: 0 0 0.75rem;
+}
+
+.reminder-form {
   display: grid;
-  gap: 0.5rem;
+  grid-template-columns: minmax(160px, 1fr) minmax(130px, 0.7fr) minmax(105px, 0.55fr) auto;
+  gap: 0.65rem;
+  align-items: end;
 }
 
-.milestone-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  font-size: 0.85rem;
-}
+@media (max-width: 700px) {
+  .reminder-form {
+    grid-template-columns: 1fr 1fr;
+  }
 
-.milestone-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.milestone-tag {
-  font-size: 0.725rem;
-  color: var(--primary);
-  font-weight: bold;
-}
-
-.milestone-info small {
-  color: var(--text-muted);
-  font-size: 0.75rem;
+  .reminder-form .field:first-child {
+    grid-column: 1 / -1;
+  }
 }
 </style>
