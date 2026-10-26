@@ -32,10 +32,69 @@ export function useCollaboration(enabled = true) {
   let generation = 0;
   let disposed = false;
   let interval: ReturnType<typeof setInterval>;
+  let eventSource: EventSource | null = null;
+  let sseConnected = false;
+  let lastPollAt = 0;
+  let mutationQueue: Promise<unknown> = Promise.resolve();
   let etag = '';
   let retryAt = 0;
   let failures = 0;
   const pendingOperations = new Map<string, string>();
+
+  function closeEventStream() {
+    sseConnected = false;
+
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+  }
+
+  function syncEventStream() {
+    if (
+      !enabled ||
+      disposed ||
+      typeof EventSource === 'undefined' ||
+      !online.value ||
+      !active.value ||
+      !state.value.user ||
+      expired.value ||
+      document.hidden
+    ) {
+      closeEventStream();
+
+      return;
+    }
+
+    if (eventSource) {
+      return;
+    }
+
+    try {
+      const source = new EventSource('/api/events');
+      eventSource = source;
+      const markConnected = () => {
+        if (eventSource === source && !disposed) {
+          sseConnected = true;
+        }
+      };
+      source.addEventListener('open', markConnected);
+      source.addEventListener('ready', markConnected);
+      source.addEventListener('sync', () => {
+        if (eventSource === source && !disposed) {
+          retryAt = 0;
+          void refresh();
+        }
+      });
+      source.addEventListener('error', () => {
+        if (eventSource === source) {
+          closeEventStream();
+        }
+      });
+    } catch {
+      closeEventStream();
+    }
+  }
 
   try {
     active.value = enabled && localStorage.getItem(ACTIVE_KEY) === 'true';
@@ -112,6 +171,8 @@ export function useCollaboration(enabled = true) {
     if (!next.family?.inviteExpiresAt) {
       invitation.value = null;
     }
+
+    syncEventStream();
   }
 
   function persistSnapshot() {
@@ -143,6 +204,7 @@ export function useCollaboration(enabled = true) {
         persistSnapshot();
         recoveryKey.value = '';
         backupData.value = null;
+        closeEventStream();
       }
 
       error.value =
@@ -151,18 +213,26 @@ export function useCollaboration(enabled = true) {
           : reason.message;
     } else {
       online.value = false;
+      closeEventStream();
       error.value =
         '连接失败，尚未确认保存。输入已保留，请恢复连接后重试；离开页面会丢失未保存输入。';
     }
   }
 
   async function refresh() {
-    if (fetching || busy.value || disposed || (ready.value && document.hidden)) {
+    if (disposed || (ready.value && document.hidden)) {
+      return;
+    }
+
+    if (fetching || busy.value) {
+      refreshPending = true;
+
       return;
     }
 
     fetching = true;
     refreshPending = false;
+    lastPollAt = Date.now();
     const startedAt = generation;
 
     try {
@@ -182,6 +252,7 @@ export function useCollaboration(enabled = true) {
         failures = 0;
         retryAt = 0;
         lastSynced.value = new Date().toLocaleTimeString('zh-CN');
+        syncEventStream();
 
         return;
       }
@@ -202,6 +273,7 @@ export function useCollaboration(enabled = true) {
         persistSnapshot();
         recoveryKey.value = '';
         backupData.value = null;
+        closeEventStream();
         error.value = '登录已过期或已撤销，请在「我的家庭」重新登录。';
       } else {
         receive(next);
@@ -282,17 +354,22 @@ export function useCollaboration(enabled = true) {
   }
 
   async function applyChange(change: FamilyChange) {
-    const familyId = state.value.family?.id;
-    const key = canonicalJson({ familyId, change });
-    const operationId = pendingOperations.get(key) ?? createId();
-    pendingOperations.set(key, operationId);
-    const success = await run('family/records', { familyId, change, operationId });
+    const task = mutationQueue.then(async () => {
+      const familyId = state.value.family?.id;
+      const key = canonicalJson({ familyId, change });
+      const operationId = pendingOperations.get(key) ?? createId();
+      pendingOperations.set(key, operationId);
+      const success = await run('family/records', { familyId, change, operationId });
 
-    if (success) {
-      pendingOperations.delete(key);
-    }
+      if (success) {
+        pendingOperations.delete(key);
+      }
 
-    return success;
+      return success;
+    });
+    mutationQueue = task.catch(() => false);
+
+    return task;
   }
 
   async function logout() {
@@ -300,6 +377,7 @@ export function useCollaboration(enabled = true) {
       rememberActive(false);
       expired.value = false;
       error.value = '';
+      closeEventStream();
 
       return true;
     }
@@ -314,6 +392,7 @@ export function useCollaboration(enabled = true) {
 
     rememberActive(false);
     expired.value = false;
+    closeEventStream();
 
     if (path !== 'recover') {
       recoveryKey.value = '';
@@ -331,6 +410,16 @@ export function useCollaboration(enabled = true) {
 
   function offline() {
     online.value = false;
+    closeEventStream();
+  }
+
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      closeEventStream();
+    } else {
+      syncEventStream();
+      void refresh();
+    }
   }
 
   function storageChanged(event: StorageEvent) {
@@ -353,6 +442,7 @@ export function useCollaboration(enabled = true) {
         online.value = true;
         expired.value = false;
         refreshPending = false;
+        closeEventStream();
 
         return;
       }
@@ -399,7 +489,10 @@ export function useCollaboration(enabled = true) {
     if (enabled) {
       void refresh();
       interval = setInterval(() => {
-        if (!document.hidden && Date.now() >= retryAt) {
+        const now = Date.now();
+        const pollInterval = sseConnected ? 30000 : 2000;
+
+        if (!document.hidden && now >= retryAt && now - lastPollAt >= pollInterval) {
           void refresh();
         }
       }, 2000);
@@ -407,18 +500,19 @@ export function useCollaboration(enabled = true) {
       window.addEventListener('online', refresh);
       window.addEventListener('offline', offline);
       window.addEventListener('storage', storageChanged);
-      document.addEventListener('visibilitychange', refresh);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
     }
   });
 
   onUnmounted(() => {
     disposed = true;
+    closeEventStream();
     clearInterval(interval);
     window.removeEventListener('focus', refresh);
     window.removeEventListener('online', refresh);
     window.removeEventListener('offline', offline);
     window.removeEventListener('storage', storageChanged);
-    document.removeEventListener('visibilitychange', refresh);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
 
   return {

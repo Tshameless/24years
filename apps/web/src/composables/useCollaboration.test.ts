@@ -203,3 +203,73 @@ it('preserves cached family when a captive portal or gateway returns non-session
     wrapper.unmount();
   }
 });
+
+it('throttles polling while SSE is connected, syncs on server push and queues rapid record changes', async () => {
+  vi.useFakeTimers();
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+  const listeners = new Map<string, () => void>();
+  class FakeEventSource {
+    close = vi.fn();
+    addEventListener(type: string, callback: () => void) {
+      listeners.set(type, callback);
+    }
+  }
+  vi.stubGlobal('EventSource', FakeEventSource);
+  const state = snapshot('sse-user', 1);
+  const fetcher = vi.fn().mockImplementation((url: string) => {
+    if (url === '/api/session') {
+      return Promise.resolve(
+        new Response(JSON.stringify(state), {
+          headers: { ETag: `"rev-${state.family!.revision}"` },
+        }),
+      );
+    }
+
+    state.family!.revision += 1;
+
+    return Promise.resolve(new Response(JSON.stringify(state)));
+  });
+  vi.stubGlobal('fetch', fetcher);
+  const { cloud, wrapper } = mountCloud();
+
+  try {
+    await flushPromises();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    listeners.get('open')?.();
+
+    // While SSE is connected, 2s polling is suppressed.
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    // Server push triggers an immediate session refresh.
+    listeners.get('sync')?.();
+    await flushPromises();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    // Concurrent record mutations queue sequentially instead of dropping the second call.
+    const firstTask = {
+      id: 't1',
+      title: '第一项',
+      date: '2026-10-26',
+      time: '09:00',
+      repeat: 'once' as const,
+      completedDates: [],
+    };
+    const secondTask = {
+      id: 't2',
+      title: '第二项',
+      date: '2026-10-26',
+      time: '10:00',
+      repeat: 'once' as const,
+      completedDates: [],
+    };
+    const results = await Promise.all([
+      cloud.applyChange({ type: 'task', before: null, value: firstTask }),
+      cloud.applyChange({ type: 'task', before: null, value: secondTask }),
+    ]);
+    expect(results).toEqual([true, true]);
+    expect(cloud.state.value.family?.revision).toBe(3);
+  } finally {
+    wrapper.unmount();
+  }
+});

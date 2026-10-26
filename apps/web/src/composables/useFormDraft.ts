@@ -169,6 +169,19 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
     );
   });
 
+  function flushPendingDraft() {
+    if (dirty.value && persistTimer !== undefined) {
+      clearPersistTimer();
+      persist();
+    }
+  }
+
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      flushPendingDraft();
+    }
+  }
+
   function beforeUnload(event: BeforeUnloadEvent) {
     if (dirty.value) {
       clearPersistTimer();
@@ -179,6 +192,8 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
   }
 
   window.addEventListener('beforeunload', beforeUnload);
+  window.addEventListener('pagehide', flushPendingDraft);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
   watch(
     options.scope,
     (next) => {
@@ -197,6 +212,8 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
     persist();
     removeGuard();
     window.removeEventListener('beforeunload', beforeUnload);
+    window.removeEventListener('pagehide', flushPendingDraft);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
 
   return { id, dirty, restored, changedSource, storageError, accept, confirmDiscard };

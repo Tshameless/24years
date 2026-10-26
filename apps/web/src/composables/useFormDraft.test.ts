@@ -190,5 +190,11 @@ it('coalesces rapid edits and flushes immediately on beforeunload or accept', ()
   expect(
     JSON.parse(sessionStorage.getItem('24years.draft.v1:["local","expense:new"]')!).form.title,
   ).toBe('first-after-accept');
+
+  form.title = 'flushed-on-pagehide';
+  window.dispatchEvent(new Event('pagehide'));
+  expect(
+    JSON.parse(sessionStorage.getItem('24years.draft.v1:["local","expense:new"]')!).form.title,
+  ).toBe('flushed-on-pagehide');
   vi.useRealTimers();
 });

@@ -89,6 +89,26 @@ export function createApplication(options: {
   const db = openDatabase(options.database);
   const service = createService(db);
   const limit = createRateLimiter(db);
+  const selectAccountByUsername = db.prepare('SELECT id FROM accounts WHERE username = ?');
+  const eventClients = new Set<{ userId: string; response: ServerResponse }>();
+
+  function familyUsers(userId: string): string[] {
+    const state = service.snapshot(userId);
+    const members = state.family?.members.map((member) => member.id) ?? [];
+
+    return [...new Set([userId, ...members])];
+  }
+
+  function notifyUsers(userIds: Iterable<string>) {
+    const targets = new Set(userIds);
+
+    for (const client of eventClients) {
+      if (targets.has(client.userId) && !client.response.writableEnded) {
+        client.response.write(`event: sync\ndata: ${Date.now()}\n\n`);
+      }
+    }
+  }
+
   const cleanup = () => {
     db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
     db.prepare('DELETE FROM invites WHERE expires_at <= ?').run(Date.now());
@@ -109,6 +129,14 @@ export function createApplication(options: {
     }
   }, 60 * 60000);
   maintenance.unref();
+  const heartbeat = setInterval(() => {
+    for (const client of eventClients) {
+      if (!client.response.writableEnded) {
+        client.response.write(': ping\n\n');
+      }
+    }
+  }, 25000);
+  heartbeat.unref();
 
   const server = createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -133,6 +161,31 @@ export function createApplication(options: {
       if (path === '/api/health' && request.method === 'GET') {
         db.prepare('SELECT 1').get();
         json(response, 200, { ok: true });
+
+        return;
+      }
+
+      if (path === '/api/events' && request.method === 'GET') {
+        if (!userId) {
+          throw new ApiError(401, '登录已过期，请重新登录后继续。');
+        }
+
+        request.socket.setTimeout(0);
+        request.socket.setNoDelay(true);
+        response.writeHead(200, {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'private, no-store, no-transform',
+          Connection: 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        });
+        response.write(`event: ready\ndata: ${service.sessionTag(userId)}\n\n`);
+        const client = { userId, response };
+        eventClients.add(client);
+        const removeClient = () => {
+          eventClients.delete(client);
+        };
+        request.once('close', removeClient);
+        response.once('close', removeClient);
 
         return;
       }
@@ -180,9 +233,18 @@ export function createApplication(options: {
 
         if (path === '/api/recover') {
           limit(`recovery-ip:${ip}`, 30);
-          limit(`recovery-account:${String(body.username).toLowerCase()}`, 6);
+          const targetUsername = String(body.username).toLowerCase();
+          limit(`recovery-account:${targetUsername}`, 6);
+          const targetAccount = selectAccountByUsername.get(targetUsername) as
+            | { id: string }
+            | undefined;
           const result = await service.recover(body);
           service.logout(token);
+
+          if (targetAccount) {
+            notifyUsers([targetAccount.id]);
+          }
+
           response.setHeader(
             'Set-Cookie',
             `family_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${options.secureCookie ? '; Secure' : ''}`,
@@ -212,6 +274,7 @@ export function createApplication(options: {
 
         if (path === '/api/logout') {
           service.logout(token);
+          notifyUsers([userId]);
           response.setHeader(
             'Set-Cookie',
             `family_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${options.secureCookie ? '; Secure' : ''}`,
@@ -227,11 +290,13 @@ export function createApplication(options: {
           path === '/api/account/delete'
         ) {
           limit(`security:${userId}`, 6);
+          const affectedUsers = familyUsers(userId);
           const result = path.endsWith('/recovery')
             ? await service.rotateRecovery(userId, body)
             : path.endsWith('/change-password')
               ? await service.changePassword(userId, token, body)
               : await service.deleteAccount(userId, body);
+          notifyUsers(affectedUsers);
 
           if (path.endsWith('/delete')) {
             response.setHeader(
@@ -256,7 +321,11 @@ export function createApplication(options: {
           limit(`pair-ip:${ip}`, 60);
         }
 
-        json(response, 200, service.mutate(userId, action, body));
+        const beforeUsers = familyUsers(userId);
+        const result = service.mutate(userId, action, body);
+        const afterUsers = result.family?.members.map((member) => member.id) ?? [];
+        notifyUsers([...beforeUsers, ...afterUsers]);
+        json(response, 200, result);
 
         return;
       }
@@ -282,7 +351,20 @@ export function createApplication(options: {
     }
   });
   server.requestTimeout = 15000;
-  server.once('close', () => clearInterval(maintenance));
+  const originalClose = server.close.bind(server);
+  server.close = ((callback?: (error?: Error) => void) => {
+    for (const client of eventClients) {
+      client.response.end();
+    }
+
+    eventClients.clear();
+
+    return originalClose(callback);
+  }) as typeof server.close;
+  server.once('close', () => {
+    clearInterval(maintenance);
+    clearInterval(heartbeat);
+  });
 
   return { server, db };
 }

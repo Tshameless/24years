@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream';
@@ -31,18 +31,19 @@ export function serveStatic(
     throw new ApiError(404, '页面不存在。');
   }
 
-  const file =
-    existsSync(candidate) && statSync(candidate).isFile() ? candidate : resolve(root, 'index.html');
+  const candidateStat = statSync(candidate, { throwIfNoEntry: false });
+  const isCandidateFile = candidateStat?.isFile() ?? false;
+  const file = isCandidateFile ? candidate : resolve(root, 'index.html');
 
-  if (file !== candidate && (path.startsWith('/assets/') || path === '/version.json')) {
+  if (!isCandidateFile && (path.startsWith('/assets/') || path === '/version.json')) {
     throw new ApiError(404, '资源不存在。');
   }
 
-  if (!existsSync(file)) {
+  const stat = isCandidateFile ? candidateStat! : statSync(file, { throwIfNoEntry: false });
+
+  if (!stat?.isFile()) {
     return false;
   }
-
-  const stat = statSync(file);
   const etag = `W/"${stat.size}-${stat.mtimeMs}"`;
   response.setHeader('ETag', etag);
   const compressible = /\.(?:html|js|css|svg|json|webmanifest)$/.test(file);

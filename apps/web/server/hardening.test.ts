@@ -250,9 +250,53 @@ test('HTTP uses 304, immutable assets, CSP and 404 for missing chunks', async ()
       assert.equal(await unchanged.text(), '');
     }
     const session = await fetch(base + '/api/session', { headers: { Cookie: cookie } });
+    const unauthEvents = await fetch(base + '/api/events');
+    assert.equal(unauthEvents.status, 401);
+    const abortController = new AbortController();
+    const eventsResponse = await fetch(base + '/api/events', {
+      headers: { Cookie: cookie },
+      signal: abortController.signal,
+    });
+    assert.equal(eventsResponse.status, 200);
+    assert.match(eventsResponse.headers.get('content-type')!, /^text\/event-stream/);
+    const reader = eventsResponse.body!.getReader();
+    const decoder = new TextDecoder();
+    const initialChunk = decoder.decode((await reader.read()).value);
+    assert.match(initialChunk, /event: ready/);
+    const syncRead = reader.read();
+    const mutated = await fetch(base + '/api/family/records', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'X-24Years-Client': 'web',
+      },
+      body: JSON.stringify({
+        familyId: expected.family!.id,
+        operationId: 'sse-notify-op-001',
+        change: {
+          type: 'task',
+          before: null,
+          value: {
+            id: 'sse-task',
+            title: 'SSE Task',
+            date: '2026-10-26',
+            time: '09:00',
+            repeat: 'once',
+            completedDates: [],
+          },
+        },
+      }),
+    });
+    assert.equal(mutated.status, 200);
+    const syncChunk = decoder.decode((await syncRead).value);
+    assert.match(syncChunk, /event: sync/);
+    abortController.abort();
+
+    const latestSession = await fetch(base + '/api/session', { headers: { Cookie: cookie } });
     service.logout(registered.token);
     const expired = await fetch(base + '/api/session', {
-      headers: { Cookie: cookie, 'If-None-Match': session.headers.get('etag')! },
+      headers: { Cookie: cookie, 'If-None-Match': latestSession.headers.get('etag')! },
     });
     assert.equal(expired.status, 200);
     assert.equal((await expired.json()).user, null);
