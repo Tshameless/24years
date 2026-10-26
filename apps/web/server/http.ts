@@ -41,13 +41,19 @@ async function readBody(request: IncomingMessage): Promise<Record<string, unknow
 
 function json(response: ServerResponse, status: number, value: unknown) {
   const payload = JSON.stringify(value);
-  const encoding = Buffer.byteLength(payload) >= 1024
-    ? compressionEncoding(response.req.headers['accept-encoding'])
-    : undefined;
+  const encoding =
+    Buffer.byteLength(payload) >= 1024
+      ? compressionEncoding(response.req.headers['accept-encoding'])
+      : undefined;
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.setHeader('Cache-Control', 'no-store');
   const vary = response.getHeader('Vary');
-  const fields = new Set(String(vary ?? '').split(',').map((field) => field.trim()).filter(Boolean));
+  const fields = new Set(
+    String(vary ?? '')
+      .split(',')
+      .map((field) => field.trim())
+      .filter(Boolean),
+  );
   fields.add('Accept-Encoding');
   response.setHeader('Vary', [...fields].join(', '));
 
@@ -60,7 +66,11 @@ function json(response: ServerResponse, status: number, value: unknown) {
         ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: 4 } })
         : createGzip(),
       response,
-      (error) => { if (error) {response.destroy(error);} },
+      (error) => {
+        if (error) {
+          response.destroy(error);
+        }
+      },
     );
 
     return;
@@ -86,6 +96,10 @@ export function createApplication(options: {
     db.prepare('DELETE FROM rate_limits WHERE until <= ?').run(Date.now());
     // Retain receipts for 30 days, matching the maximum session lifetime.
     db.prepare('DELETE FROM receipts WHERE created_at <= ?').run(Date.now() - 30 * 86400000);
+    // An import backup is an undo safety net, not an archive. Retain it for 30 days.
+    db.prepare('DELETE FROM import_backups WHERE created_at <= ?').run(
+      new Date(Date.now() - 30 * 86400000).toISOString(),
+    );
   };
   cleanup();
   const maintenance = setInterval(() => {
@@ -208,11 +222,17 @@ export function createApplication(options: {
           return;
         }
 
-        if (path === '/api/account/recovery' || path === '/api/account/delete') {
+        if (
+          path === '/api/account/recovery' ||
+          path === '/api/account/change-password' ||
+          path === '/api/account/delete'
+        ) {
           limit(`security:${userId}`, 6);
           const result = path.endsWith('/recovery')
             ? await service.rotateRecovery(userId, body)
-            : await service.deleteAccount(userId, body);
+            : path.endsWith('/change-password')
+              ? await service.changePassword(userId, token, body)
+              : await service.deleteAccount(userId, body);
 
           if (path.endsWith('/delete')) {
             response.setHeader(

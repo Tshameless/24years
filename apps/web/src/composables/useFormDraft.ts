@@ -28,7 +28,9 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
   const router = useRouter();
   const initial = JSON.stringify(options.form);
   const currentBaseline = () =>
-    JSON.stringify(typeof options.baseline === 'function' ? options.baseline() : options.baseline ?? null);
+    JSON.stringify(
+      typeof options.baseline === 'function' ? options.baseline() : (options.baseline ?? null),
+    );
   const baseline = currentBaseline();
   let draftBaseline = baseline;
   const scope = options.scope();
@@ -39,6 +41,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
   const storageError = shallowRef('');
   const clean = shallowRef(initial);
   let suspended = false;
+  let persistTimer: ReturnType<typeof setTimeout> | undefined;
 
   try {
     const raw = sessionStorage.getItem(key);
@@ -102,7 +105,20 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
     }
   }
 
-  watch(options.form, persist, { deep: true, flush: 'sync' });
+  function schedulePersist() {
+    if (persistTimer !== undefined) {
+      clearTimeout(persistTimer);
+    } else {
+      // Keep the first edit durable immediately; coalesce subsequent keystrokes.
+      persist();
+    }
+    persistTimer = setTimeout(() => {
+      persistTimer = undefined;
+      persist();
+    }, 150);
+  }
+
+  watch(options.form, schedulePersist, { deep: true, flush: 'sync' });
 
   function accept() {
     clean.value = JSON.stringify(options.form);
@@ -142,6 +158,11 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
 
   function beforeUnload(event: BeforeUnloadEvent) {
     if (dirty.value) {
+      if (persistTimer !== undefined) {
+        clearTimeout(persistTimer);
+        persistTimer = undefined;
+      }
+      persist();
       event.preventDefault();
       event.returnValue = '';
     }
@@ -161,6 +182,11 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
     { flush: 'sync' },
   );
   onUnmounted(() => {
+    if (persistTimer !== undefined) {
+      clearTimeout(persistTimer);
+      persistTimer = undefined;
+    }
+    persist();
     removeGuard();
     window.removeEventListener('beforeunload', beforeUnload);
   });

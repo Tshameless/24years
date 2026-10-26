@@ -528,13 +528,49 @@ test('恢复密钥仅存摘要、更新后旧密钥失效，并发恢复仅一�
       ).recovery_hash,
       hash(nextKey),
     );
-    await assert.rejects(() => service.recover({
-      username: original.username, recoveryKey: rotated.recoveryKey, password: 'another-password',
-    }), failsWith(400));
+    await assert.rejects(
+      () =>
+        service.recover({
+          username: original.username,
+          recoveryKey: rotated.recoveryKey,
+          password: 'another-password',
+        }),
+      failsWith(400),
+    );
     const nextRecovery = await service.recover({
-      username: original.username, recoveryKey: nextKey, password: 'another-password',
+      username: original.username,
+      recoveryKey: nextKey,
+      password: 'another-password',
     });
     assert.notEqual(nextRecovery.recoveryKey, nextKey);
+  } finally {
+    db.close();
+  }
+});
+
+test('已登录修改密码保留当前会话并撤销其他会话', async () => {
+  const db = openDatabase(':memory:');
+  const service = createService(db);
+  const original = { username: 'changeable', nickname: '小改', password: 'old-password-2026' };
+
+  try {
+    const current = await service.authenticate(original, true);
+    const other = await service.authenticate(original, false);
+    const userId = current.state.user!.id;
+
+    const state = await service.changePassword(userId, current.token, {
+      currentPassword: original.password,
+      newPassword: 'new-password-2026',
+    });
+    assert.equal(state.user!.id, userId);
+    assert.equal(service.userForToken(current.token), userId);
+    assert.equal(service.userForToken(other.token), null);
+    await assert.rejects(() => service.authenticate(original, false), failsWith(401));
+    assert.equal(
+      (await service.authenticate({ ...original, password: 'new-password-2026' }, false)).state
+        .user!.id,
+      userId,
+    );
   } finally {
     db.close();
   }

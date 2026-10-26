@@ -1,21 +1,36 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, defineAsyncComponent } from 'vue';
 import { useRoute } from 'vue-router';
 import { pregnancyOutcome } from '@/domain/family';
-import BirthPlanPanel from '@/components/pregnancy/BirthPlanPanel.vue';
-import OutcomePanel from '@/components/pregnancy/OutcomePanel.vue';
-import PostpartumPanel from '@/components/pregnancy/PostpartumPanel.vue';
-import CycleOverview from '@/components/pregnancy/CycleOverview.vue';
 import { useFamily } from '@/composables/useFamily';
-import CheckupsPanel from '@/components/pregnancy/CheckupsPanel.vue';
-import VitalsPanel from '@/components/pregnancy/VitalsPanel.vue';
-import ContractionsPanel from '@/components/pregnancy/ContractionsPanel.vue';
-import MedicalCardPanel from '@/components/pregnancy/MedicalCardPanel.vue';
-import BondingPanel from '@/components/pregnancy/BondingPanel.vue';
-import PackingPanel from '@/components/pregnancy/PackingPanel.vue';
-import MovementsPanel from '@/components/pregnancy/MovementsPanel.vue';
 import '@/assets/pregnancy.css';
-import CareJournal from '@/components/pregnancy/CareJournal.vue';
+
+const BirthPlanPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/BirthPlanPanel.vue'),
+);
+const OutcomePanel = defineAsyncComponent(() => import('@/components/pregnancy/OutcomePanel.vue'));
+const PostpartumPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/PostpartumPanel.vue'),
+);
+const CycleOverview = defineAsyncComponent(
+  () => import('@/components/pregnancy/CycleOverview.vue'),
+);
+const CheckupsPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/CheckupsPanel.vue'),
+);
+const VitalsPanel = defineAsyncComponent(() => import('@/components/pregnancy/VitalsPanel.vue'));
+const ContractionsPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/ContractionsPanel.vue'),
+);
+const MedicalCardPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/MedicalCardPanel.vue'),
+);
+const BondingPanel = defineAsyncComponent(() => import('@/components/pregnancy/BondingPanel.vue'));
+const PackingPanel = defineAsyncComponent(() => import('@/components/pregnancy/PackingPanel.vue'));
+const MovementsPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/MovementsPanel.vue'),
+);
+const CareJournal = defineAsyncComponent(() => import('@/components/pregnancy/CareJournal.vue'));
 
 const { data, locked, cloud } = useFamily();
 const route = useRoute();
@@ -145,14 +160,15 @@ const selected = computed(
           </div>
         </section>
       </nav>
-      <CareJournal
-        v-if="selected.component === CareJournal"
+      <component
+        :is="selected.component"
+        v-if="selected.id === 'mood'"
         :key="selected.id"
         kind="mood"
       />
       <component
         :is="selected.component"
-        v-else
+        v-else-if="selected.id !== 'mood'"
       />
     </template>
   </div>

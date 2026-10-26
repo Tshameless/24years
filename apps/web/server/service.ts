@@ -286,6 +286,36 @@ export function createService(db: DatabaseSync) {
     return { ...snapshot(userId), recoveryKey };
   }
 
+  async function changePassword(userId: string, currentToken: string, body: Body) {
+    const verifiedHash = await verifyPassword(userId, body.currentPassword);
+    requireValue(
+      typeof body.newPassword === 'string' &&
+        body.newPassword.length >= 10 &&
+        body.newPassword.length <= 128,
+      400,
+      '新密码需为 10–128 个字符。',
+    );
+    requireValue(body.newPassword !== body.currentPassword, 400, '新密码不能与当前密码相同。');
+    const salt = randomBytes(16).toString('hex');
+    const key = await passwordHash(body.newPassword, salt);
+    const currentTokenHash = hash(currentToken);
+
+    transaction(db, () => {
+      const result = db
+        .prepare(
+          'UPDATE accounts SET password_hash = ?, salt = ? WHERE id = ? AND password_hash = ?',
+        )
+        .run(key.toString('hex'), salt, userId, verifiedHash);
+      requireValue(result.changes === 1, 401, '账号已发生变更，请重新登录。');
+      db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?').run(
+        userId,
+        currentTokenHash,
+      );
+    });
+
+    return snapshot(userId);
+  }
+
   async function recover(body: Body) {
     requireValue(
       typeof body.username === 'string' && /^[a-zA-Z0-9_]{3,32}$/.test(body.username),
@@ -785,6 +815,7 @@ export function createService(db: DatabaseSync) {
     sessionTag,
     authenticate,
     rotateRecovery,
+    changePassword,
     recover,
     deleteAccount,
     userForToken,

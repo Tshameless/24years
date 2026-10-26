@@ -412,8 +412,7 @@ export function useCollaboration(enabled = true) {
     // Do not erase a good local snapshot on every write from a sibling tab.
     // Identity transitions clear sensitive in-memory state before revalidation.
     const identityChanged =
-      cached?.user?.id !== state.value.user?.id ||
-      cached?.family?.id !== state.value.family?.id;
+      cached?.user?.id !== state.value.user?.id || cached?.family?.id !== state.value.family?.id;
     generation += 1;
     etag = '';
     online.value = false;
@@ -424,7 +423,11 @@ export function useCollaboration(enabled = true) {
       invitation.value = null;
       backupData.value = null;
       pendingOperations.clear();
-    } else if (cached.family && state.value.family && cached.family.revision > state.value.family.revision) {
+    } else if (
+      cached.family &&
+      state.value.family &&
+      cached.family.revision > state.value.family.revision
+    ) {
       // A newer read-only snapshot may be shown while the server is checked.
       state.value = cached;
     }
@@ -484,6 +487,8 @@ export function useCollaboration(enabled = true) {
       recoveryUsername.value = '';
     },
     rotateRecovery: (password: string) => run('account/recovery', { password }),
+    changePassword: (currentPassword: string, newPassword: string) =>
+      run('account/change-password', { currentPassword, newPassword }),
     recover: (credentials: { username: string; recoveryKey: string; password: string }) =>
       endAccountAction('recover', credentials),
     deleteAccount: (

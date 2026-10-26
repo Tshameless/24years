@@ -6,6 +6,8 @@ import { downloadBackup } from '@/domain/backup';
 const { cloud } = useFamily();
 const { state, busy, recoveryKey } = cloud;
 const recoveryPassword = shallowRef('');
+const passwordForm = reactive({ current: '', next: '', repeat: '' });
+const passwordError = shallowRef('');
 const deletion = shallowRef<{
   familyId: string | null;
   revision: number | null;
@@ -22,6 +24,17 @@ const stale = computed(
 async function rotate() {
   if (await cloud.rotateRecovery(recoveryPassword.value)) {
     recoveryPassword.value = '';
+  }
+}
+
+async function changePassword() {
+  passwordError.value = '';
+  if (passwordForm.next !== passwordForm.repeat) {
+    passwordError.value = '两次输入的新密码不一致。';
+    return;
+  }
+  if (await cloud.changePassword(passwordForm.current, passwordForm.next)) {
+    Object.assign(passwordForm, { current: '', next: '', repeat: '' });
   }
 }
 
@@ -133,6 +146,57 @@ async function remove() {
           :disabled="busy"
         >
           生成新的恢复密钥
+        </button>
+      </form>
+      <form
+        class="form-grid security-form"
+        @submit.prevent="changePassword"
+      >
+        <p class="muted">修改密码后，其他设备上的登录会话将被撤销；当前设备保持登录。</p>
+        <p
+          v-if="passwordError"
+          class="form-error"
+        >
+          {{ passwordError }}
+        </p>
+        <label class="field">
+          当前密码
+          <input
+            v-model="passwordForm.current"
+            type="password"
+            required
+            minlength="10"
+            maxlength="128"
+            autocomplete="current-password"
+          />
+        </label>
+        <label class="field">
+          新密码
+          <input
+            v-model="passwordForm.next"
+            type="password"
+            required
+            minlength="10"
+            maxlength="128"
+            autocomplete="new-password"
+          />
+        </label>
+        <label class="field">
+          重复新密码
+          <input
+            v-model="passwordForm.repeat"
+            type="password"
+            required
+            minlength="10"
+            maxlength="128"
+            autocomplete="new-password"
+          />
+        </label>
+        <button
+          class="button button-secondary"
+          :disabled="busy"
+        >
+          修改密码
         </button>
       </form>
       <div class="deletion-area">
