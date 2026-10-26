@@ -5,32 +5,71 @@ import { selectVitals, vitalPlot, vitalLabels, type Vital } from '@/domain/vital
 
 const { data } = useFamily();
 const metric = shallowRef<Vital['metric']>('weight');
+const glucoseContext = shallowRef('all');
 const from = shallowRef('');
 const to = shallowRef('');
 const invalid = computed(() => !!from.value && !!to.value && from.value > to.value);
-const entries = computed(() =>
+const baseEntries = computed(() =>
   invalid.value
     ? []
     : selectVitals(data.value.pregnancyRecords ?? [], metric.value, from.value, to.value),
 );
+function matchesGlucoseContext(context: string | undefined, group: string) {
+  if (group === 'fasting') return context?.includes('空腹') ?? false;
+  if (group === 'after1') return context?.includes('餐后1小时') ?? false;
+  if (group === 'after2') return context?.includes('餐后2小时') ?? false;
+  if (group === 'random') return context?.includes('随机') ?? false;
+  if (group === 'other') return context === '其他';
+  if (group === 'unclassified')
+    return (
+      !context ||
+      !['空腹', '餐后1小时', '餐后2小时', '随机', '其他'].some((item) => context.includes(item))
+    );
+  return true;
+}
+const entries = computed(() =>
+  metric.value !== 'glucose' || glucoseContext.value === 'all'
+    ? baseEntries.value
+    : baseEntries.value.filter((item) => matchesGlucoseContext(item.context, glucoseContext.value)),
+);
 const glucoseSummary = computed(() => {
   if (metric.value !== 'glucose') return null;
-  const fasting = entries.value.filter((item) => item.context?.includes('空腹'));
-  const postMeal = entries.value.filter((item) => item.context?.includes('餐后'));
+  const fasting = baseEntries.value.filter((item) =>
+    matchesGlucoseContext(item.context, 'fasting'),
+  );
+  const after1 = baseEntries.value.filter((item) => matchesGlucoseContext(item.context, 'after1'));
+  const after2 = baseEntries.value.filter((item) => matchesGlucoseContext(item.context, 'after2'));
   const average = (items: typeof entries.value) =>
-    items.length ? (items.reduce((sum, item) => sum + item.value, 0) / items.length).toFixed(1) : '—';
+    items.length
+      ? (items.reduce((sum, item) => sum + item.value, 0) / items.length).toFixed(1)
+      : '—';
   return {
     fasting,
-    postMeal,
     fastingAverage: average(fasting),
-    postMealAverage: average(postMeal),
-    highCount: entries.value.filter(
-      (item) =>
-        (item.value >= 5.1 && item.context?.includes('空腹')) ||
-        (item.value >= 8.5 && item.context?.includes('餐后')),
-    ).length,
+    after1Average: average(after1),
+    after2Average: average(after2),
   };
 });
+function csvCell(value: string | number | undefined) {
+  const text = value === undefined ? '' : String(value);
+  const safe = /^[=+@\-\t\r]/.test(text) ? `'${text}` : text;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+function exportGlucoseCsv() {
+  if (metric.value !== 'glucose' || !entries.value.length || invalid.value) return;
+  const rows = [
+    ['日期', '时间', '测量场景', '血糖 (mmol/L)', '备注'],
+    ...entries.value.map((item) => [item.date, item.time, item.context, item.value, item.notes]),
+  ];
+  const content = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = '24years-glucose-records.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+}
 const plot = computed(() => vitalPlot(entries.value));
 const primary = computed(
   () => plot.value?.points.map((point) => `${point.x},${point.y}`).join(' ') ?? '',
@@ -77,6 +116,21 @@ const alertY = computed(() => {
           </option>
         </select>
       </label>
+      <label
+        v-if="metric === 'glucose'"
+        class="field"
+      >
+        血糖场景
+        <select v-model="glucoseContext">
+          <option value="all">全部场景</option>
+          <option value="fasting">空腹</option>
+          <option value="after1">餐后 1 小时</option>
+          <option value="after2">餐后 2 小时</option>
+          <option value="random">随机</option>
+          <option value="other">其他</option>
+          <option value="unclassified">未分类历史记录</option>
+        </select>
+      </label>
       <label class="field">
         起始日期
         <input
@@ -93,14 +147,25 @@ const alertY = computed(() => {
       </label>
     </div>
     <p class="muted">
-      只展示已保存的原始测量值，不标注正常范围或作诊断。同日测量位于相同横坐标，具体时间与场景见数据表；未记录时间不推断先后，纵轴自动缩放。血糖不同测量场景不可直接比较。
+      只展示已保存的原始测量值，不标注正常范围或作诊断。同日测量位于相同横坐标，具体时间与场景见数据表；未记录时间不推断先后，纵轴自动缩放。血糖趋势可按测量场景筛选。
     </p>
-    <div v-if="glucoseSummary" class="glucose-summary">
+    <div
+      v-if="glucoseSummary"
+      class="glucose-summary"
+    >
       <strong>血糖记录摘要</strong>
       <span>空腹平均 {{ glucoseSummary.fastingAverage }} mmol/L</span>
-      <span>餐后平均 {{ glucoseSummary.postMealAverage }} mmol/L</span>
-      <span>参考线以上 {{ glucoseSummary.highCount }} 次</span>
-      <small>请在测量场景中填写“空腹”或“餐后”，摘要才会分类；参考线不等于个人诊断标准。</small>
+      <span>餐后 1 小时平均 {{ glucoseSummary.after1Average }} mmol/L</span>
+      <span>餐后 2 小时平均 {{ glucoseSummary.after2Average }} mmol/L</span>
+      <button
+        class="text-button export-button"
+        type="button"
+        :disabled="!entries.length || invalid"
+        @click="exportGlucoseCsv"
+      >
+        导出当前筛选 CSV
+      </button>
+      <small>摘要按所选日期范围内的记录计算，只作记录整理；请遵医嘱解释测量结果。</small>
     </div>
     <p
       v-if="invalid"

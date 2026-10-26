@@ -132,39 +132,64 @@ async function submit() {
       >
         还没有超声指标记录。
       </p>
-      <ul
+      <div
         v-else
-        class="record-list"
+        class="trend-table-wrap"
       >
-        <li
-          v-for="item in entries"
-          :key="item.id"
-        >
-          <div class="record-heading">
-            <strong>{{ item.date }} · {{ item.gestationWeeks }} 周</strong>
-          </div>
-          <p class="record-notes">
-            BPD {{ item.bpd ?? '—' }} · FL {{ item.fl ?? '—' }} · AC {{ item.ac ?? '—' }} · HC
-            {{ item.hc ?? '—' }} · AFI {{ item.afi ?? '—' }} · S/D {{ item.umbilicalSd ?? '—' }}
-          </p>
-          <div class="record-actions">
-            <button
-              class="text-button"
-              :disabled="disabled"
-              @click="edit(item)"
+        <table class="trend-table">
+          <caption>历次超声测量值对照</caption>
+          <thead>
+            <tr>
+              <th scope="col">检查日期</th>
+              <th scope="col">孕周</th>
+              <th scope="col">BPD (mm)</th>
+              <th scope="col">FL (mm)</th>
+              <th scope="col">AC (mm)</th>
+              <th scope="col">HC (mm)</th>
+              <th scope="col">AFI (cm)</th>
+              <th scope="col">脐动脉 S/D</th>
+              <th scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in entries"
+              :key="item.id"
             >
-              编辑
-            </button>
-            <button
-              class="text-button"
-              :disabled="disabled"
-              @click="remove(item)"
-            >
-              删除
-            </button>
-          </div>
-        </li>
-      </ul>
+              <th scope="row">{{ item.date }}</th>
+              <td>{{ item.gestationWeeks }}</td>
+              <td>{{ item.bpd ?? '—' }}</td>
+              <td>{{ item.fl ?? '—' }}</td>
+              <td>{{ item.ac ?? '—' }}</td>
+              <td>{{ item.hc ?? '—' }}</td>
+              <td>{{ item.afi ?? '—' }}</td>
+              <td>{{ item.umbilicalSd ?? '—' }}</td>
+              <td class="row-actions">
+                <button
+                  class="text-button"
+                  :disabled="disabled"
+                  @click="edit(item)"
+                >
+                  编辑
+                </button>
+                <button
+                  class="text-button"
+                  :disabled="disabled"
+                  @click="remove(item)"
+                >
+                  删除
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p
+        v-if="entries.some((item) => item.notes)"
+        class="muted trend-note"
+      >
+        备注已随 CSV 导出；请结合原始报告和医护人员解释查看。
+      </p>
     </section>
     <section class="panel">
       <div class="panel-heading">
@@ -301,6 +326,46 @@ async function submit() {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.trend-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.trend-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.trend-table caption {
+  padding: 10px 0;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.trend-table th,
+.trend-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.trend-table thead th {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.trend-note {
+  margin: 10px 0 0;
 }
 
 @media (max-width: 480px) {

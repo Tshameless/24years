@@ -11,6 +11,7 @@ import FormDraftNotice from '@/components/FormDraftNotice.vue';
 type Vital = Extract<PregnancyRecord, { type: 'vital' }>;
 const { records, disabled, message, error, reportError, save, remove } = usePregnancyRecords();
 const labels = { weight: '体重（kg）', bloodPressure: '血压（mmHg）', glucose: '血糖（mmol/L）' };
+const glucoseContexts = ['空腹', '餐后1小时', '餐后2小时', '随机', '其他'];
 const entries = computed(() =>
   records.value
     .filter((item): item is Vital => item.type === 'vital')
@@ -38,6 +39,7 @@ const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
     notes: item.notes,
   }),
 });
+const standardGlucoseContext = computed(() => glucoseContexts.includes(form.context));
 
 async function submit() {
   if (disabled.value || stale.value) {
@@ -61,6 +63,11 @@ async function submit() {
   if (!validPregnancyRecord(value) || value.date > localDate()) {
     reportError('请填写不晚于今天的测量日期和有效测量数值。');
 
+    return;
+  }
+
+  if (form.metric === 'glucose' && !form.context.trim()) {
+    reportError('请选择血糖测量场景。');
     return;
   }
 
@@ -195,8 +202,28 @@ async function submit() {
             />
           </label>
           <label class="field">
-            测量场景（可选）
+            {{ form.metric === 'glucose' ? '血糖测量场景' : '测量场景（可选）' }}
+            <select
+              v-if="form.metric === 'glucose'"
+              v-model="form.context"
+            >
+              <option value="">请选择</option>
+              <option
+                v-for="context in glucoseContexts"
+                :key="context"
+                :value="context"
+              >
+                {{ context }}
+              </option>
+              <option
+                v-if="form.context && !standardGlucoseContext"
+                :value="form.context"
+              >
+                原记录：{{ form.context }}
+              </option>
+            </select>
             <input
+              v-else
               v-model="form.context"
               maxlength="80"
               placeholder="按实际情况填写，例如晨起、休息后"
