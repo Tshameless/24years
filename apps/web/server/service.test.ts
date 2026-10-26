@@ -911,6 +911,14 @@ test('关系型分表与增量变更日志同步，客户端可按版本号增�
       },
     });
 
+    const childRecord = {
+      id: 'delta-child',
+      name: '小汤圆',
+      birthDate: '2026-10-26',
+      gender: 'girl' as const,
+    };
+    f.change(f.owner, 'child', childRecord, null);
+
     const taskCount = (
       f.db
         .prepare('SELECT count(*) AS count FROM family_tasks WHERE family_id = ?')
@@ -926,14 +934,20 @@ test('关系型分表与增量变更日志同步，客户端可按版本号增�
         .prepare('SELECT count(*) AS count FROM family_pregnancy_records WHERE family_id = ?')
         .get(f.familyId) as { count: number }
     ).count;
+    const childCount = (
+      f.db
+        .prepare('SELECT count(*) AS count FROM family_children WHERE family_id = ?')
+        .get(f.familyId) as { count: number }
+    ).count;
     assert.equal(taskCount, 1);
     assert.equal(expenseCount, 1);
     assert.equal(pregnancyCount, 1);
+    assert.equal(childCount, 1);
 
     const delta = f.service.changesSince(f.owner, initial.revision)!;
     assert.equal(delta.reset, false);
     assert.equal(delta.fromRevision, 1);
-    assert.equal(delta.revision, 4);
+    assert.equal(delta.revision, 5);
     const patched = applyFamilyDelta(initial, delta);
     assert.deepEqual(patched, f.service.snapshot(f.owner).family);
 

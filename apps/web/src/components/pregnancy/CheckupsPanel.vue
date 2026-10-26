@@ -26,7 +26,7 @@ function applyTemplate() {
   }
 
   if (
-    (draft.dirty.value || form.title || form.notes) &&
+    (form.title.trim() !== '' || form.notes.trim() !== '') &&
     !window.confirm('用模板替换产检名称和备注？')
   ) {
     return;

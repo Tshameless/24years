@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
   decodeFamily,
+  type Child,
   type Expense,
   type FamilyData,
   type FamilyTask,
@@ -54,6 +55,19 @@ export function initRelationalSchema(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS family_pregnancy_order ON family_pregnancy_records(family_id, position);
     CREATE INDEX IF NOT EXISTS family_pregnancy_type ON family_pregnancy_records(family_id, type);
 
+    CREATE TABLE IF NOT EXISTS family_children (
+      family_id TEXT NOT NULL REFERENCES families(id),
+      id TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      birth_date TEXT NOT NULL,
+      data TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (family_id, id)
+    );
+    CREATE INDEX IF NOT EXISTS family_children_order ON family_children(family_id, position);
+    CREATE INDEX IF NOT EXISTS family_children_birth_date ON family_children(family_id, birth_date);
+
     CREATE TABLE IF NOT EXISTS family_changes (
       seq INTEGER PRIMARY KEY AUTOINCREMENT,
       family_id TEXT NOT NULL REFERENCES families(id),
@@ -92,11 +106,17 @@ export function initRelationalSchema(db: DatabaseSync) {
           .prepare('SELECT count(*) AS count FROM family_pregnancy_records WHERE family_id = ?')
           .get(row.id) as { count: number }
       ).count;
+      const childCount = (
+        db
+          .prepare('SELECT count(*) AS count FROM family_children WHERE family_id = ?')
+          .get(row.id) as { count: number }
+      ).count;
 
       if (
         taskCount !== data.tasks.length ||
         expenseCount !== data.expenses.length ||
-        pregnancyCount !== (data.pregnancyRecords?.length ?? 0)
+        pregnancyCount !== (data.pregnancyRecords?.length ?? 0) ||
+        childCount !== (data.children?.length ?? 0)
       ) {
         syncFamilyTables(db, row.id, data, row.updated_at);
         recordResetChange(db, row.id, row.revision);
@@ -124,6 +144,7 @@ export function syncFamilyTables(
   db.prepare('DELETE FROM family_tasks WHERE family_id = ?').run(familyId);
   db.prepare('DELETE FROM family_expenses WHERE family_id = ?').run(familyId);
   db.prepare('DELETE FROM family_pregnancy_records WHERE family_id = ?').run(familyId);
+  db.prepare('DELETE FROM family_children WHERE family_id = ?').run(familyId);
 
   const insertTask = db.prepare(
     'INSERT INTO family_tasks(family_id, id, position, date, repeat, assignee, data, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -170,6 +191,21 @@ export function syncFamilyTables(
       record.type,
       recordDate(record),
       JSON.stringify(record),
+      updatedAt,
+    );
+  }
+
+  const insertChild = db.prepare(
+    'INSERT INTO family_children(family_id, id, position, name, birth_date, data, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  );
+  for (const [index, child] of (data.children ?? []).entries()) {
+    insertChild.run(
+      familyId,
+      child.id,
+      index,
+      child.name,
+      child.birthDate,
+      JSON.stringify(child),
       updatedAt,
     );
   }
@@ -284,6 +320,37 @@ export function upsertPregnancyRow(
   }
 }
 
+export function upsertChildRow(
+  db: DatabaseSync,
+  familyId: string,
+  id: string,
+  value: Child | null,
+  updatedAt = new Date().toISOString(),
+) {
+  db.prepare('DELETE FROM family_children WHERE family_id = ? AND id = ?').run(familyId, id);
+
+  if (value) {
+    const nextPos = (
+      db
+        .prepare(
+          'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM family_children WHERE family_id = ?',
+        )
+        .get(familyId) as { next: number }
+    ).next;
+    db.prepare(
+      'INSERT INTO family_children(family_id, id, position, name, birth_date, data, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run(
+      familyId,
+      value.id,
+      nextPos,
+      value.name,
+      value.birthDate,
+      JSON.stringify(value),
+      updatedAt,
+    );
+  }
+}
+
 export function recordResetChange(db: DatabaseSync, familyId: string, revision: number) {
   db.prepare('DELETE FROM family_changes WHERE family_id = ?').run(familyId);
   db.prepare(
@@ -318,6 +385,7 @@ export function deleteFamilyTables(db: DatabaseSync, familyId: string) {
   db.prepare('DELETE FROM family_tasks WHERE family_id = ?').run(familyId);
   db.prepare('DELETE FROM family_expenses WHERE family_id = ?').run(familyId);
   db.prepare('DELETE FROM family_pregnancy_records WHERE family_id = ?').run(familyId);
+  db.prepare('DELETE FROM family_children WHERE family_id = ?').run(familyId);
   db.prepare('DELETE FROM family_changes WHERE family_id = ?').run(familyId);
 }
 

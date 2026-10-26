@@ -152,4 +152,42 @@ describe('存档校验', () => {
       ),
     ).toThrow();
   });
+
+  it('支持儿童档案并在格式或唯一性错误时拒绝', () => {
+    const validChildData = {
+      ...emptyFamily(),
+      children: [
+        {
+          id: 'child-1',
+          name: '小宝',
+          birthDate: '2026-06-01',
+          gender: 'girl',
+        },
+      ],
+    };
+    expect(decodeFamily(JSON.stringify(validChildData))).toEqual(validChildData);
+
+    // 拒绝重名/重复 ID
+    expect(() =>
+      decodeFamily(
+        JSON.stringify({
+          ...emptyFamily(),
+          children: [
+            { id: 'child-1', name: '大宝', birthDate: '2026-06-01' },
+            { id: 'child-1', name: '二宝', birthDate: '2026-06-01' },
+          ],
+        }),
+      ),
+    ).toThrow();
+
+    // 拒绝格式非法的儿童对象
+    expect(() =>
+      decodeFamily(
+        JSON.stringify({
+          ...emptyFamily(),
+          children: [{ id: 'child-1', name: '', birthDate: '2026-06-01' }],
+        }),
+      ),
+    ).toThrow();
+  });
 });

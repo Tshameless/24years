@@ -2,6 +2,7 @@ import { isObject } from './primitives.ts';
 import { validProfile } from './profile.ts';
 import { validTask } from './tasks.ts';
 import { validExpense } from './ledger.ts';
+import { validChild } from './child.ts';
 import {
   pregnancyOutcome,
   validPregnancyLifecycle,
@@ -47,6 +48,14 @@ export {
   type PregnancyOutcome,
   type PregnancyRecord,
 } from './pregnancy.ts';
+export {
+  formatChildAge,
+  validChild,
+  type Child,
+  type ChildAge,
+  type ChildBloodType,
+  type ChildGender,
+} from './child.ts';
 
 export const emptyFamily = (): FamilyData => ({
   version: 1,
@@ -77,6 +86,10 @@ export function decodeFamily(raw: string): FamilyData {
         value.pregnancyRecords.filter(
           (item) => item.type === 'contraction' && item.endedAt === null,
         ).length > 1)) ||
+    (value.children !== undefined &&
+      (!Array.isArray(value.children) ||
+        !value.children.every(validChild) ||
+        new Set(value.children.map((item) => item.id)).size !== value.children.length)) ||
     !['light', 'dark'].includes(String(value.theme)) ||
     new Set(value.tasks.map((task) => task.id)).size !== value.tasks.length ||
     new Set(value.expenses.map((expense) => expense.id)).size !== value.expenses.length

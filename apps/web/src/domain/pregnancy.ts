@@ -2,6 +2,7 @@ import { isDate, isObject, localDate, sameValue, shortText } from './primitives.
 import { validExpense, type Expense } from './ledger.ts';
 import type { FamilyProfile } from './profile.ts';
 import type { FamilyTask } from './tasks.ts';
+import type { Child } from './child.ts';
 
 export interface FamilyData {
   version: 1;
@@ -10,6 +11,7 @@ export interface FamilyData {
   expenses: Expense[];
   theme: 'light' | 'dark';
   pregnancyRecords?: PregnancyRecord[];
+  children?: Child[];
 }
 
 export type PregnancyRecord =

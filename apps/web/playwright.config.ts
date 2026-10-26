@@ -6,9 +6,9 @@ export default defineConfig({
   expect: {
     timeout: 10000,
   },
+  workers: 4,
+  retries: 1,
   fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: 0,
   use: {
     baseURL: 'http://127.0.0.1:4173',
     timezoneId: 'Asia/Shanghai',

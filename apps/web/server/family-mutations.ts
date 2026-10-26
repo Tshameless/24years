@@ -6,9 +6,11 @@ import {
   canonicalJson,
   decodeFamily,
   PregnancyChangeError,
+  validChild,
   validExpense,
   validProfile,
   validTask,
+  type Child,
   type Expense,
   type FamilyData,
   type FamilyTask,
@@ -29,6 +31,7 @@ import {
   recordDeltaEntries,
   recordResetChange,
   syncFamilyTables,
+  upsertChildRow,
   upsertExpenseRow,
   upsertPregnancyRow,
   upsertTaskRow,
@@ -221,6 +224,32 @@ export function createFamilyMutations(options: {
           value: family.data.profile,
         });
       }
+    } else if (change.type === 'child') {
+      requireValue(
+        (before === null || validChild(before)) &&
+          (value === null || validChild(value)) &&
+          (before !== null || value !== null),
+        400,
+        '孩子记录格式无效。',
+      );
+      const previous = before as { id: string } | null;
+      const next = value as { id: string } | null;
+      requireValue(!previous || !next || previous.id === next.id, 400, '不能修改孩子记录编号。');
+      const children = family.data.children ?? [];
+      const id = (previous ?? next)!.id;
+      const current = children.find((item) => item.id === id) ?? null;
+      requireValue(
+        isDeepStrictEqual(current, before),
+        409,
+        '这条孩子记录已被另一位成员修改或删除。',
+      );
+      const updated = [
+        ...children.filter((item) => item.id !== id),
+        ...(value ? [value as Child] : []),
+      ];
+      family.data = { ...family.data, children: updated };
+      upsertChildRow(db, family.id, id, value as Child | null, now);
+      deltaEntries.push({ recordType: 'child', recordId: id, value });
     } else {
       requireValue(change.type === 'task' || change.type === 'expense', 400, '不支持的记录类型。');
       const validate = change.type === 'task' ? validTask : validExpense;

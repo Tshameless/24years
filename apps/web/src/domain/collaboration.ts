@@ -1,5 +1,6 @@
 import {
   decodeFamily,
+  type Child,
   type FamilyData,
   type FamilyProfile,
   type FamilyTask,
@@ -43,14 +44,16 @@ export type FamilyChange =
   | PregnancyChange
   | { type: 'profile'; value: FamilyProfile; before: FamilyProfile | null }
   | { type: 'task'; value: FamilyTask | null; before: FamilyTask | null }
-  | { type: 'expense'; value: Expense | null; before: Expense | null };
+  | { type: 'expense'; value: Expense | null; before: Expense | null }
+  | { type: 'child'; value: Child | null; before: Child | null };
 
 export type FamilyDeltaRecordType =
   | 'profile'
   | 'task'
   | 'expense'
   | 'expense_prepend'
-  | 'pregnancy';
+  | 'pregnancy'
+  | 'child';
 
 export interface FamilyDeltaEntry {
   revision: number;
@@ -88,6 +91,7 @@ export function applyFamilyDelta(current: SharedFamily, delta: FamilyDelta): Sha
   let pregnancyRecords = current.data.pregnancyRecords
     ? [...current.data.pregnancyRecords]
     : undefined;
+  let children = current.data.children ? [...current.data.children] : undefined;
 
   for (const entry of delta.entries) {
     if (entry.recordType === 'profile') {
@@ -113,6 +117,12 @@ export function applyFamilyDelta(current: SharedFamily, delta: FamilyDelta): Sha
         ...base.filter((item) => item.id !== entry.recordId),
         ...(entry.value ? [entry.value as PregnancyRecord] : []),
       ];
+    } else if (entry.recordType === 'child') {
+      const base = children ?? [];
+      children = [
+        ...base.filter((item) => item.id !== entry.recordId),
+        ...(entry.value ? [entry.value as Child] : []),
+      ];
     } else {
       return null;
     }
@@ -125,6 +135,7 @@ export function applyFamilyDelta(current: SharedFamily, delta: FamilyDelta): Sha
       tasks,
       expenses,
       ...(pregnancyRecords !== undefined ? { pregnancyRecords } : {}),
+      ...(children !== undefined ? { children } : {}),
     };
     const validated = decodeFamily(JSON.stringify(candidate));
 

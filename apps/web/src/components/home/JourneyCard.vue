@@ -2,7 +2,9 @@
 import { computed } from 'vue';
 import {
   dayDifference,
+  formatChildAge,
   pregnancyProgress,
+  type Child,
   type PregnancyOutcome,
   type FamilyProfile,
 } from '@/domain/family';
@@ -12,7 +14,13 @@ const props = defineProps<{
   profile: FamilyProfile | null;
   today: string;
   outcome?: PregnancyOutcome | null;
+  children?: readonly Child[];
 }>();
+
+const primaryChild = computed(() => props.children?.[0]);
+const childAge = computed(() =>
+  primaryChild.value ? formatChildAge(primaryChild.value.birthDate, props.today) : null,
+);
 
 const progress = computed(() =>
   props.profile ? pregnancyProgress(props.profile.dueDate, props.today) : null,
@@ -65,12 +73,36 @@ const progress = computed(() =>
               : '本次孕期已结束'
           }}
         </h2>
-        <p>记录日期：{{ outcome.date }}。历史记录已保留。</p>
+        <p v-if="outcome.kind === 'birth' && primaryChild">
+          {{ primaryChild.name }} · {{ childAge?.label }}（记录日期：{{ outcome.date }}）
+        </p>
+        <p v-else>记录日期：{{ outcome.date }}。历史记录已保留。</p>
         <RouterLink
           class="button button-primary"
           :to="outcome.kind === 'birth' ? '/pregnancy?tab=postpartum' : '/pregnancy?tab=outcome'"
         >
           {{ outcome.kind === 'birth' ? '查看产后交接' : '查看结束记录' }}
+        </RouterLink>
+      </template>
+      <template v-else-if="primaryChild && childAge">
+        <span class="journey-tag">
+          <AppIcon
+            name="heart"
+            :size="14"
+          />
+          陪伴成长的每一天
+        </span>
+        <h2>{{ primaryChild.name }} · {{ childAge.label }}</h2>
+        <p>出生日期：{{ primaryChild.birthDate }} · 祝宝宝健康成长</p>
+        <RouterLink
+          to="/family"
+          class="button button-primary"
+        >
+          查看家庭档案
+          <AppIcon
+            name="arrow"
+            :size="17"
+          />
         </RouterLink>
       </template>
       <template v-else-if="profile && progress">

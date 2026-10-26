@@ -217,4 +217,39 @@ describe('本地存档', () => {
     expect(store.today.value).toBe('2026-10-10');
     expect(store.todayTasks.value).toHaveLength(1);
   });
+  it('支持儿童信息的添加、编辑与删除，并同步本地存档', () => {
+    const store = setup();
+    expect(store.children.value).toHaveLength(0);
+
+    const childId = 'child-test-1';
+    const added = store.addChild(
+      {
+        name: '安安',
+        birthDate: '2026-10-01',
+        gender: 'boy',
+        bloodType: 'A',
+      },
+      childId,
+    );
+    expect(added).toBe(true);
+    expect(store.children.value).toHaveLength(1);
+    expect(store.children.value[0].name).toBe('安安');
+
+    const updated = store.updateChild(
+      {
+        id: childId,
+        name: '安安（大名）',
+        birthDate: '2026-10-01',
+        gender: 'boy',
+        bloodType: 'A',
+      },
+      store.children.value[0],
+    );
+    expect(updated).toBe(true);
+    expect(store.children.value[0].name).toBe('安安（大名）');
+
+    const removed = store.removeChild(childId);
+    expect(removed).toBe(true);
+    expect(store.children.value).toHaveLength(0);
+  });
 });

@@ -73,6 +73,7 @@ const dateLabel = computed(() =>
           :profile="data.profile"
           :today="today"
           :outcome="outcome"
+          :children="data.children"
         />
         <section
           v-if="data.profile && !data.profile.quietMode && !outcome"

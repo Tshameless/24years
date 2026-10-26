@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
+import { useFamily } from '@/composables/useFamily';
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { localDate, validPregnancyRecord, type PregnancyOutcome } from '@/domain/family';
 
 const { outcome, outcomeDisabled, saveOutcome, error, message, reportError } =
   usePregnancyRecords();
+const familyStore = useFamily();
+const syncedChild = computed(() =>
+  outcome.value?.kind === 'birth'
+    ? (familyStore.data.value.children ?? []).find((c) => c.birthDate === outcome.value?.date)
+    : null,
+);
 const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
   type: 'outcome',
   initial: outcome.value,
@@ -99,6 +106,26 @@ async function submit() {
 
   if (await saveOutcome({ type: 'pregnancy', before: before.value, value })) {
     reset(value as PregnancyOutcome);
+
+    if (birth.value) {
+      const babyName = form.babyName.trim() || '宝宝';
+      const existing = (familyStore.data.value.children ?? []).find(
+        (c) => c.birthDate === form.date && c.name === babyName,
+      );
+
+      if (!existing) {
+        familyStore.addChild({
+          name: babyName,
+          birthDate: form.date,
+          birthWeightGrams: form.birthWeightGrams ? Number(form.birthWeightGrams) : undefined,
+          birthLengthCm: form.birthLengthCm ? Number(form.birthLengthCm) : undefined,
+          headCircumferenceCm: form.headCircumferenceCm
+            ? Number(form.headCircumferenceCm)
+            : undefined,
+          notes: form.notes.trim() ? `出生记录：${form.notes.trim()}` : undefined,
+        });
+      }
+    }
   }
 }
 
@@ -272,6 +299,16 @@ async function reopen() {
     >
       {{ message }}
     </p>
+    <div
+      v-if="outcome?.kind === 'birth' && syncedChild"
+      class="child-sync-banner"
+    >
+      <p>
+        已同步登记新生儿成长档案：
+        <strong>{{ syncedChild.name }}</strong>
+        （出生日期：{{ syncedChild.birthDate }}）
+      </p>
+    </div>
     <RouterLink
       v-if="outcome?.kind === 'birth'"
       class="button button-secondary"
@@ -281,3 +318,19 @@ async function reopen() {
     </RouterLink>
   </section>
 </template>
+
+<style scoped>
+.child-sync-banner {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--pink-light);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  font-size: 0.9rem;
+}
+
+.child-sync-banner p {
+  margin: 0;
+  color: var(--text-heading);
+}
+</style>

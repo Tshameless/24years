@@ -18,7 +18,9 @@ import {
   validExpense,
   validProfile,
   validTask,
+  validChild,
   applyPregnancyChange,
+  type Child,
   type PregnancyChange,
   type Expense,
   type FamilyData,
@@ -218,6 +220,52 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     );
   }
 
+  function addChild(input: Omit<Child, 'id'>, id = createId()) {
+    const child: Child = { ...input, id };
+
+    return (
+      validChild(child) &&
+      changeRecords(
+        { type: 'child', value: child, before: null },
+        {
+          ...data.value,
+          children: [...(data.value.children ?? []), child],
+        },
+      )
+    );
+  }
+
+  function updateChild(child: Child, before: Child) {
+    return (
+      validChild(child) &&
+      changeRecords(
+        { type: 'child', value: child, before },
+        {
+          ...data.value,
+          children: (data.value.children ?? []).map((item) =>
+            item.id === child.id ? child : item,
+          ),
+        },
+      )
+    );
+  }
+
+  function removeChild(id: string) {
+    const current = (data.value.children ?? []).find((item) => item.id === id);
+
+    if (!current) {
+      return false;
+    }
+
+    return changeRecords(
+      { type: 'child', value: null, before: current },
+      {
+        ...data.value,
+        children: (data.value.children ?? []).filter((item) => item.id !== id),
+      },
+    );
+  }
+
   function exportBackup() {
     try {
       const raw =
@@ -358,6 +406,10 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     addExpense,
     updateTask,
     updateExpense,
+    children: computed(() => data.value.children ?? []),
+    addChild,
+    updateChild,
+    removeChild,
     exportBackup,
     importTarget,
     importBackup,
