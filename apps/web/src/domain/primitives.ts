@@ -59,3 +59,20 @@ export function sameValue(a: unknown, b: unknown): boolean {
 
   return false;
 }
+
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJson(item === undefined ? null : item)).join(',')}]`;
+  }
+
+  if (isObject(value)) {
+    const entries = Object.keys(value)
+      .sort()
+      .filter((key) => value[key] !== undefined)
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`);
+
+    return `{${entries.join(',')}}`;
+  }
+
+  return JSON.stringify(value);
+}

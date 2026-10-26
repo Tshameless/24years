@@ -6,7 +6,7 @@ import type {
   FamilyParentRole,
   SessionState,
 } from '@/domain/collaboration';
-import type { FamilyData } from '@/domain/family';
+import { canonicalJson, type FamilyData } from '@/domain/family';
 import { CLOUD_CACHE_KEY, readCloudCache } from './cloudCache';
 
 const ACTIVE_KEY = '24years.cloud.active';
@@ -324,7 +324,7 @@ export function useCollaboration(enabled = true) {
 
   async function applyChange(change: FamilyChange) {
     const familyId = state.value.family?.id;
-    const key = JSON.stringify({ familyId, change });
+    const key = canonicalJson({ familyId, change });
     const operationId = pendingOperations.get(key) ?? createId();
     pendingOperations.set(key, operationId);
     const success = await run('family/records', { familyId, change, operationId });

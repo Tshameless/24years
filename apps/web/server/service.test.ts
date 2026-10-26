@@ -638,6 +638,37 @@ test('共享档案导入需管理员、拒绝过时预览，原子备份且重�
   }
 });
 
+test('幂等操作回执不受请求对象属性键序影响', async () => {
+  const f = await fixture();
+
+  try {
+    const familyId = f.service.snapshot(f.owner).family!.id;
+    const operationId = randomUUID();
+    const item = task('键序无关重试');
+    f.service.mutate(f.owner, 'records', {
+      familyId,
+      operationId,
+      change: { type: 'task', before: null, value: item },
+    });
+    const reordered = {
+      completedDates: item.completedDates,
+      repeat: item.repeat,
+      time: item.time,
+      date: item.date,
+      title: item.title,
+      id: item.id,
+    };
+    const retried = f.service.mutate(f.owner, 'records', {
+      operationId,
+      change: { value: reordered, before: null, type: 'task' },
+      familyId,
+    });
+    assert.equal(retried.family!.data.tasks.length, 1);
+  } finally {
+    f.db.close();
+  }
+});
+
 test('注销先核对密码和家庭版本，管理员注销将家庭交给剩余成员', async () => {
   const f = await fixture();
 

@@ -11,6 +11,7 @@ import {
 
 export {
   addDays,
+  canonicalJson,
   cents,
   dayDifference,
   isDate,

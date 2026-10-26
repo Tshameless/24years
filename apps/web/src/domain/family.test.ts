@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
+  canonicalJson,
   decodeFamily,
   dueDateFromGestation,
   emptyFamily,
   isDate,
   parseMoney,
   pregnancyProgress,
+  sameValue,
   summarizeExpenses,
   taskIsDue,
   validProfile,
@@ -121,6 +123,13 @@ describe('账目金额', () => {
 describe('存档校验', () => {
   it('接受正确版本的空档案', () =>
     expect(decodeFamily(JSON.stringify(emptyFamily()))).toEqual(emptyFamily()));
+  it('忽略对象键序比较相等性并生成稳定序列化', () => {
+    const first = { b: [1, { y: 'yes', x: 'no' }], a: 'ok' };
+    const second = { a: 'ok', b: [1, { x: 'no', y: 'yes' }] };
+    expect(sameValue(first, second)).toBe(true);
+    expect(sameValue(first, { ...second, a: 'changed' })).toBe(false);
+    expect(canonicalJson(first)).toBe(canonicalJson(second));
+  });
   it('拒绝损坏、未知版本及非法金额的档案', () => {
     expect(() => decodeFamily('{')).toThrow();
     expect(() => decodeFamily(JSON.stringify({ ...emptyFamily(), version: 2 }))).toThrow();
