@@ -1,4 +1,5 @@
 import { dayDifference, isDate, isObject, shortText } from './primitives.ts';
+import { validGrowthRecord, type ChildGrowthRecord } from './growth.ts';
 
 export type ChildGender = 'boy' | 'girl' | 'other' | 'unknown';
 export type ChildBloodType = 'A' | 'B' | 'AB' | 'O' | 'unknown';
@@ -13,6 +14,7 @@ export interface Child {
   birthLengthCm?: number;
   headCircumferenceCm?: number;
   notes?: string;
+  growthRecords?: readonly ChildGrowthRecord[];
 }
 
 export function validChild(value: unknown): value is Child {
@@ -30,6 +32,7 @@ export function validChild(value: unknown): value is Child {
     birthLengthCm,
     headCircumferenceCm,
     notes,
+    growthRecords,
   } = value as Record<string, unknown>;
 
   if (!shortText(id, 64) || !shortText(name, 50) || !name.trim() || !isDate(birthDate)) {
@@ -88,6 +91,15 @@ export function validChild(value: unknown): value is Child {
   }
 
   if (notes !== undefined && (typeof notes !== 'string' || notes.length > 500)) {
+    return false;
+  }
+
+  if (
+    growthRecords !== undefined &&
+    (!Array.isArray(growthRecords) ||
+      !growthRecords.every(validGrowthRecord) ||
+      new Set(growthRecords.map((r) => r.id)).size !== growthRecords.length)
+  ) {
     return false;
   }
 

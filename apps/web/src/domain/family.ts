@@ -56,6 +56,16 @@ export {
   type ChildBloodType,
   type ChildGender,
 } from './child.ts';
+export {
+  assessChildGrowth,
+  getRecommendedMilestones,
+  PEDIATRIC_MILESTONES,
+  validGrowthRecord,
+  type ChildGrowthRecord,
+  type GrowthAssessment,
+  type GrowthMetric,
+  type PediatricMilestone,
+} from './growth.ts';
 
 export const emptyFamily = (): FamilyData => ({
   version: 1,

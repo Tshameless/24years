@@ -59,6 +59,41 @@ describe('validChild', () => {
   it('rejects excessively long notes', () => {
     expect(validChild({ ...baseChild, notes: 'a'.repeat(501) })).toBe(false);
   });
+
+  it('validates child with growth records and rejects duplicates or invalid records', () => {
+    expect(
+      validChild({
+        ...baseChild,
+        growthRecords: [
+          {
+            id: 'g-1',
+            date: '2026-06-10',
+            weightKg: 4.2,
+            heightCm: 53.0,
+          },
+        ],
+      }),
+    ).toBe(true);
+
+    // 重复生长记录 ID
+    expect(
+      validChild({
+        ...baseChild,
+        growthRecords: [
+          { id: 'g-1', date: '2026-06-10', weightKg: 4.2 },
+          { id: 'g-1', date: '2026-07-10', weightKg: 5.1 },
+        ],
+      }),
+    ).toBe(false);
+
+    // 非法生长记录
+    expect(
+      validChild({
+        ...baseChild,
+        growthRecords: [{ id: 'g-1', date: 'bad-date', weightKg: 4.2 }],
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('formatChildAge', () => {

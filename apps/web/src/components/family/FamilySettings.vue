@@ -3,11 +3,15 @@ import AccountPanel from './AccountPanel.vue';
 import FamilyPairing from './FamilyPairing.vue';
 import DataBackupPanel from './DataBackupPanel.vue';
 import ProfileForm from './ProfileForm.vue';
+import ChildrenPanel from './ChildrenPanel.vue';
 </script>
 
 <template>
   <div class="settings-grid">
-    <ProfileForm />
+    <div class="main-settings">
+      <ProfileForm />
+      <ChildrenPanel />
+    </div>
     <aside class="settings-aside">
       <details
         class="secondary-settings"
@@ -36,6 +40,12 @@ import ProfileForm from './ProfileForm.vue';
   grid-template-columns: minmax(0, 1.3fr) minmax(280px, 1fr);
   gap: 26px;
   align-items: start;
+}
+
+.main-settings {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
 }
 
 .settings-aside {

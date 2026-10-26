@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, shallowRef } from 'vue';
 import {
   dayDifference,
   formatChildAge,
@@ -17,9 +17,15 @@ const props = defineProps<{
   children?: readonly Child[];
 }>();
 
-const primaryChild = computed(() => props.children?.[0]);
+const selectedChildIndex = shallowRef(0);
+const activeChild = computed(() => {
+  const list = props.children ?? [];
+
+  return list[selectedChildIndex.value] ?? list[0] ?? null;
+});
+
 const childAge = computed(() =>
-  primaryChild.value ? formatChildAge(primaryChild.value.birthDate, props.today) : null,
+  activeChild.value ? formatChildAge(activeChild.value.birthDate, props.today) : null,
 );
 
 const progress = computed(() =>
@@ -73,8 +79,8 @@ const progress = computed(() =>
               : '本次孕期已结束'
           }}
         </h2>
-        <p v-if="outcome.kind === 'birth' && primaryChild">
-          {{ primaryChild.name }} · {{ childAge?.label }}（记录日期：{{ outcome.date }}）
+        <p v-if="outcome.kind === 'birth' && activeChild">
+          {{ activeChild.name }} · {{ childAge?.label }}（记录日期：{{ outcome.date }}）
         </p>
         <p v-else>记录日期：{{ outcome.date }}。历史记录已保留。</p>
         <RouterLink
@@ -84,7 +90,22 @@ const progress = computed(() =>
           {{ outcome.kind === 'birth' ? '查看产后交接' : '查看结束记录' }}
         </RouterLink>
       </template>
-      <template v-else-if="primaryChild && childAge">
+      <template v-else-if="activeChild && childAge">
+        <div
+          v-if="(children?.length ?? 0) > 1"
+          class="child-tabs"
+        >
+          <button
+            v-for="(child, idx) in children"
+            :key="child.id"
+            type="button"
+            class="child-tab-pill"
+            :class="{ active: selectedChildIndex === idx }"
+            @click="selectedChildIndex = idx"
+          >
+            {{ child.name }}
+          </button>
+        </div>
         <span class="journey-tag">
           <AppIcon
             name="heart"
@@ -92,8 +113,8 @@ const progress = computed(() =>
           />
           陪伴成长的每一天
         </span>
-        <h2>{{ primaryChild.name }} · {{ childAge.label }}</h2>
-        <p>出生日期：{{ primaryChild.birthDate }} · 祝宝宝健康成长</p>
+        <h2>{{ activeChild.name }} · {{ childAge.label }}</h2>
+        <p>出生日期：{{ activeChild.birthDate }} · 祝宝宝健康成长</p>
         <RouterLink
           to="/family"
           class="button button-primary"
@@ -252,6 +273,29 @@ const progress = computed(() =>
   font-size: 12px;
   color: var(--text-secondary);
   margin: 10px 0 17px;
+}
+
+.child-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.child-tab-pill {
+  padding: 4px 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.child-tab-pill.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
 }
 
 .journey-copy small {
