@@ -31,6 +31,10 @@ function duration(ms: number) {
 }
 
 async function toggle() {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(active.value ? [40] : [80, 40, 80]);
+  }
+
   if (active.value) {
     const before = { ...active.value };
     await save({
@@ -68,7 +72,7 @@ async function toggle() {
         {{ active ? duration(now - active.startedAt) : '0分00秒' }}
       </p>
       <button
-        class="button button-primary"
+        class="button button-primary timer-button"
         :disabled="disabled || (!active && !!quietMode)"
         @click="toggle"
       >
@@ -193,6 +197,14 @@ async function toggle() {
   margin: 36px 0;
 }
 
+.timer-button {
+  width: min(100%, 320px);
+  min-height: 120px;
+  margin: 0 auto;
+  border-radius: 24px;
+  font-size: 18px;
+}
+
 .timer-note {
   margin-top: 24px;
 }
@@ -237,5 +249,16 @@ async function toggle() {
   display: flex;
   gap: 10px;
   margin-top: 14px;
+}
+
+@media (max-width: 600px) {
+  .timer-button {
+    min-height: 160px;
+    font-size: 20px;
+  }
+
+  .pattern-actions .button {
+    flex: 1 1 100%;
+  }
 }
 </style>

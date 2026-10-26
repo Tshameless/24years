@@ -114,10 +114,14 @@ const selected = computed(
 <template>
   <div class="fade-in">
     <header class="page-heading">
-      <div>
+      <div class="pregnancy-heading-copy">
         <p class="eyebrow">CARE AT YOUR OWN PACE</p>
         <h1>孕期记录</h1>
         <p>把安排和身体的变化轻轻记下，就医时多一份从容。</p>
+      </div>
+      <div class="pregnancy-emergency-actions">
+        <RouterLink to="/pregnancy?tab=emergency" class="button button-secondary">异常与急救</RouterLink>
+        <a href="tel:120" class="button emergency-call">拨打 120</a>
       </div>
     </header>
     <section
@@ -205,6 +209,22 @@ const selected = computed(
   margin-bottom: 24px;
 }
 
+.pregnancy-heading-copy {
+  min-width: 0;
+}
+
+.pregnancy-emergency-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.emergency-call {
+  background: var(--primary-ink);
+  color: #fff;
+}
+
 .pregnancy-group {
   display: grid;
   grid-template-columns: minmax(145px, 0.7fr) minmax(0, 1.8fr);
@@ -257,6 +277,15 @@ const selected = computed(
 }
 
 @media (max-width: 600px) {
+  .pregnancy-emergency-actions {
+    width: 100%;
+  }
+
+  .pregnancy-emergency-actions .button {
+    flex: 1 1 140px;
+    min-height: 48px;
+  }
+
   .pregnancy-group {
     grid-template-columns: 1fr;
     gap: 8px;

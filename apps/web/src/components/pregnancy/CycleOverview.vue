@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useFamily } from '@/composables/useFamily';
-import { pregnancyOutcome } from '@/domain/family';
+import { pregnancyOutcome, pregnancyProgress } from '@/domain/family';
 
-const { data } = useFamily();
+const { data, today } = useFamily();
 const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
+const progress = computed(() =>
+  data.value.profile ? pregnancyProgress(data.value.profile.dueDate, today.value) : null,
+);
+const companionCard = computed(() => {
+  const week = progress.value?.weeks ?? 0;
+  if (week >= 37) return { title: '本周陪伴行动：出发准备', items: ['核对待产包、证件和就医卡', '确认夜间入口、停车和接送路线', '和孕妇确认需要联系的医院与家属'] };
+  if (week >= 28) return { title: '本周陪伴行动：稳定支持', items: ['按医嘱协助记录血压或胎动', '分担采购和家务，留出休息时间', '一起确认产检问题和下一次预约'] };
+  if (week >= 13) return { title: '本周陪伴行动：一起准备', items: ['陪同或协助安排下一次产检', '准备水、简单餐食和舒适休息环境', '把医生交代的事项记录在家庭计划中'] };
+  return { title: '本周陪伴行动：建立支持', items: ['确认就医卡和紧急联系人信息', '主动询问今天需要的帮助', '陪同整理产检资料和想问医生的问题'] };
+});
 const stages = [
   {
     title: '建档与早期安排',
@@ -62,6 +72,16 @@ const stages = [
     <p class="muted">
       这里串联本次孕期的记录和交接，不设必须完成的打卡，也不自动生成医疗检查或治疗方案。
     </p>
+    <section class="companion-card">
+      <div class="panel-heading">
+        <h3>{{ companionCard.title }}</h3>
+        <span class="tag">陪伴建议</span>
+      </div>
+      <ul>
+        <li v-for="item in companionCard.items" :key="item">{{ item }}</li>
+      </ul>
+      <p class="muted">按家庭实际情况和医护人员建议调整；单人家庭也可以把这些事项作为自己的提醒。</p>
+    </section>
     <ol class="cycle-stages">
       <li
         v-for="stage in stages"
@@ -90,6 +110,33 @@ const stages = [
   gap: 24px;
   margin: 24px 0 0;
   padding-left: 24px;
+}
+
+.companion-card {
+  margin: 24px 0 0;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--pink-light);
+}
+
+.companion-card .panel-heading {
+  margin-bottom: 10px;
+}
+
+.companion-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.companion-card ul {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.9;
+}
+
+.companion-card .muted {
+  margin: 10px 0 0;
+  font-size: 12px;
 }
 
 .cycle-stages li {

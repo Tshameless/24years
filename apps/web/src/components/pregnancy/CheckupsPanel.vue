@@ -66,6 +66,47 @@ const schedule = computed(() =>
   })),
 );
 
+function escapeIcs(value: string) {
+  return value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+}
+
+function exportCalendar() {
+  if (!checkups.value.length) {
+    reportError('请先添加至少一项产检安排。');
+    return;
+  }
+
+  const events = checkups.value.map((item) => {
+    const date = item.date.replace(/-/g, '');
+    return [
+      'BEGIN:VEVENT',
+      `UID:${item.id}@24years`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`,
+      `DTSTART;VALUE=DATE:${date}`,
+      `SUMMARY:${escapeIcs(`产检：${item.title}`)}`,
+      `DESCRIPTION:${escapeIcs(item.notes || '请按医院安排准备')}`,
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:三天后有产检安排，请确认医院通知与就诊资料。',
+      'TRIGGER:-P3D',
+      'END:VALARM',
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:明天有产检安排，请确认就诊时间与出行安排。',
+      'TRIGGER:-P1D',
+      'END:VALARM',
+      'END:VEVENT',
+    ].join('\r\n');
+  });
+  const blob = new Blob([`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//24Years//Pregnancy//CN\r\n${events.join('\r\n')}\r\nEND:VCALENDAR\r\n`], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = '24years-产检安排.ics';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function addScheduledCheckup(item: PrenatalScheduleItem & { date: string }) {
   if (disabled.value || before.value || stale.value) return;
   Object.assign(form, {
@@ -151,7 +192,10 @@ async function submit() {
     <section class="panel">
       <div class="panel-heading">
         <h2>产检安排</h2>
-        <span class="tag">{{ checkups.length }} 次记录</span>
+        <div class="heading-actions">
+          <span class="tag">{{ checkups.length }} 次记录</span>
+          <button class="text-button" type="button" @click="exportCalendar">导出日历</button>
+        </div>
       </div>
       <div class="schedule-card">
         <div class="schedule-heading">
@@ -185,6 +229,7 @@ async function submit() {
       >
         还没有产检安排。按照医生的建议，记下下一次见面的时间。
       </p>
+      <p class="calendar-note">导出的日历包含提前 3 天和 1 天提醒；是否弹出通知取决于导入的日历应用及设备通知设置。</p>
       <ul
         v-else
         class="record-list"
@@ -380,6 +425,14 @@ async function submit() {
   background: var(--green-light);
 }
 
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .schedule-heading {
   display: flex;
   align-items: start;
@@ -393,11 +446,16 @@ async function submit() {
 }
 
 .schedule-heading p,
-.schedule-list p {
+.schedule-list p,
+.calendar-note {
   margin: 0;
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.7;
+}
+
+.calendar-note {
+  margin: 0 0 14px;
 }
 
 .schedule-list {

@@ -18,7 +18,7 @@ const questions = [
   '我因为不开心而哭泣。',
   '我曾有伤害自己的想法。',
 ];
-const { records, disabled, error, message, reportError, save } = usePregnancyRecords();
+const { records, disabled, error, message, reportError, save, cloudActive } = usePregnancyRecords();
 const previous = computed(() => records.value.find((item): item is Screening => item.type === 'mentalScreening'));
 const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
   type: 'mentalScreening',
@@ -36,7 +36,7 @@ const selectedAnswers = computed(() => {
 });
 const score = computed(() => selectedAnswers.value.reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0));
 const selfHarm = computed(() => selectedAnswers.value[9] > 0);
-const risk = computed(() => selfHarm.value || score.value >= 13);
+const allAnswered = computed(() => selectedAnswers.value.length === questions.length && selectedAnswers.value.every((value) => Number.isInteger(value) && value >= 0 && value <= 3));
 function setAnswer(index: number, value: string) {
   const answers = [...selectedAnswers.value];
   answers[index] = Number(value);
@@ -47,7 +47,7 @@ function setAnswer(index: number, value: string) {
 async function submit() {
   reportError('');
   const value: Screening = { id: 'mental-screening', type: 'mentalScreening', date: form.date, score: score.value, selfHarm: selfHarm.value, answers: selectedAnswers.value, notes: form.notes.trim() };
-  if (disabled.value || stale.value || !validPregnancyRecord(value) || value.date > localDate()) { reportError('请填写有效日期和 0–30 的整数分数。'); return; }
+  if (disabled.value || stale.value || !allAnswered.value || !validPregnancyRecord(value) || value.date > localDate()) { reportError('请完成全部题目，并填写有效日期。'); return; }
   if (await save({ type: 'pregnancy', before: before.value, value })) reset(value);
 }
 </script>
@@ -55,12 +55,13 @@ async function submit() {
 <template>
   <section class="panel mental-screening">
     <div class="panel-heading"><h2>孕期心理状态自查</h2><span class="tag">不作诊断</span></div>
-    <p class="muted">这是一个简短的自我观察入口。若出现自伤想法、无法保证自身安全或情绪持续影响生活，请立即联系身边可信任的人、当地急救或心理/精神科服务。</p>
+    <p class="muted">这是非诊断性的自我观察，不是经过验证的 EPDS 量表，汇总分不设医学阈值。若情绪持续影响生活，请联系专业人员；若出现自伤想法或无法保证自身安全，请立即联系可信任的人和当地急救服务。</p>
+    <p v-if="cloudActive" class="privacy-notice">家庭同步已开启：此记录会对家庭成员可见，请只填写愿意共享的信息。</p>
     <form class="form-grid" @submit.prevent="submit">
       <FormDraftNotice :dirty="draft.dirty.value" :restored="draft.restored.value" :error="draft.storageError.value" :blocked="stale" @discard="cancel" />
       <fieldset class="record-fields" :disabled="disabled || stale">
         <label class="field">评估日期<input v-model="form.date" type="date" :max="localDate()" /></label>
-        <p class="muted">请按近两周的实际感受逐题选择。每题 0–3 分，系统只保存分数和答案用于复诊沟通。</p>
+        <p class="muted">请按近两周的实际感受逐题选择。每题的 0–3 仅用于整理回答，不用于诊断或风险分级。</p>
         <ol class="screening-questions">
           <li v-for="(question, index) in questions" :key="question">
             <label class="field">{{ question }}
@@ -70,13 +71,13 @@ async function submit() {
             </label>
           </li>
         </ol>
-        <p class="screening-score">当前总分：<strong>{{ score }}</strong> / 30</p>
-        <p v-if="risk" class="form-error" role="alert">请尽快联系专业人员或急救服务；如果有即时危险，请拨打 120 或当地急救电话。</p>
+        <p class="screening-score">回答汇总：<strong>{{ allAnswered ? score : '—' }}</strong> / 30（不作量表解释）</p>
+        <p v-if="selfHarm" class="form-error" role="alert">你选择了曾有自伤想法。请尽快联系专业人员和可信任的人；如果有即时危险或无法保证安全，请拨打当地急救电话。</p>
         <label class="field">想告诉医护人员的情况<textarea v-model="form.notes" rows="4" maxlength="2000" placeholder="睡眠、焦虑、支持情况或希望获得的帮助"></textarea></label>
         <button class="button button-primary">保存心理自查</button>
       </fieldset>
     </form>
-    <p v-if="previous" class="muted">上次记录：{{ previous.date }}，分数 {{ previous.score }}。</p>
+    <p v-if="previous" class="muted">上次记录：{{ previous.date }}。</p>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p><p v-if="message" class="success-message" role="status">{{ message }}</p>
   </section>
 </template>
@@ -98,5 +99,12 @@ async function submit() {
   padding: 12px;
   border-radius: 8px;
   background: var(--green-light);
+}
+
+.privacy-notice {
+  padding: 10px 12px;
+  border-left: 3px solid var(--primary);
+  background: var(--pink-light);
+  line-height: 1.7;
 }
 </style>

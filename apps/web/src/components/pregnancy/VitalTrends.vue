@@ -13,6 +13,24 @@ const entries = computed(() =>
     ? []
     : selectVitals(data.value.pregnancyRecords ?? [], metric.value, from.value, to.value),
 );
+const glucoseSummary = computed(() => {
+  if (metric.value !== 'glucose') return null;
+  const fasting = entries.value.filter((item) => item.context?.includes('空腹'));
+  const postMeal = entries.value.filter((item) => item.context?.includes('餐后'));
+  const average = (items: typeof entries.value) =>
+    items.length ? (items.reduce((sum, item) => sum + item.value, 0) / items.length).toFixed(1) : '—';
+  return {
+    fasting,
+    postMeal,
+    fastingAverage: average(fasting),
+    postMealAverage: average(postMeal),
+    highCount: entries.value.filter(
+      (item) =>
+        (item.value >= 5.1 && item.context?.includes('空腹')) ||
+        (item.value >= 8.5 && item.context?.includes('餐后')),
+    ).length,
+  };
+});
 const plot = computed(() => vitalPlot(entries.value));
 const primary = computed(
   () => plot.value?.points.map((point) => `${point.x},${point.y}`).join(' ') ?? '',
@@ -77,6 +95,13 @@ const alertY = computed(() => {
     <p class="muted">
       只展示已保存的原始测量值，不标注正常范围或作诊断。同日测量位于相同横坐标，具体时间与场景见数据表；未记录时间不推断先后，纵轴自动缩放。血糖不同测量场景不可直接比较。
     </p>
+    <div v-if="glucoseSummary" class="glucose-summary">
+      <strong>血糖记录摘要</strong>
+      <span>空腹平均 {{ glucoseSummary.fastingAverage }} mmol/L</span>
+      <span>餐后平均 {{ glucoseSummary.postMealAverage }} mmol/L</span>
+      <span>参考线以上 {{ glucoseSummary.highCount }} 次</span>
+      <small>请在测量场景中填写“空腹”或“餐后”，摘要才会分类；参考线不等于个人诊断标准。</small>
+    </div>
     <p
       v-if="invalid"
       role="alert"
@@ -224,6 +249,24 @@ const alertY = computed(() => {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-top: 16px;
+}
+
+.glucose-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 14px 0;
+  padding: 12px;
+  background: var(--green-light);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.glucose-summary small {
+  flex-basis: 100%;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
 
 .trend-chart {
