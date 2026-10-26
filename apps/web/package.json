@@ -12,7 +12,7 @@
     "start": "node server/index.ts",
     "build": "pnpm type-check && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .ts,.vue --max-warnings=0",
+    "lint": "eslint . --max-warnings=0",
     "lint:style": "stylelint \"src/**/*.{css,vue}\"",
     "type-check": "vue-tsc --noEmit && tsc -p server/tsconfig.json",
     "format": "prettier --write .",

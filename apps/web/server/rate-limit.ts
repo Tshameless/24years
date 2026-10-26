@@ -30,7 +30,8 @@ export function createRateLimiter(db: DatabaseSync, capacity = 10000) {
     }
 
     const entry = db.prepare('SELECT count, until FROM rate_limits WHERE key = ?').get(digest) as
-      { count: number; until: number } | undefined;
+      | { count: number; until: number }
+      | undefined;
 
     if (entry && entry.until > now && entry.count >= maximum) {
       throw new ApiError(429, '尝试次数过多，请 15 分钟后再试。');
@@ -44,9 +45,13 @@ export function createRateLimiter(db: DatabaseSync, capacity = 10000) {
       if (count >= capacity) {
         // Reclaim expired keys on capacity pressure, even between maintenance passes.
         db.prepare('DELETE FROM rate_limits WHERE until <= ?').run(now);
-        const remaining = db.prepare('SELECT count(*) AS count FROM rate_limits').get() as { count: number };
+        const remaining = db.prepare('SELECT count(*) AS count FROM rate_limits').get() as {
+          count: number;
+        };
 
-        if (remaining.count >= capacity) {throw new ApiError(429, '请求过多，请稍后重试。');}
+        if (remaining.count >= capacity) {
+          throw new ApiError(429, '请求过多，请稍后重试。');
+        }
       }
     }
 

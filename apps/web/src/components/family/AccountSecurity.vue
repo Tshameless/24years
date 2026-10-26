@@ -29,10 +29,13 @@ async function rotate() {
 
 async function changePassword() {
   passwordError.value = '';
+
   if (passwordForm.next !== passwordForm.repeat) {
     passwordError.value = '两次输入的新密码不一致。';
+
     return;
   }
+
   if (await cloud.changePassword(passwordForm.current, passwordForm.next)) {
     Object.assign(passwordForm, { current: '', next: '', repeat: '' });
   }

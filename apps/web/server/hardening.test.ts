@@ -88,12 +88,20 @@ test('blocked attempts do not write and expired windows reset between cleanup pa
     const limit = createRateLimiter(db);
     limit('a', 1, 100);
     const changes = db.prepare('SELECT total_changes() AS n').get();
-    for (let i = 0; i < 20; i++) {assert.throws(() => limit('a', 1, 101 + i));}
+    for (let i = 0; i < 20; i++) {
+      assert.throws(() => limit('a', 1, 101 + i));
+    }
     assert.deepEqual(db.prepare('SELECT total_changes() AS n').get(), changes);
     limit('b', 1, 900000); // Maintenance runs just before a expires.
     limit('a', 1, 900101);
-    const rows = db.prepare('SELECT count, until FROM rate_limits ORDER BY until').all() as Array<{ count: number; until: number }>;
-    assert.deepEqual(rows.map((row) => row.count), [1, 1]);
+    const rows = db.prepare('SELECT count, until FROM rate_limits ORDER BY until').all() as Array<{
+      count: number;
+      until: number;
+    }>;
+    assert.deepEqual(
+      rows.map((row) => row.count),
+      [1, 1],
+    );
     assert.equal(rows[1].until, 1800101);
   } finally {
     db.close();
@@ -106,22 +114,43 @@ test('startup removes old receipts and retains indexed recent receipts', async (
   const db = openDatabase(database);
   const service = createService(db);
   const registered = await service.authenticate(
-    { username: 'receipts', nickname: 'User', password: 'password-12345' }, true,
+    { username: 'receipts', nickname: 'User', password: 'password-12345' },
+    true,
   );
   const family = service.mutate(registered.state.user!.id, 'create', {
-    mode: 'single', familyRole: 'single_parent', data: emptyFamily(),
+    mode: 'single',
+    familyRole: 'single_parent',
+    data: emptyFamily(),
   }).family!;
-  const insert = db.prepare('INSERT INTO receipts (user_id, family_id, operation_id, payload_hash, created_at) VALUES (?, ?, ?, ?, ?)');
+  const insert = db.prepare(
+    'INSERT INTO receipts (user_id, family_id, operation_id, payload_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+  );
   insert.run(registered.state.user!.id, family.id, 'old', 'hash', Date.now() - 31 * 86400000);
   insert.run(registered.state.user!.id, family.id, 'recent', 'hash', Date.now());
+  db.prepare('INSERT INTO import_backups VALUES (?, ?, ?)').run(
+    family.id,
+    JSON.stringify(emptyFamily()),
+    new Date(Date.now() - 31 * 86400000).toISOString(),
+  );
   db.close();
   const app = createApplication({ database });
   await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
 
   try {
-    const receipts = app.db.prepare('SELECT operation_id FROM receipts').all() as Array<{ operation_id: string }>;
-    assert.deepEqual(receipts.map((row) => row.operation_id), ['recent']);
-    const indexes = app.db.prepare("PRAGMA index_list('receipts')").all() as Array<{ name: string }>;
+    const receipts = app.db.prepare('SELECT operation_id FROM receipts').all() as Array<{
+      operation_id: string;
+    }>;
+    assert.deepEqual(
+      receipts.map((row) => row.operation_id),
+      ['recent'],
+    );
+    const expiredBackups = app.db.prepare('SELECT count(*) AS count FROM import_backups').get() as {
+      count: number;
+    };
+    assert.equal(expiredBackups.count, 0);
+    const indexes = app.db.prepare("PRAGMA index_list('receipts')").all() as Array<{
+      name: string;
+    }>;
     assert.ok(indexes.some((row) => row.name === 'receipts_created_at'));
   } finally {
     await new Promise<void>((resolve) => app.server.close(() => resolve()));
@@ -186,22 +215,35 @@ test('HTTP uses 304, immutable assets, CSP and 404 for missing chunks', async ()
     const cookie = `family_session=${registered.token}`;
     const data = emptyFamily();
     data.tasks = Array.from({ length: 40 }, (_, i) => ({
-      id: `task${i}`, title: `Task ${i}`, date: '2026-10-22', time: '10:00',
-      repeat: 'once', completedDates: [],
+      id: `task${i}`,
+      title: `Task ${i}`,
+      date: '2026-10-22',
+      time: '10:00',
+      repeat: 'once',
+      completedDates: [],
     }));
     const expected = service.mutate(registered.state.user!.id, 'create', {
-      mode: 'single', familyRole: 'single_parent', data,
+      mode: 'single',
+      familyRole: 'single_parent',
+      data,
     });
     for (const encoding of ['br', 'gzip', 'identity']) {
       const response = await fetch(base + '/api/session', {
         headers: { Cookie: cookie, 'Accept-Encoding': encoding },
       });
-      assert.equal(response.headers.get('content-encoding'), encoding === 'identity' ? null : encoding);
+      assert.equal(
+        response.headers.get('content-encoding'),
+        encoding === 'identity' ? null : encoding,
+      );
       assert.equal(response.headers.get('cache-control'), 'no-store');
       assert.equal(response.headers.get('vary'), 'Cookie, Accept-Encoding');
       assert.deepEqual(await response.json(), JSON.parse(JSON.stringify(expected)));
       const unchanged = await fetch(base + '/api/session', {
-        headers: { Cookie: cookie, 'Accept-Encoding': encoding, 'If-None-Match': response.headers.get('etag')! },
+        headers: {
+          Cookie: cookie,
+          'Accept-Encoding': encoding,
+          'If-None-Match': response.headers.get('etag')!,
+        },
       });
       assert.equal(unchanged.status, 304);
       assert.equal(unchanged.headers.get('vary'), 'Cookie, Accept-Encoding');

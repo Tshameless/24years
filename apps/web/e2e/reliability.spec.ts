@@ -60,14 +60,19 @@ async function selectBackup(page: Page, value: unknown = backup) {
 test('旧版大备份可恢复并紧凑导出，本机保留超过云端额度的数据', async ({ page }) => {
   const large = {
     ...backup,
-    expenses: Array.from({ length: 6500 }, (_, i) => ({ ...backup.expenses[0], id: `expense-${i}` })),
+    expenses: Array.from({ length: 6500 }, (_, i) => ({
+      ...backup.expenses[0],
+      id: `expense-${i}`,
+    })),
   };
   const raw = JSON.stringify(large, null, 2);
   expect(Buffer.byteLength(JSON.stringify(large))).toBeGreaterThan(800000);
   await page.goto('/backup');
   await page.getByText('从 JSON 备份恢复', { exact: true }).click();
   await page.getByLabel('选择 JSON 备份').setInputFiles({
-    name: 'large.json', mimeType: 'application/json', buffer: Buffer.from(raw),
+    name: 'large.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(raw),
   });
   await page.getByLabel('我理解恢复会替换当前记录').check();
   await page.getByRole('button', { name: '确认恢复备份' }).click();
@@ -83,7 +88,10 @@ test('旧版大备份可恢复并紧凑导出，本机保留超过云端额度�
   const exported = Buffer.concat(chunks).toString();
   expect(exported).toBe(JSON.stringify(large));
   expect(JSON.parse(exported)).toEqual(large);
-  await page.screenshot({ path: `test-results/backup-capacity-${test.info().project.name}.png`, fullPage: true });
+  await page.screenshot({
+    path: `test-results/backup-capacity-${test.info().project.name}.png`,
+    fullPage: true,
+  });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -135,7 +143,9 @@ test('恢复密钥找回密码、重新登录和生成密钥，注销保留本�
   await page.getByRole('button', { name: '下载新恢复密钥' }).click();
   const keyStream = await (await keyDownload).createReadStream();
   const keyChunks: Buffer[] = [];
-  for await (const chunk of keyStream!) {keyChunks.push(Buffer.from(chunk));}
+  for await (const chunk of keyStream!) {
+    keyChunks.push(Buffer.from(chunk));
+  }
   expect(JSON.parse(Buffer.concat(keyChunks).toString())).toEqual({
     username,
     recoveryKey: await newKey.inputValue(),

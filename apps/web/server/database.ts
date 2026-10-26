@@ -58,6 +58,10 @@ export function openDatabase(path: string) {
       data TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      applied_at TEXT NOT NULL
+    );
   `);
 
   // The first collaboration release only stored permission roles. Keep existing
@@ -90,6 +94,10 @@ export function openDatabase(path: string) {
       WHERE family_id IN (SELECT id FROM families WHERE mode = 'single');
     `);
   }
+
+  db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (1, ?)').run(
+    new Date().toISOString(),
+  );
 
   return db;
 }

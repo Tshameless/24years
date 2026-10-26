@@ -161,3 +161,31 @@ it('rejects malformed drafts and clears only draft storage', () => {
   expect(sessionStorage.getItem('unrelated')).toBe('keep');
   expect(sessionStorage.length).toBe(1);
 });
+
+it('coalesces rapid edits and flushes immediately on beforeunload or accept', () => {
+  vi.useFakeTimers();
+  const setItem = vi.spyOn(sessionStorage, 'setItem');
+  const { form, draft } = setup();
+  form.title = 'a';
+  form.title = 'ab';
+  form.title = 'abc';
+  expect(setItem).toHaveBeenCalledTimes(1);
+  vi.advanceTimersByTime(150);
+  expect(setItem).toHaveBeenCalledTimes(2);
+  expect(
+    JSON.parse(sessionStorage.getItem('24years.draft.v1:["local","expense:new"]')!).form.title,
+  ).toBe('abc');
+
+  form.title = 'abcd';
+  window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
+  expect(
+    JSON.parse(sessionStorage.getItem('24years.draft.v1:["local","expense:new"]')!).form.title,
+  ).toBe('abcd');
+
+  draft.accept();
+  form.title = 'first-after-accept';
+  expect(
+    JSON.parse(sessionStorage.getItem('24years.draft.v1:["local","expense:new"]')!).form.title,
+  ).toBe('first-after-accept');
+  vi.useRealTimers();
+});

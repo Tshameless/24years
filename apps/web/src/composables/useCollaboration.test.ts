@@ -12,9 +12,14 @@ function snapshot(id = 'user', revision = 1): SessionState {
   return {
     user,
     family: {
-      id: `family-${id}`, mode: 'single', revision, data: emptyFamily(),
+      id: `family-${id}`,
+      mode: 'single',
+      revision,
+      data: emptyFamily(),
       members: [{ ...user, role: 'owner', familyRole: 'single_parent' }],
-      updatedAt: new Date().toISOString(), updatedBy: id, inviteExpiresAt: null,
+      updatedAt: new Date().toISOString(),
+      updatedBy: id,
+      inviteExpiresAt: null,
     },
   };
 }
@@ -26,11 +31,15 @@ function cache(state: SessionState, savedAt = Date.now()) {
 
 function mountCloud() {
   let cloud!: ReturnType<typeof useCollaboration>;
-  const wrapper = mount(defineComponent({ setup() {
-    cloud = useCollaboration();
+  const wrapper = mount(
+    defineComponent({
+      setup() {
+        cloud = useCollaboration();
 
-    return () => null;
-  } }));
+        return () => null;
+      },
+    }),
+  );
 
   return { cloud, wrapper };
 }
@@ -54,7 +63,9 @@ it('restores a read-only cloud snapshot on offline cold start and clears it on e
     expect(cloud.state.value.family).toBeNull();
     expect(cloud.expired.value).toBe(true);
     expect(localStorage.getItem(CLOUD_CACHE_KEY)).toBeNull();
-  } finally { wrapper.unmount(); }
+  } finally {
+    wrapper.unmount();
+  }
 });
 
 it('rejects expired, malformed and mismatched snapshots', () => {
@@ -70,7 +81,9 @@ it('rejects expired, malformed and mismatched snapshots', () => {
 
 it('persists a successful session and removes its snapshot on logout', async () => {
   const state = snapshot();
-  const fetcher = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(state))));
+  const fetcher = vi
+    .fn()
+    .mockImplementation(() => Promise.resolve(new Response(JSON.stringify(state))));
   vi.stubGlobal('fetch', fetcher);
   const { cloud, wrapper } = mountCloud();
 
@@ -81,27 +94,43 @@ it('persists a successful session and removes its snapshot on logout', async () 
     expect(await cloud.logout()).toBe(true);
     expect(readCloudCache()).toBeNull();
     expect(localStorage.getItem('24years.cloud.active')).toBe('false');
-  } finally { wrapper.unmount(); }
+  } finally {
+    wrapper.unmount();
+  }
 });
 
 it('ignores a stale in-flight response after another tab switches accounts', async () => {
   cache(snapshot('old'));
   let resolve!: (response: Response) => void;
-  const fetcher = vi.fn().mockImplementationOnce(() => new Promise<Response>((done) => { resolve = done; }))
+  const fetcher = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<Response>((done) => {
+          resolve = done;
+        }),
+    )
     .mockRejectedValue(new TypeError('offline'));
   vi.stubGlobal('fetch', fetcher);
   const { cloud, wrapper } = mountCloud();
 
   try {
     cache(snapshot('new'));
-    window.dispatchEvent(new StorageEvent('storage', { key: CLOUD_CACHE_KEY, newValue: localStorage.getItem(CLOUD_CACHE_KEY) }));
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: CLOUD_CACHE_KEY,
+        newValue: localStorage.getItem(CLOUD_CACHE_KEY),
+      }),
+    );
     expect(cloud.state.value.user!.id).toBe('new');
     resolve(new Response(JSON.stringify(snapshot('old', 9))));
     await flushPromises();
     expect(cloud.state.value.user!.id).toBe('new');
     expect(cloud.online.value).toBe(false);
     expect(readCloudCache()!.user!.id).toBe('new');
-  } finally { wrapper.unmount(); }
+  } finally {
+    wrapper.unmount();
+  }
 });
 
 afterEach(() => {

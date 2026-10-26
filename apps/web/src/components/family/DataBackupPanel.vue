@@ -24,7 +24,10 @@ const usedBytes = computed(() =>
 );
 const nearCapacity = computed(() => usedBytes.value >= MAX_CLOUD_BYTES * 0.9);
 const unavailable = computed(
-  () => !ready.value || busy.value || (active.value && (!online.value || expired.value || role.value !== 'owner')),
+  () =>
+    !ready.value ||
+    busy.value ||
+    (active.value && (!online.value || expired.value || role.value !== 'owner')),
 );
 let selection = 0;
 

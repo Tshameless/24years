@@ -33,13 +33,11 @@ test('选择登录或本机使用，未登录备份可迁移到新浏览器', as
     await target.goto('/');
     await target.getByRole('link', { name: '已有备份？导入恢复' }).click();
     await target.getByText('从 JSON 备份恢复', { exact: true }).click();
-    await target
-      .getByLabel('选择 JSON 备份')
-      .setInputFiles({
-        name: 'backup.json',
-        mimeType: 'application/json',
-        buffer: Buffer.from(raw),
-      });
+    await target.getByLabel('选择 JSON 备份').setInputFiles({
+      name: 'backup.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(raw),
+    });
     await expect(target.getByText('本机备份之家', { exact: true })).toBeVisible();
     await expect(target.getByRole('button', { name: '确认恢复备份' })).toBeDisabled();
     await target.getByLabel('我理解恢复会替换当前记录').check();

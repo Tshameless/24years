@@ -105,6 +105,13 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
     }
   }
 
+  function clearPersistTimer() {
+    if (persistTimer !== undefined) {
+      clearTimeout(persistTimer);
+      persistTimer = undefined;
+    }
+  }
+
   function schedulePersist() {
     if (persistTimer !== undefined) {
       clearTimeout(persistTimer);
@@ -112,6 +119,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
       // Keep the first edit durable immediately; coalesce subsequent keystrokes.
       persist();
     }
+
     persistTimer = setTimeout(() => {
       persistTimer = undefined;
       persist();
@@ -121,6 +129,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
   watch(options.form, schedulePersist, { deep: true, flush: 'sync' });
 
   function accept() {
+    clearPersistTimer();
     clean.value = JSON.stringify(options.form);
     restored.value = false;
     changedSource.value = false;
@@ -158,10 +167,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
 
   function beforeUnload(event: BeforeUnloadEvent) {
     if (dirty.value) {
-      if (persistTimer !== undefined) {
-        clearTimeout(persistTimer);
-        persistTimer = undefined;
-      }
+      clearPersistTimer();
       persist();
       event.preventDefault();
       event.returnValue = '';
@@ -173,6 +179,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
     options.scope,
     (next) => {
       if (next !== scope) {
+        clearPersistTimer();
         suspended = true;
         Object.assign(options.form, JSON.parse(initial));
         restored.value = false;
@@ -182,10 +189,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
     { flush: 'sync' },
   );
   onUnmounted(() => {
-    if (persistTimer !== undefined) {
-      clearTimeout(persistTimer);
-      persistTimer = undefined;
-    }
+    clearPersistTimer();
     persist();
     removeGuard();
     window.removeEventListener('beforeunload', beforeUnload);

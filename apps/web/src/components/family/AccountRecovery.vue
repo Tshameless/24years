@@ -38,14 +38,37 @@ function downloadKey() {
 </script>
 
 <template>
-  <div v-if="recoveryKey" class="form-grid">
+  <div
+    v-if="recoveryKey"
+    class="form-grid"
+  >
     <p role="status">密码已重置，旧密钥已失效。请保存新的恢复密钥，只在本次操作后显示。</p>
     <label class="field">
       新恢复密钥
-      <textarea :value="recoveryKey" readonly rows="3" spellcheck="false" />
+      <textarea
+        :value="recoveryKey"
+        readonly
+        rows="3"
+        spellcheck="false"
+      />
     </label>
-    <button type="button" class="button button-secondary" @click="downloadKey">下载新恢复密钥</button>
-    <button type="button" class="text-button" @click="cloud.dismissRecoveryKey(); emit('recovered')">已保存，返回登录</button>
+    <button
+      type="button"
+      class="button button-secondary"
+      @click="downloadKey"
+    >
+      下载新恢复密钥
+    </button>
+    <button
+      type="button"
+      class="text-button"
+      @click="
+        cloud.dismissRecoveryKey();
+        emit('recovered');
+      "
+    >
+      已保存，返回登录
+    </button>
   </div>
   <form
     v-else
