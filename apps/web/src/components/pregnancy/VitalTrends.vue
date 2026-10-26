@@ -24,6 +24,20 @@ const secondary = computed(
       .map((point) => `${point.x},${point.y2}`)
       .join(' ') ?? '',
 );
+
+const alertY = computed(() => {
+  if (metric.value !== 'bloodPressure' || !plot.value) {
+    return null;
+  }
+
+  const { low, high } = plot.value;
+
+  if (140 < low || 140 > high) {
+    return null;
+  }
+
+  return 160 - ((140 - low) / (high - low)) * 130;
+});
 </script>
 
 <template>
@@ -121,6 +135,14 @@ const secondary = computed(
         >
           {{ entries[entries.length - 1]?.date }}
         </text>
+        <line
+          v-if="alertY !== null"
+          x1="55"
+          :y1="alertY"
+          x2="545"
+          :y2="alertY"
+          class="alert-guideline"
+        />
         <polyline
           :points="primary"
           class="primary-line"
@@ -153,6 +175,12 @@ const secondary = computed(
           </circle>
         </g>
       </svg>
+      <p
+        v-if="metric === 'bloodPressure' && alertY !== null"
+        class="muted alert-caption"
+      >
+        红色警戒参考线：140 mmHg（妊娠期高血压警戒线，参考中国妇产学会指南）。
+      </p>
       <details>
         <summary>查看趋势数据（{{ entries.length }} 条）</summary>
         <div class="trend-table">
@@ -233,6 +261,19 @@ const secondary = computed(
 
 .secondary-point {
   fill: var(--green);
+}
+
+.alert-guideline {
+  stroke: var(--primary);
+  stroke-dasharray: 4 4;
+  stroke-width: 1.5;
+  opacity: 70%;
+}
+
+.alert-caption {
+  margin: 6px 0 14px;
+  font-size: 12px;
+  color: var(--primary);
 }
 
 .trend-table {

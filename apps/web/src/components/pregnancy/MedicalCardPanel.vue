@@ -90,6 +90,13 @@ async function submit() {
         <dt>过敏史、用药与其他备注</dt>
         <dd class="record-notes">{{ card?.notes || '尚未填写' }}</dd>
       </dl>
+      <div
+        v-if="card?.notes && (card.notes.includes('过敏') || card.notes.includes('禁忌'))"
+        class="allergy-alert"
+      >
+        <strong>⚠️ 用药安全警示</strong>
+        <p>{{ card.notes }}</p>
+      </div>
       <p class="muted">就诊时请同时携带正式证件和病历。点击电话号码可调用设备拨号功能。</p>
     </section>
     <section class="panel">
@@ -190,5 +197,20 @@ dd {
 
 .medical-card {
   background: linear-gradient(135deg, var(--green-light), var(--surface));
+}
+
+.allergy-alert {
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: var(--pink-light);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  color: var(--primary);
+  font-size: 13px;
+}
+
+.allergy-alert strong {
+  display: block;
+  margin-bottom: 4px;
 }
 </style>

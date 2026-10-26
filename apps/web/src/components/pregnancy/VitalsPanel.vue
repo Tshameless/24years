@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import VitalTrends from './VitalTrends.vue';
+import { assessVital } from '@/domain/vitalTrends';
 import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
 
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
@@ -94,11 +95,27 @@ async function submit() {
         >
           <div class="record-heading">
             <strong>{{ labels[item.metric] }}</strong>
-            <span class="numbers">
-              {{ item.value }}{{ item.secondary === null ? '' : ` / ${item.secondary}` }}
-            </span>
+            <div class="vital-value-group">
+              <span class="numbers">
+                {{ item.value }}{{ item.secondary === null ? '' : ` / ${item.secondary}` }}
+              </span>
+              <span
+                class="tag"
+                :class="`vital-badge-${assessVital(item.metric, item.value, item.secondary, item.context).level}`"
+              >
+                {{ assessVital(item.metric, item.value, item.secondary, item.context).badge }}
+              </span>
+            </div>
           </div>
           <p class="muted">{{ item.date }} · {{ item.time || '时间未记录' }}</p>
+          <p
+            v-if="
+              assessVital(item.metric, item.value, item.secondary, item.context).level === 'warning'
+            "
+            class="vital-warning-tip"
+          >
+            ⚠️ {{ assessVital(item.metric, item.value, item.secondary, item.context).tip }}
+          </p>
           <p
             v-if="item.context"
             class="record-notes"
@@ -258,3 +275,34 @@ async function submit() {
     </section>
   </div>
 </template>
+
+<style scoped>
+.vital-value-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vital-badge-warning {
+  background: var(--pink-light);
+  color: var(--primary);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+.vital-badge-attention {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.vital-warning-tip {
+  margin: 6px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--primary);
+  background: var(--pink-light);
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+</style>

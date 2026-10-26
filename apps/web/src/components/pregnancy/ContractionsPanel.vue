@@ -2,6 +2,7 @@
 import { createId } from '@/domain/id';
 import { computed, onMounted, onUnmounted, shallowRef } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
+import { analyzeContractions } from '@/domain/contractions';
 import type { PregnancyRecord } from '@/domain/family';
 
 type Contraction = Extract<PregnancyRecord, { type: 'contraction' }>;
@@ -13,6 +14,7 @@ const entries = computed(() =>
     .sort((a, b) => b.startedAt - a.startedAt),
 );
 const active = computed(() => entries.value.find((item) => item.endedAt === null));
+const analysis = computed(() => analyzeContractions(entries.value, now.value));
 let draft: Contraction | null = null;
 let interval: ReturnType<typeof setInterval>;
 onMounted(() => {
@@ -81,6 +83,47 @@ async function toggle() {
       <p class="muted timer-note">
         以开始、结束时间计算。刷新页面后可继续结束正在记录的一次；关闭页面不会自动结束。请及时结束记录，修改系统时间可能影响时长。
       </p>
+      <div
+        v-if="analysis.completedCount > 0"
+        class="pattern-card"
+        :class="`pattern-${analysis.status}`"
+      >
+        <div class="pattern-header">
+          <strong>{{ analysis.title }}</strong>
+          <span class="tag">{{ analysis.badge }}</span>
+        </div>
+        <p class="pattern-advice">{{ analysis.advice }}</p>
+        <div
+          v-if="analysis.avgIntervalMinutes !== null"
+          class="pattern-stats"
+        >
+          <span>
+            平均间隔：
+            <strong>{{ analysis.avgIntervalMinutes }} 分钟</strong>
+          </span>
+          <span>
+            平均持续：
+            <strong>{{ analysis.avgDurationSeconds }} 秒</strong>
+          </span>
+        </div>
+        <div
+          v-if="analysis.matches511"
+          class="pattern-actions"
+        >
+          <RouterLink
+            to="/pregnancy?tab=medicalCard"
+            class="button button-primary"
+          >
+            就医卡 / 医院电话
+          </RouterLink>
+          <RouterLink
+            to="/pregnancy?tab=packing"
+            class="button"
+          >
+            核对待产包
+          </RouterLink>
+        </div>
+      </div>
       <p class="muted">此工具仅记录时间，不判断是否临产；如有不适或疑问，请联系医护人员。</p>
       <p
         v-if="error"
@@ -152,5 +195,47 @@ async function toggle() {
 
 .timer-note {
   margin-top: 24px;
+}
+
+.pattern-card {
+  margin: 20px 0;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.pattern-card.pattern-active_labor_511 {
+  background: var(--pink-light);
+  border-color: var(--primary);
+}
+
+.pattern-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pattern-advice {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  margin: 6px 0;
+}
+
+.pattern-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  margin: 10px 0;
+  color: var(--text-secondary);
+}
+
+.pattern-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
 }
 </style>
