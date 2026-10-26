@@ -8,46 +8,9 @@ import type {
 } from '@/domain/collaboration';
 import { canonicalJson, type FamilyData } from '@/domain/family';
 import { CLOUD_CACHE_KEY, readCloudCache } from './cloudCache';
+import { parseCloudResponse, request, RequestError } from './cloudClient';
 
 const ACTIVE_KEY = '24years.cloud.active';
-
-class RequestError extends Error {
-  status: number;
-  state?: SessionState;
-
-  constructor(status: number, message: string, state?: SessionState) {
-    super(message);
-    this.status = status;
-    this.state = state;
-  }
-}
-
-async function request(
-  path: string,
-  body?: unknown,
-): Promise<
-  SessionState & {
-    invitation?: { code: string; expiresAt: string };
-    recoveryKey?: string;
-    backupData?: FamilyData;
-  }
-> {
-  const response = await fetch(`/api/${path}`, {
-    method: body === undefined ? 'GET' : 'POST',
-    headers:
-      body === undefined ? {} : { 'Content-Type': 'application/json', 'X-24Years-Client': 'web' },
-    credentials: 'same-origin',
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(10000),
-  });
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new RequestError(response.status, result.message ?? '请求失败，请重试。', result.state);
-  }
-
-  return result;
-}
 
 export function useCollaboration(enabled = true) {
   const state = shallowRef<SessionState>({ user: null, family: null });
@@ -223,14 +186,10 @@ export function useCollaboration(enabled = true) {
         return;
       }
 
-      const next = await response.json();
+      const next = await parseCloudResponse(response);
 
       if (startedAt !== generation || disposed) {
         return;
-      }
-
-      if (!response.ok) {
-        throw new RequestError(response.status, next.message ?? '请求失败，请重试。');
       }
 
       etag = response.headers.get('ETag') ?? '';

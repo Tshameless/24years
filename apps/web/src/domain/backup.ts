@@ -15,11 +15,21 @@ export function readFamilyBackup(raw: string): FamilyData {
   }
 }
 
-export function downloadBackup(raw: string, filename: string) {
-  const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
+export function downloadBackup(
+  raw: string,
+  filename: string,
+  type = 'application/json;charset=utf-8',
+) {
+  const url = URL.createObjectURL(new Blob([raw], { type }));
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  try {
+    document.body?.appendChild(link);
+    link.click();
+  } finally {
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 }

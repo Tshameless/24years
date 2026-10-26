@@ -1,3 +1,4 @@
+import { downloadBackup } from './backup';
 import { type Expense, type ExpenseCategory } from './family';
 
 export type LedgerCategory = '全部' | '津贴' | ExpenseCategory;
@@ -66,18 +67,5 @@ export function ledgerCsv(expenses: readonly Expense[]): string {
 }
 
 export function downloadLedgerCsv(expenses: readonly Expense[], filename: string) {
-  const url = URL.createObjectURL(
-    new Blob([ledgerCsv(expenses)], { type: 'text/csv;charset=utf-8' }),
-  );
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-
-  try {
-    document.body.appendChild(link);
-    link.click();
-  } finally {
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
+  downloadBackup(ledgerCsv(expenses), filename, 'text/csv;charset=utf-8');
 }

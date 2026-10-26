@@ -171,3 +171,35 @@ it('reuses ETag without decoding 304 and pauses hidden polling', async () => {
     wrapper.unmount();
   }
 });
+
+it('preserves cached family when a captive portal or gateway returns non-session responses', async () => {
+  const state = snapshot();
+  cache(state);
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response('<html>captive portal</html>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      }),
+    )
+    .mockResolvedValueOnce(new Response('<html>502 Bad Gateway</html>', { status: 502 }));
+  vi.stubGlobal('fetch', fetcher);
+  const { cloud, wrapper } = mountCloud();
+
+  try {
+    await flushPromises();
+    expect(cloud.online.value).toBe(false);
+    expect(cloud.expired.value).toBe(false);
+    expect(cloud.state.value).toEqual(state);
+    expect(readCloudCache()).toEqual(state);
+
+    await cloud.refresh();
+    expect(cloud.online.value).toBe(false);
+    expect(cloud.expired.value).toBe(false);
+    expect(cloud.state.value).toEqual(state);
+    expect(readCloudCache()).toEqual(state);
+  } finally {
+    wrapper.unmount();
+  }
+});
