@@ -43,6 +43,9 @@ const MentalScreeningPanel = defineAsyncComponent(
 const UltrasoundPanel = defineAsyncComponent(
   () => import('@/components/pregnancy/UltrasoundPanel.vue'),
 );
+const SymptomsPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/SymptomsPanel.vue'),
+);
 
 const { data, locked, cloud } = useFamily();
 const route = useRoute();
@@ -79,6 +82,7 @@ const tabGroups = [
       { id: 'checkups', label: '产检安排', component: CheckupsPanel },
       { id: 'vitals', label: '体征记录', component: VitalsPanel },
       { id: 'ultrasound', label: '超声指标', component: UltrasoundPanel },
+      { id: 'symptoms', label: '症状观察', component: SymptomsPanel },
     ],
   },
   {

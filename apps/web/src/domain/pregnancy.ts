@@ -45,6 +45,7 @@ export type PregnancyRecord =
       date: string;
       score: number;
       selfHarm: boolean;
+      answers?: readonly number[];
       notes: string;
     }
   | {
@@ -58,6 +59,14 @@ export type PregnancyRecord =
       hc?: number;
       afi?: number;
       umbilicalSd?: number;
+      notes: string;
+    }
+  | {
+      id: string;
+      type: 'symptom';
+      date: string;
+      symptoms: readonly string[];
+      severity: 'mild' | 'moderate' | 'severe';
       notes: string;
     }
   | {
@@ -187,6 +196,10 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         value.score >= 0 &&
         value.score <= 30 &&
         typeof value.selfHarm === 'boolean' &&
+        (value.answers === undefined ||
+          (Array.isArray(value.answers) &&
+            value.answers.length === 10 &&
+            value.answers.every((answer) => Number.isInteger(answer) && answer >= 0 && answer <= 3))) &&
         note(value.notes)
       );
     case 'ultrasound':
@@ -199,6 +212,15 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         ['bpd', 'fl', 'ac', 'hc', 'afi', 'umbilicalSd'].every((key) =>
           value[key] === undefined || (typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0),
         ) &&
+        note(value.notes)
+      );
+    case 'symptom':
+      return (
+        isDate(value.date) &&
+        Array.isArray(value.symptoms) &&
+        value.symptoms.length <= 12 &&
+        value.symptoms.every((item) => shortText(item, 40)) &&
+        ['mild', 'moderate', 'severe'].includes(String(value.severity)) &&
         note(value.notes)
       );
     case 'packing':

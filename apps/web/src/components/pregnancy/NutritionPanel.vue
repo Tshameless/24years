@@ -30,6 +30,10 @@ async function submit() {
     <section class="panel">
       <div class="panel-heading"><h2>营养与补剂记录</h2><span class="tag">{{ entries.length }} 天</span></div>
       <p class="muted">记录今天是否完成饮水、优质蛋白、蔬菜和遵医嘱补剂。这里不替代个体化营养方案。</p>
+      <div class="nutrition-guide">
+        <strong>按阶段提醒</strong>
+        <p>孕早期优先保证能进食和补水；孕中晚期关注多样饮食、蛋白质和铁钙来源。补剂剂量、咖啡因和特殊饮食请按产科或营养科建议。</p>
+      </div>
       <p v-if="!entries.length" class="empty-state">从今天的四项小记录开始。</p>
       <ul v-else class="record-list">
         <li v-for="item in entries" :key="item.id">
@@ -57,3 +61,18 @@ async function submit() {
     </section>
   </div>
 </template>
+
+<style scoped>
+.nutrition-guide {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--green-light);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.nutrition-guide p {
+  margin: 4px 0 0;
+}
+</style>
