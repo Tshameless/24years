@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ageInMonthsAt,
   correctedAgeInMonthsAt,
+  formatGrowthAge,
   validGrowthRecord,
   type ChildGrowthRecord,
 } from './growth.ts';
@@ -67,5 +68,11 @@ describe('correctedAgeInMonthsAt', () => {
     expect(correctedAgeInMonthsAt('2026-01-01', '2026-02-26', 32)).toBe(0);
     expect(correctedAgeInMonthsAt('2026-01-01', '2026-03-26', 32)).toBe(1);
     expect(correctedAgeInMonthsAt('2026-01-01', '2026-03-01', 37)).toBeNull();
+  });
+
+  it('formats record age with corrected months within 24 months for preterm children', () => {
+    expect(formatGrowthAge('2026-01-01', '2026-04-01', 32)).toBe('3 个月（矫正 1 个月）');
+    expect(formatGrowthAge('2026-01-01', '2028-02-01', 32)).toBe('25 个月');
+    expect(formatGrowthAge('2026-01-01', '2026-04-01', 39)).toBe('3 个月');
   });
 });

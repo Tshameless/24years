@@ -9,6 +9,9 @@ type Nutrition = Extract<PregnancyRecord, { type: 'nutrition' }>;
 const {
   records,
   careDisabled: disabled,
+  careMinDate,
+  careMaxDate,
+  canEditCareRecord,
   error,
   message,
   reportError,
@@ -107,14 +110,14 @@ async function submit() {
           <div class="record-actions">
             <button
               class="text-button"
-              :disabled="disabled"
+              :disabled="disabled || !canEditCareRecord(item)"
               @click="edit(item)"
             >
               编辑
             </button>
             <button
               class="text-button"
-              :disabled="disabled"
+              :disabled="disabled || !canEditCareRecord(item)"
               @click="remove(item)"
             >
               删除
@@ -147,7 +150,8 @@ async function submit() {
             <input
               v-model="form.date"
               type="date"
-              :max="localDate()"
+              :min="careMinDate"
+              :max="careMaxDate"
             />
           </label>
           <label class="check-option">

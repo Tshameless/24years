@@ -204,6 +204,7 @@ test('更正分娩结局时取消删除会保留孩子并解除自动关联', as
   const dialogMessages: string[] = [];
   page.on('dialog', async (dialog) => {
     dialogMessages.push(dialog.message());
+
     if (dialogMessages.length === 1) {
       await dialog.accept();
     } else {

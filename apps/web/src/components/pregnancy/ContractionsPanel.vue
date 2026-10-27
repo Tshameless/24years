@@ -128,7 +128,10 @@ async function toggle() {
           </RouterLink>
         </div>
       </div>
-      <p class="muted">此工具仅记录时间，不判断是否临产；如有不适或疑问，请联系医护人员。</p>
+      <p class="muted">
+        此工具记录宫缩时间并提供 5-1-1
+        规律统计参考，不替代临床临产诊断；如有不适或疑问，请联系医护人员。
+      </p>
       <p
         v-if="error"
         class="form-error"

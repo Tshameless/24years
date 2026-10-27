@@ -86,7 +86,7 @@ test('计划草稿刷新恢复，拒绝离开保留页面，保存后清理', as
   await expect(page.getByText(/未提交草稿已暂存/)).toBeVisible();
   page.once('dialog', (dialog) => dialog.dismiss());
   await page.getByRole('link', { name: '家庭账本', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:4173/tasks');
+  await expect(page).toHaveURL(/\/tasks$/);
   page.once('dialog', (dialog) => dialog.accept());
   await page.reload();
   await expect(page.getByLabel('计划名称')).toHaveValue('带齐检查资料');

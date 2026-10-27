@@ -3,6 +3,7 @@ import { useFamily } from './useFamily';
 import {
   isPostpartumCareRecord,
   localDate,
+  postpartumWindowEnd,
   pregnancyOutcome,
   withinPostpartumWindow,
   type PregnancyChange,
@@ -19,12 +20,36 @@ export function usePregnancyRecords() {
   const outcomeDisabled = computed(() => store.recordLocked.value || busy.value);
   const disabled = computed(() => outcomeDisabled.value || !!outcome.value);
   const careDisabled = computed(
-    () =>
-      outcomeDisabled.value ||
-      (!!outcome.value &&
-        (outcome.value.kind !== 'birth' ||
-          !withinPostpartumWindow(outcome.value.date, localDate()))),
+    () => outcomeDisabled.value || (!!outcome.value && outcome.value.kind !== 'birth'),
   );
+  const careMinDate = computed(() =>
+    outcome.value?.kind === 'birth' ? outcome.value.date : undefined,
+  );
+  const careMaxDate = computed(() => {
+    const today = localDate();
+
+    if (outcome.value?.kind === 'birth') {
+      const end = postpartumWindowEnd(outcome.value.date);
+
+      return end < today ? end : today;
+    }
+
+    return today;
+  });
+
+  function canEditCareRecord(record: PregnancyRecord): boolean {
+    if (outcomeDisabled.value || !isPostpartumCareRecord(record)) {
+      return false;
+    }
+
+    if (!outcome.value) {
+      return true;
+    }
+
+    return (
+      outcome.value.kind === 'birth' && withinPostpartumWindow(outcome.value.date, record.date)
+    );
+  }
 
   async function persist(change: PregnancyChange, allowedType?: 'outcome' | 'postpartum' | 'care') {
     if (
@@ -44,6 +69,9 @@ export function usePregnancyRecords() {
         !isPostpartumCareRecord(record) ||
         (outcome.value &&
           (outcome.value.kind !== 'birth' ||
+            (change.before &&
+              (!isPostpartumCareRecord(change.before) ||
+                !withinPostpartumWindow(outcome.value.date, change.before.date))) ||
             !withinPostpartumWindow(outcome.value.date, record.date)))
       ) {
         return false;
@@ -103,6 +131,9 @@ export function usePregnancyRecords() {
     outcome,
     disabled,
     careDisabled,
+    careMinDate,
+    careMaxDate,
+    canEditCareRecord,
     outcomeDisabled,
     message: readonly(message),
     error: readonly(error),

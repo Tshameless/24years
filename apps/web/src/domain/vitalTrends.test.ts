@@ -88,5 +88,11 @@ describe('vitalTrends domain', () => {
     expect(assessVital('glucose', 5.3, null, '晨起空腹').level).toBe('warning');
     expect(assessVital('glucose', 7.5, null, '午餐后2小时').level).toBe('normal');
     expect(assessVital('glucose', 9.1, null, '午餐后2小时').level).toBe('warning');
+    expect(assessVital('glucose', 5.5, null, '晨起空腹', { postpartum: true }).level).toBe(
+      'normal',
+    );
+    expect(assessVital('glucose', 6.3, null, '晨起空腹', { postpartum: true }).level).toBe(
+      'warning',
+    );
   });
 });

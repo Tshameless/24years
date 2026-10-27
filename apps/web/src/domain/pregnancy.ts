@@ -133,6 +133,7 @@ export type PregnancyRecord =
       mode?: 'vaginal' | 'cesarean' | 'assisted' | 'unknown';
       location?: string;
       babyName?: string;
+      birthGestationalWeeks?: number;
       birthWeightGrams?: number;
       birthLengthCm?: number;
       headCircumferenceCm?: number;
@@ -156,12 +157,17 @@ export function isPostpartumCareRecord(
   return ['mood', 'nutrition', 'mentalScreening', 'vital'].includes(record.type);
 }
 
-export function withinPostpartumWindow(outcomeDate: string, recordDate: string): boolean {
-  const end = new Date(`${outcomeDate}T00:00:00Z`);
-  end.setUTCFullYear(end.getUTCFullYear() + 2);
-  const endDate = end.toISOString().slice(0, 10);
+export function postpartumWindowEnd(outcomeDate: string): string {
+  const [year, month, day] = outcomeDate.split('-').map(Number);
+  const targetYear = year + 2;
+  const maxDay = new Date(Date.UTC(targetYear, month, 0)).getUTCDate();
+  const clampedDay = Math.min(day, maxDay);
 
-  return recordDate >= outcomeDate && recordDate <= endDate;
+  return `${targetYear}-${String(month).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`;
+}
+
+export function withinPostpartumWindow(outcomeDate: string, recordDate: string): boolean {
+  return recordDate >= outcomeDate && recordDate <= postpartumWindowEnd(outcomeDate);
 }
 
 export interface PregnancyChange {
@@ -354,6 +360,7 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
           value.mode === undefined &&
           value.location === undefined &&
           value.babyName === undefined &&
+          value.birthGestationalWeeks === undefined &&
           value.birthWeightGrams === undefined &&
           value.birthLengthCm === undefined &&
           value.headCircumferenceCm === undefined &&
@@ -370,6 +377,11 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
           (typeof value.location === 'string' && value.location.length <= 100)) &&
         (value.babyName === undefined ||
           (typeof value.babyName === 'string' && value.babyName.length <= 40)) &&
+        (value.birthGestationalWeeks === undefined ||
+          (typeof value.birthGestationalWeeks === 'number' &&
+            Number.isInteger(value.birthGestationalWeeks) &&
+            value.birthGestationalWeeks >= 20 &&
+            value.birthGestationalWeeks <= 45)) &&
         (value.birthWeightGrams === undefined ||
           (typeof value.birthWeightGrams === 'number' &&
             Number.isInteger(value.birthWeightGrams) &&
@@ -520,12 +532,19 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
     isPostpartumCareRecord((before ?? value)!) &&
     isPostpartumCareRecord(currentCareRecord)
   ) {
-
     if (
       currentOutcome.kind !== 'birth' ||
+      (before &&
+        (!isPostpartumCareRecord(before) ||
+          !withinPostpartumWindow(currentOutcome.date, before.date))) ||
       !withinPostpartumWindow(currentOutcome.date, currentCareRecord.date)
     ) {
-      throw new PregnancyChangeError('产后身心记录仅可在分娩后 24 个月内保存。', 409);
+      throw new PregnancyChangeError(
+        before && isPostpartumCareRecord(before) && before.date < currentOutcome.date
+          ? '孕期记录已结束，分娩前的历史记录仅供查阅。'
+          : '产后身心记录仅可在分娩后 24 个月内保存。',
+        409,
+      );
     }
   }
 

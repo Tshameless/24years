@@ -29,6 +29,7 @@ const syncedChild = computed(() => {
 const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
   type: 'outcome',
   initial: outcome.value,
+  optionalFields: ['birthGestationalWeeks'],
   defaults: () => ({
     kind: 'birth',
     date: localDate(),
@@ -36,6 +37,7 @@ const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
     mode: 'unknown',
     location: '',
     babyName: '',
+    birthGestationalWeeks: '',
     birthWeightGrams: '',
     birthLengthCm: '',
     headCircumferenceCm: '',
@@ -50,6 +52,7 @@ const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
     mode: item.mode ?? 'unknown',
     location: item.location ?? '',
     babyName: item.babyName ?? '',
+    birthGestationalWeeks: String(item.birthGestationalWeeks ?? ''),
     birthWeightGrams: String(item.birthWeightGrams ?? ''),
     birthLengthCm: String(item.birthLengthCm ?? ''),
     headCircumferenceCm: String(item.headCircumferenceCm ?? ''),
@@ -59,6 +62,7 @@ const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
   }),
 });
 const measurements = [
+  { key: 'birthGestationalWeeks', label: '出生孕周（周，可留空）', max: 45, step: 1, min: 20 },
   { key: 'birthWeightGrams', label: '出生体重（克）', max: 10000, step: 1, min: 1 },
   { key: 'birthLengthCm', label: '出生身长（厘米）', max: 100, step: 0.1, min: 0.1 },
   { key: 'headCircumferenceCm', label: '头围（厘米）', max: 100, step: 0.1, min: 0.1 },
@@ -108,7 +112,8 @@ function childChangeWhenEnding(outcome: PregnancyOutcome | null) {
     return { before: child, value: null };
   }
 
-  const { sourceOutcomeId: _sourceOutcomeId, ...detached } = child;
+  const detached = { ...child };
+  delete detached.sourceOutcomeId;
 
   return { before: child, value: detached };
 }
@@ -185,12 +190,18 @@ async function submit() {
 
   if (birth.value) {
     const babyName = form.babyName.trim() || '宝宝';
+    const birthGestationalWeeks = form.birthGestationalWeeks
+      ? Number(form.birthGestationalWeeks)
+      : previousOutcome?.birthGestationalWeeks !== undefined
+        ? undefined
+        : linkedChild?.birthGestationalWeeks;
     const child: Child = {
       ...linkedChild,
       id: linkedChild?.id ?? childIdForOutcome(value.id),
       name: babyName,
       birthDate: value.date,
       sourceOutcomeId: value.id,
+      ...(birthGestationalWeeks !== undefined ? { birthGestationalWeeks } : {}),
       birthWeightGrams: form.birthWeightGrams ? Number(form.birthWeightGrams) : undefined,
       birthLengthCm: form.birthLengthCm ? Number(form.birthLengthCm) : undefined,
       headCircumferenceCm: form.headCircumferenceCm ? Number(form.headCircumferenceCm) : undefined,
@@ -200,6 +211,11 @@ async function submit() {
           ? undefined
           : linkedChild?.notes,
     };
+
+    if (birthGestationalWeeks === undefined) {
+      delete child.birthGestationalWeeks;
+    }
+
     change.child = { before: linkedChild, value: child };
   } else if (previousOutcome?.kind === 'birth') {
     change.child = childChangeWhenEnding(previousOutcome) ?? undefined;

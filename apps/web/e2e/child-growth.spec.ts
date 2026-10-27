@@ -139,7 +139,18 @@ test('生长记录编辑草稿恢复原记录 ID，并在档案变化后阻止�
     await tracker.locator('.history-table-wrap').evaluate((element) => {
       element.scrollLeft = element.scrollWidth;
     });
-    await tracker.getByRole('button', { name: `编辑 ${recordDate} 的测量记录` }).click();
+    const editButton = tracker.getByRole('button', { name: `编辑 ${recordDate} 的测量记录` });
+    await editButton.evaluate((button) =>
+      button.scrollIntoView({ block: 'center', inline: 'center' }),
+    );
+
+    if (test.info().project.name === 'mobile') {
+      const bounds = await editButton.boundingBox();
+      expect(bounds).not.toBeNull();
+      await page.touchscreen.tap(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+    } else {
+      await editButton.click();
+    }
   };
 
   await editRecord();
@@ -160,7 +171,21 @@ test('生长记录编辑草稿恢复原记录 ID，并在档案变化后阻止�
   await restoredTracker.locator('.history-table-wrap').evaluate((element) => {
     element.scrollLeft = element.scrollWidth;
   });
-  await restoredTracker.getByRole('button', { name: `编辑 ${recordDate} 的测量记录` }).click();
+  const restoredEditButton = restoredTracker.getByRole('button', {
+    name: `编辑 ${recordDate} 的测量记录`,
+  });
+  await restoredEditButton.evaluate((button) =>
+    button.scrollIntoView({ block: 'center', inline: 'center' }),
+  );
+
+  if (test.info().project.name === 'mobile') {
+    const bounds = await restoredEditButton.boundingBox();
+    expect(bounds).not.toBeNull();
+    await page.touchscreen.tap(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+  } else {
+    await restoredEditButton.click();
+  }
+
   await restoredTracker.getByLabel('测量备注（就医或家庭测量）').fill('不应覆盖远端更新');
   await page.evaluate(() => {
     const family = JSON.parse(localStorage.getItem('24years.family.v1')!);

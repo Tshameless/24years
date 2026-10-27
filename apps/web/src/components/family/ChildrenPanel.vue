@@ -343,6 +343,9 @@ const genderLabels: Record<string, string> = {
             出生日期：
             <strong>{{ child.birthDate }}</strong>
           </span>
+          <span v-if="child.birthGestationalWeeks">
+            出生孕周：{{ child.birthGestationalWeeks }} 周
+          </span>
           <span v-if="child.birthWeightGrams">出生体重：{{ child.birthWeightGrams }} g</span>
           <span v-if="child.birthLengthCm">出生身长：{{ child.birthLengthCm }} cm</span>
           <span v-if="child.headCircumferenceCm">出生头围：{{ child.headCircumferenceCm }} cm</span>

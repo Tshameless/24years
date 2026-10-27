@@ -11,7 +11,11 @@ import FormDraftNotice from '@/components/FormDraftNotice.vue';
 type Vital = Extract<PregnancyRecord, { type: 'vital' }>;
 const {
   records,
+  outcome,
   careDisabled: disabled,
+  careMinDate,
+  careMaxDate,
+  canEditCareRecord,
   message,
   error,
   reportError,
@@ -20,6 +24,13 @@ const {
 } = usePregnancyRecords();
 const labels = { weight: '体重（kg）', bloodPressure: '血压（mmHg）', glucose: '血糖（mmol/L）' };
 const glucoseContexts = ['空腹', '餐后1小时', '餐后2小时', '随机', '其他'];
+
+function assessItem(item: Vital) {
+  return assessVital(item.metric, item.value, item.secondary, item.context, {
+    postpartum: outcome.value?.kind === 'birth' && item.date >= outcome.value.date,
+  });
+}
+
 const entries = computed(() =>
   records.value
     .filter((item): item is Vital => item.type === 'vital')
@@ -94,7 +105,7 @@ async function submit() {
         <h2>体征历史</h2>
         <span class="tag">{{ entries.length }} 条</span>
       </div>
-      <p class="muted">保留测量值供就医时参考，不提供诊断或正常范围判断。</p>
+      <p class="muted">保留测量值与常规参考区间供就医时核对，不替代临床诊断。</p>
       <p
         v-if="!entries.length"
         class="empty-state"
@@ -117,20 +128,18 @@ async function submit() {
               </span>
               <span
                 class="tag"
-                :class="`vital-badge-${assessVital(item.metric, item.value, item.secondary, item.context).level}`"
+                :class="`vital-badge-${assessItem(item).level}`"
               >
-                {{ assessVital(item.metric, item.value, item.secondary, item.context).badge }}
+                {{ assessItem(item).badge }}
               </span>
             </div>
           </div>
           <p class="muted">{{ item.date }} · {{ item.time || '时间未记录' }}</p>
           <p
-            v-if="
-              assessVital(item.metric, item.value, item.secondary, item.context).level === 'warning'
-            "
+            v-if="assessItem(item).level === 'warning'"
             class="vital-warning-tip"
           >
-            ⚠️ {{ assessVital(item.metric, item.value, item.secondary, item.context).tip }}
+            ⚠️ {{ assessItem(item).tip }}
           </p>
           <p
             v-if="item.context"
@@ -147,14 +156,14 @@ async function submit() {
           <div class="record-actions">
             <button
               class="text-button"
-              :disabled="disabled"
+              :disabled="disabled || !canEditCareRecord(item)"
               @click="edit(item)"
             >
               编辑
             </button>
             <button
               class="text-button"
-              :disabled="disabled"
+              :disabled="disabled || !canEditCareRecord(item)"
               @click="remove(item)"
             >
               删除
@@ -200,7 +209,8 @@ async function submit() {
               v-model="form.date"
               type="date"
               required
-              :max="localDate()"
+              :min="careMinDate"
+              :max="careMaxDate"
             />
           </label>
           <label class="field">

@@ -42,6 +42,7 @@ export {
   PregnancyChangeError,
   pregnancyOutcome,
   isPostpartumCareRecord,
+  postpartumWindowEnd,
   withinPostpartumWindow,
   validPregnancyLifecycle,
   validPregnancyRecord,
@@ -62,6 +63,7 @@ export {
 export {
   ageInMonthsAt,
   correctedAgeInMonthsAt,
+  formatGrowthAge,
   validGrowthRecord,
   type ChildGrowthRecord,
   type GrowthMetric,

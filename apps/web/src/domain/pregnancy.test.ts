@@ -215,6 +215,50 @@ describe('孕期记录和原子入账', () => {
         value: { ...mood, date: '2028-01-02' },
       }),
     ).toThrow('24 个月内');
+
+    const preBirthMood: PregnancyRecord = {
+      id: 'pre-birth-mood',
+      type: 'mood',
+      date: '2025-12-15',
+      title: '平静',
+      notes: '',
+    };
+    const withPreBirth = {
+      ...data,
+      pregnancyRecords: [preBirthMood, birth],
+    };
+
+    expect(() =>
+      applyPregnancyChange(withPreBirth, {
+        type: 'pregnancy',
+        before: preBirthMood,
+        value: { ...preBirthMood, date: '2026-01-10', notes: '尝试修改孕期历史' },
+      }),
+    ).toThrow('仅供查阅');
+
+    const leapBirth: PregnancyRecord = {
+      ...birth,
+      date: '2024-02-29',
+    };
+    const leapData = {
+      ...data,
+      pregnancyRecords: [leapBirth],
+    };
+
+    expect(
+      applyPregnancyChange(leapData, {
+        type: 'pregnancy',
+        before: null,
+        value: { ...mood, date: '2026-02-28' },
+      }).pregnancyRecords,
+    ).toHaveLength(2);
+    expect(() =>
+      applyPregnancyChange(leapData, {
+        type: 'pregnancy',
+        before: null,
+        value: { ...mood, date: '2026-03-01' },
+      }),
+    ).toThrow('24 个月内');
   });
   it('产检和费用一起保存，旧快照不能覆盖，失败不修改输入', () => {
     const data = { ...emptyFamily(), pregnancyRecords: [checkup] };

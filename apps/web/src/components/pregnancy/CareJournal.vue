@@ -12,6 +12,9 @@ const {
   records,
   disabled: pregnancyDisabled,
   careDisabled,
+  careMinDate,
+  careMaxDate,
+  canEditCareRecord,
   save,
   saveCare,
   remove,
@@ -21,6 +24,8 @@ const {
   message,
 } = usePregnancyRecords();
 const disabled = computed(() => (kind === 'mood' ? careDisabled.value : pregnancyDisabled.value));
+const canEditEntry = (item: Entry) =>
+  kind === 'mood' ? !disabled.value && canEditCareRecord(item) : !disabled.value;
 const entries = computed(() =>
   records.value
     .filter((item): item is Entry => item.type === kind)
@@ -117,14 +122,14 @@ async function submit() {
           <div class="record-actions">
             <button
               class="text-button"
-              :disabled="disabled"
+              :disabled="!canEditEntry(item)"
               @click="edit(item)"
             >
               编辑
             </button>
             <button
               class="text-button"
-              :disabled="disabled"
+              :disabled="!canEditEntry(item)"
               @click="kind === 'mood' ? removeCare(item) : remove(item)"
             >
               删除
@@ -183,7 +188,8 @@ async function submit() {
               v-model="form.date"
               required
               type="date"
-              :max="localDate()"
+              :min="kind === 'mood' ? careMinDate : undefined"
+              :max="kind === 'mood' ? careMaxDate : localDate()"
             />
           </label>
           <label

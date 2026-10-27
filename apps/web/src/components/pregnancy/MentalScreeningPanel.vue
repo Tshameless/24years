@@ -21,6 +21,9 @@ const questions = [
 const {
   records,
   careDisabled: disabled,
+  careMinDate,
+  careMaxDate,
+  canEditCareRecord,
   error,
   message,
   reportError,
@@ -195,14 +198,15 @@ async function submit() {
         />
         <fieldset
           class="record-fields"
-          :disabled="disabled || stale"
+          :disabled="disabled || stale || (!!before && !canEditCareRecord(before))"
         >
           <label class="field">
             评估日期
             <input
               v-model="form.date"
               type="date"
-              :max="localDate()"
+              :min="careMinDate"
+              :max="careMaxDate"
             />
           </label>
           <p class="muted">

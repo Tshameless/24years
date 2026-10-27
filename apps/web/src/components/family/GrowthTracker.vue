@@ -5,6 +5,7 @@ import {
   ageInMonthsAt,
   correctedAgeInMonthsAt,
   dayDifference,
+  formatGrowthAge,
   localDate,
   sameValue,
   validChild,
@@ -71,6 +72,7 @@ const editingRecordId = computed(() => form.recordId || null);
 if (draft.dirty.value) {
   showRecordForm.value = true;
 }
+
 const correctedAge = computed(() => {
   const weeks = props.child.birthGestationalWeeks;
 
@@ -111,7 +113,7 @@ const plotData = computed(() => {
   const values = points.map((p) => p.value);
   const minVal = Math.floor(Math.min(...values) * 0.85);
   const maxVal = Math.ceil(Math.max(...values) * 1.15);
-  const maxMonth = Math.max(12, Math.ceil(Math.max(...points.map((p) => p.month))));
+  const maxMonth = Math.max(6, Math.ceil(Math.max(...points.map((p) => p.month))));
 
   const chartW = 340;
   const chartH = 140;
@@ -548,6 +550,7 @@ async function addReminder() {
           <thead>
             <tr>
               <th scope="col">日期</th>
+              <th scope="col">月龄</th>
               <th scope="col">体重（kg）</th>
               <th scope="col">身长（cm）</th>
               <th scope="col">头围（cm）</th>
@@ -561,6 +564,9 @@ async function addReminder() {
               :key="record.id"
             >
               <td>{{ record.date }}</td>
+              <td>
+                {{ formatGrowthAge(child.birthDate, record.date, child.birthGestationalWeeks) }}
+              </td>
               <td>{{ record.weightKg ?? '—' }}</td>
               <td>{{ record.heightCm ?? '—' }}</td>
               <td>{{ record.headCircumferenceCm ?? '—' }}</td>

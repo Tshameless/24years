@@ -139,6 +139,7 @@ describe('孕期全周期', () => {
     expect(
       validPregnancyRecord({
         ...birth,
+        birthGestationalWeeks: 34,
         birthWeightGrams: 3000,
         birthLengthCm: 50.5,
         headCircumferenceCm: 34,
@@ -147,6 +148,9 @@ describe('孕期全周期', () => {
       }),
     ).toBe(true);
     for (const invalid of [
+      { birthGestationalWeeks: 19 },
+      { birthGestationalWeeks: 46 },
+      { birthGestationalWeeks: 34.5 },
       { birthWeightGrams: 0 },
       { birthWeightGrams: 3.5 },
       { birthLengthCm: Infinity },
@@ -159,6 +163,7 @@ describe('孕期全周期', () => {
       expect(validPregnancyRecord({ ...birth, ...invalid })).toBe(false);
     }
     expect(validPregnancyRecord({ ...ended, mode: 'unknown' })).toBe(false);
+    expect(validPregnancyRecord({ ...ended, birthGestationalWeeks: 36 })).toBe(false);
     expect(validPregnancyRecord({ ...plan, discussPainRelief: 'yes' })).toBe(false);
     expect(validPregnancyRecord({ ...handoff, followupDate: '2026-01-01' })).toBe(false);
   });
