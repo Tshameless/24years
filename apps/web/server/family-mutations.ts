@@ -233,9 +233,9 @@ export function createFamilyMutations(options: {
     const change = body.change as Body | null;
     requireValue(change && typeof change === 'object', 400, '修改内容无效。');
     const familyId = member.family_id;
-    const familyRow = db
-      .prepare('SELECT revision FROM families WHERE id = ?')
-      .get(familyId) as { revision: number } | undefined;
+    const familyRow = db.prepare('SELECT revision FROM families WHERE id = ?').get(familyId) as
+      | { revision: number }
+      | undefined;
     requireValue(familyRow, 404, '家庭不存在。');
     const familyRevision = Number(familyRow.revision);
     let familySnapshot: SharedFamily | null = null;
@@ -315,9 +315,11 @@ export function createFamilyMutations(options: {
           409,
           '关联的新生儿档案已变化，请刷新后重试。',
         );
+
         if (!childBefore && childValue) {
           requireCollectionRoom('family_children', familyId);
         }
+
         const oldGrowthCount = currentChild?.value.growthRecords?.length ?? 0;
         const newGrowthCount = childValue?.growthRecords?.length ?? 0;
 
@@ -329,18 +331,13 @@ export function createFamilyMutations(options: {
             `单家庭生长记录不能超过 ${MAX_FAMILY_COLLECTION_RECORDS} 条。`,
           );
         }
-        upsertChildRow(
-          db,
-          familyId,
-          childId,
-          childValue,
-          now,
-          currentChild?.position,
-        );
+
+        upsertChildRow(db, familyId, childId, childValue, now, currentChild?.position);
         deltaEntries.push({ recordType: 'child', recordId: childId, value: childValue });
       }
 
       if (pregnancyChange.expense) {
+        requireCollectionRoom('family_expenses', familyId);
         upsertExpenseRow(
           db,
           familyId,
@@ -375,9 +372,11 @@ export function createFamilyMutations(options: {
       const next = value as { id: string } | null;
       requireValue(!previous || !next || previous.id === next.id, 400, '不能修改孩子记录编号。');
       const id = (previous ?? next)!.id;
+
       if (!previous && next) {
         requireCollectionRoom('family_children', familyId);
       }
+
       const currentRow = readRelationalRecord<Child>(db, 'family_children', familyId, id);
       const current = currentRow?.value ?? null;
       requireValue(
@@ -386,7 +385,7 @@ export function createFamilyMutations(options: {
         '这条孩子记录已被另一位成员修改或删除。',
       );
       const oldGrowthCount = currentRow?.value.growthRecords?.length ?? 0;
-      const newGrowthCount = next && validChild(next) ? next.growthRecords?.length ?? 0 : 0;
+      const newGrowthCount = next && validChild(next) ? (next.growthRecords?.length ?? 0) : 0;
 
       if (oldGrowthCount !== newGrowthCount) {
         requireValue(
@@ -396,6 +395,7 @@ export function createFamilyMutations(options: {
           `单家庭生长记录不能超过 ${MAX_FAMILY_COLLECTION_RECORDS} 条。`,
         );
       }
+
       upsertChildRow(db, familyId, id, value as Child | null, now, currentRow?.position);
       deltaEntries.push({ recordType: 'child', recordId: id, value });
     } else {
@@ -744,9 +744,7 @@ export function createFamilyMutations(options: {
           invitation = manage(userId, action, body);
         }
 
-        return includeSnapshot
-          ? { ...snapshot(userId), invitation }
-          : { user: account(userId) };
+        return includeSnapshot ? { ...snapshot(userId), invitation } : { user: account(userId) };
       });
     } catch (error) {
       if (action === 'join') {

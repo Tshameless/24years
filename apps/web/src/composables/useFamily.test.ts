@@ -7,13 +7,13 @@ import { CLOUD_CACHE_KEY } from './cloudCache';
 
 const wrappers: ReturnType<typeof mount>[] = [];
 
-function setup() {
+function setup(connect = false) {
   let store!: FamilyStore;
   wrappers.push(
     mount(
       defineComponent({
         setup() {
-          store = createFamilyStore({ connect: false });
+          store = createFamilyStore({ connect });
 
           return () => null;
         },
@@ -273,18 +273,7 @@ it('离线云端家庭允许连续排队并立即显示待同步记录', async (
     JSON.stringify({ version: 1, savedAt: Date.now(), state: { user, family } }),
   );
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
-  let store!: FamilyStore;
-  wrappers.push(
-    mount(
-      defineComponent({
-        setup() {
-          store = createFamilyStore();
-
-          return () => null;
-        },
-      }),
-    ),
-  );
+  const store = setup(true);
 
   await flushPromises();
   expect(store.locked.value).toBe(true);

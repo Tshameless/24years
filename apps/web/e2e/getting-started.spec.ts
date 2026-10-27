@@ -35,7 +35,7 @@ test('建档后的指引可收起恢复，真实记录推进流程，分组保�
     '产检与健康',
     '待产与应急',
   ]);
-  await expect(navigation.getByRole('link')).toHaveCount(12);
+  await expect(navigation.getByRole('link')).toHaveCount(17);
   await navigation.getByRole('link', { name: '就医卡', exact: true }).click();
   await page.reload();
   await expect(page.getByLabel('就诊医院', { exact: true })).toBeVisible();

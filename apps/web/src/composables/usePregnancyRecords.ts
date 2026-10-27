@@ -29,7 +29,10 @@ export function usePregnancyRecords() {
       const saved = await store.savePregnancy(change);
 
       if (saved) {
-        message.value = '记录已保存。';
+        message.value =
+          store.cloud.active.value && !store.cloud.online.value
+            ? '记录已保存在本机，待联网同步。'
+            : '记录已保存。';
       } else {
         error.value = store.error.value || '保存未完成，输入已保留，请重试。';
       }

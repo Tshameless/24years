@@ -14,26 +14,48 @@ const baseEntries = computed(() =>
     ? []
     : selectVitals(data.value.pregnancyRecords ?? [], metric.value, from.value, to.value),
 );
+
 function matchesGlucoseContext(context: string | undefined, group: string) {
-  if (group === 'fasting') return context?.includes('空腹') ?? false;
-  if (group === 'after1') return context?.includes('餐后1小时') ?? false;
-  if (group === 'after2') return context?.includes('餐后2小时') ?? false;
-  if (group === 'random') return context?.includes('随机') ?? false;
-  if (group === 'other') return context === '其他';
-  if (group === 'unclassified')
+  if (group === 'fasting') {
+    return context?.includes('空腹') ?? false;
+  }
+
+  if (group === 'after1') {
+    return context?.includes('餐后1小时') ?? false;
+  }
+
+  if (group === 'after2') {
+    return context?.includes('餐后2小时') ?? false;
+  }
+
+  if (group === 'random') {
+    return context?.includes('随机') ?? false;
+  }
+
+  if (group === 'other') {
+    return context === '其他';
+  }
+
+  if (group === 'unclassified') {
     return (
       !context ||
       !['空腹', '餐后1小时', '餐后2小时', '随机', '其他'].some((item) => context.includes(item))
     );
+  }
+
   return true;
 }
+
 const entries = computed(() =>
   metric.value !== 'glucose' || glucoseContext.value === 'all'
     ? baseEntries.value
     : baseEntries.value.filter((item) => matchesGlucoseContext(item.context, glucoseContext.value)),
 );
 const glucoseSummary = computed(() => {
-  if (metric.value !== 'glucose') return null;
+  if (metric.value !== 'glucose') {
+    return null;
+  }
+
   const fasting = baseEntries.value.filter((item) =>
     matchesGlucoseContext(item.context, 'fasting'),
   );
@@ -43,6 +65,7 @@ const glucoseSummary = computed(() => {
     items.length
       ? (items.reduce((sum, item) => sum + item.value, 0) / items.length).toFixed(1)
       : '—';
+
   return {
     fasting,
     fastingAverage: average(fasting),
@@ -50,14 +73,19 @@ const glucoseSummary = computed(() => {
     after2Average: average(after2),
   };
 });
+
 function csvCell(value: string | number | undefined) {
   const text = value === undefined ? '' : String(value);
   const safe = /^[=+@\-\t\r]/.test(text) ? `'${text}` : text;
+
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
 function exportGlucoseCsv() {
-  if (metric.value !== 'glucose' || !entries.value.length || invalid.value) return;
+  if (metric.value !== 'glucose' || !entries.value.length || invalid.value) {
+    return;
+  }
+
   const rows = [
     ['日期', '时间', '测量场景', '血糖 (mmol/L)', '备注'],
     ...entries.value.map((item) => [item.date, item.time, item.context, item.value, item.notes]),
@@ -70,6 +98,7 @@ function exportGlucoseCsv() {
   link.click();
   URL.revokeObjectURL(url);
 }
+
 const plot = computed(() => vitalPlot(entries.value));
 const primary = computed(
   () => plot.value?.points.map((point) => `${point.x},${point.y}`).join(' ') ?? '',

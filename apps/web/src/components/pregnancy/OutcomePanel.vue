@@ -118,18 +118,18 @@ async function submit() {
 
   const previousOutcome = before.value?.type === 'outcome' ? before.value : null;
   const children = familyStore.data.value.children ?? [];
-  const legacyMatches = previousOutcome?.kind === 'birth'
-    ? children.filter(
-        (child) =>
-          child.birthDate === previousOutcome.date &&
-          child.name === (previousOutcome.babyName?.trim() || '宝宝'),
-      )
-    : [];
+  const legacyMatches =
+    previousOutcome?.kind === 'birth'
+      ? children.filter(
+          (child) =>
+            child.birthDate === previousOutcome.date &&
+            child.name === (previousOutcome.babyName?.trim() || '宝宝'),
+        )
+      : [];
   const linkedChild =
     children.find(
       (child) => child.sourceOutcomeId === value.id || child.id === childIdForOutcome(value.id),
-    ) ??
-    (legacyMatches.length === 1 ? legacyMatches[0] : null);
+    ) ?? (legacyMatches.length === 1 ? legacyMatches[0] : null);
   const change: Parameters<typeof saveOutcome>[0] = {
     type: 'pregnancy',
     before: before.value,
@@ -146,9 +146,7 @@ async function submit() {
       sourceOutcomeId: value.id,
       birthWeightGrams: form.birthWeightGrams ? Number(form.birthWeightGrams) : undefined,
       birthLengthCm: form.birthLengthCm ? Number(form.birthLengthCm) : undefined,
-      headCircumferenceCm: form.headCircumferenceCm
-        ? Number(form.headCircumferenceCm)
-        : undefined,
+      headCircumferenceCm: form.headCircumferenceCm ? Number(form.headCircumferenceCm) : undefined,
       notes: form.notes.trim()
         ? `出生记录：${form.notes.trim()}`
         : linkedChild?.notes?.startsWith('出生记录：')
@@ -156,8 +154,6 @@ async function submit() {
           : linkedChild?.notes,
     };
     change.child = { before: linkedChild, value: child };
-  } else if (previousOutcome?.kind === 'birth' && linkedChild) {
-    change.child = { before: linkedChild, value: null };
   }
 
   if (await saveOutcome(change)) {

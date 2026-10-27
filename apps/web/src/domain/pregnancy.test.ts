@@ -70,6 +70,73 @@ describe('孕期记录和原子入账', () => {
       ),
     ).toThrow();
   });
+  it('兼容旧心理自查编号并允许按日期保存多条记录', () => {
+    const legacy = {
+      id: 'mental-screening',
+      type: 'mentalScreening' as const,
+      date: '2026-10-20',
+      score: 1,
+      selfHarm: false,
+      answers: Array(10).fill(0),
+      notes: '',
+    };
+    const next = { ...legacy, id: 'screening-2026-10-27', date: '2026-10-27' };
+    const first = applyPregnancyChange(emptyFamily(), {
+      type: 'pregnancy',
+      before: null,
+      value: legacy,
+    });
+    const saved = applyPregnancyChange(first, {
+      type: 'pregnancy',
+      before: null,
+      value: next,
+    });
+
+    expect(saved.pregnancyRecords).toEqual([legacy, next]);
+    expect(decodeFamily(JSON.stringify(saved)).pregnancyRecords).toEqual([legacy, next]);
+  });
+  it('更正分娩结局类型不会删除关联孩子或其成长记录', () => {
+    const birth: Extract<PregnancyRecord, { type: 'outcome' }> = {
+      id: 'pregnancy-outcome',
+      type: 'outcome' as const,
+      kind: 'birth' as const,
+      date: '2026-10-20',
+      mode: 'unknown' as const,
+      notes: '',
+    };
+    const ended: Extract<PregnancyRecord, { type: 'outcome' }> = {
+      id: 'pregnancy-outcome',
+      type: 'outcome' as const,
+      kind: 'ended' as const,
+      date: '2026-10-20',
+      notes: '',
+    };
+    const child = {
+      id: 'birth-pregnancy-outcome',
+      name: '宝宝',
+      birthDate: birth.date,
+      sourceOutcomeId: birth.id,
+      growthRecords: [{ id: 'measurement', date: '2026-10-27', weightKg: 3.2 }],
+    };
+    const data = {
+      ...emptyFamily(),
+      profile: { name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: false },
+      pregnancyRecords: [birth],
+      children: [child],
+    };
+
+    expect(
+      applyPregnancyChange(data, { type: 'pregnancy', before: birth, value: ended }).children,
+    ).toEqual([child]);
+    expect(() =>
+      applyPregnancyChange(data, {
+        type: 'pregnancy',
+        before: birth,
+        value: ended,
+        child: { before: child, value: null },
+      }),
+    ).toThrow('不能通过更正分娩记录删除孩子档案');
+  });
   it('产检和费用一起保存，旧快照不能覆盖，失败不修改输入', () => {
     const data = { ...emptyFamily(), pregnancyRecords: [checkup] };
     const saved = applyPregnancyChange(data, completion);

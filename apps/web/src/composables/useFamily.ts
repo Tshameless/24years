@@ -52,9 +52,9 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
   const localLocked = shallowRef(false);
   const cloud = useCollaboration(options.connect ?? true);
   const data = computed<FamilyData>(() => {
-    const source = (cloud.active.value
-      ? (cloud.state.value.family?.data ?? emptyFamily())
-      : localData.value) as FamilyData;
+    const source = (
+      cloud.active.value ? (cloud.state.value.family?.data ?? emptyFamily()) : localData.value
+    ) as FamilyData;
     let snapshot: FamilyData = {
       ...source,
       profile: source.profile ? { ...source.profile } : null,
@@ -189,14 +189,15 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
       profile.familyMode &&
       profile.parentRole
     ) {
-      return await cloud.create(profile.familyMode, { ...emptyFamily(), profile }, profile.parentRole);
+      return await cloud.create(
+        profile.familyMode,
+        { ...emptyFamily(), profile },
+        profile.parentRole,
+      );
     }
 
     return validProfile(profile) && canManage.value
-      ? await changeRecords(
-          { type: 'profile', value: profile, before },
-          { ...data.value, profile },
-        )
+      ? await changeRecords({ type: 'profile', value: profile, before }, { ...data.value, profile })
       : false;
   }
 
@@ -208,23 +209,23 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
 
     return (
       validTask(task) &&
-      await changeRecords(
+      (await changeRecords(
         { type: 'task', value: task, before: null },
         { ...data.value, tasks: [...data.value.tasks, task] },
-      )
+      ))
     );
   }
 
   async function updateTask(task: FamilyTask, before: FamilyTask): Promise<boolean> {
     return (
       validTask(task) &&
-      await changeRecords(
+      (await changeRecords(
         { type: 'task', value: task, before },
         {
           ...data.value,
           tasks: data.value.tasks.map((item) => (item.id === task.id ? task : item)),
         },
-      )
+      ))
     );
   }
 
@@ -247,23 +248,23 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
 
     return (
       validExpense(expense) &&
-      await changeRecords(
+      (await changeRecords(
         { type: 'expense', value: expense, before: null },
         { ...data.value, expenses: [expense, ...data.value.expenses] },
-      )
+      ))
     );
   }
 
   async function updateExpense(expense: Expense, before: Expense): Promise<boolean> {
     return (
       validExpense(expense) &&
-      await changeRecords(
+      (await changeRecords(
         { type: 'expense', value: expense, before },
         {
           ...data.value,
           expenses: data.value.expenses.map((item) => (item.id === expense.id ? expense : item)),
         },
-      )
+      ))
     );
   }
 
@@ -272,20 +273,20 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
 
     return (
       validChild(child) &&
-      await changeRecords(
+      (await changeRecords(
         { type: 'child', value: child, before: null },
         {
           ...data.value,
           children: [...(data.value.children ?? []), child],
         },
-      )
+      ))
     );
   }
 
   async function updateChild(child: Child, before: Child): Promise<boolean> {
     return (
       validChild(child) &&
-      await changeRecords(
+      (await changeRecords(
         { type: 'child', value: child, before },
         {
           ...data.value,
@@ -293,7 +294,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
             item.id === child.id ? child : item,
           ),
         },
-      )
+      ))
     );
   }
 
@@ -467,16 +468,16 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
 
       return before
         ? await changeRecords(
-        {
-          type: 'task',
-          value: null,
-          before,
-        },
-        {
-          ...data.value,
-          tasks: data.value.tasks.filter((task) => task.id !== id),
-        },
-      )
+            {
+              type: 'task',
+              value: null,
+              before,
+            },
+            {
+              ...data.value,
+              tasks: data.value.tasks.filter((task) => task.id !== id),
+            },
+          )
         : false;
     },
     removeExpense: async (id: string): Promise<boolean> => {
@@ -484,16 +485,16 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
 
       return before
         ? await changeRecords(
-        {
-          type: 'expense',
-          value: null,
-          before,
-        },
-        {
-          ...data.value,
-          expenses: data.value.expenses.filter((expense) => expense.id !== id),
-        },
-      )
+            {
+              type: 'expense',
+              value: null,
+              before,
+            },
+            {
+              ...data.value,
+              expenses: data.value.expenses.filter((expense) => expense.id !== id),
+            },
+          )
         : false;
     },
     toggleTheme: async (): Promise<boolean> =>

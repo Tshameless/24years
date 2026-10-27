@@ -19,9 +19,9 @@ describe('生长记录 CSV', () => {
   });
 
   it('转义备注并阻止表格公式注入', () => {
-    expect(growthCsv([{ id: 'g', date: '2026-06-01', weightKg: 3.2, notes: '=SUM(A1)' }])).toContain(
-      "'=SUM(A1)",
-    );
+    expect(
+      growthCsv([{ id: 'g', date: '2026-06-01', weightKg: 3.2, notes: '=SUM(A1)' }]),
+    ).toContain("'=SUM(A1)");
   });
 
   it('空列表仍导出带中文表头的 CSV', () => {

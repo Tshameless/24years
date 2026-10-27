@@ -68,6 +68,7 @@ async function submit() {
 
   if (form.metric === 'glucose' && !form.context.trim()) {
     reportError('请选择血糖测量场景。');
+
     return;
   }
 

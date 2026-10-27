@@ -52,3 +52,34 @@ it('下载受阻时明确显示错误，不显示成功也不修改记录', asyn
   expect(JSON.stringify(expenses)).toBe(original);
   wrapper.unmount();
 });
+
+it('分类占比使用当前范围内的支出，不把津贴计入支出总额', () => {
+  const wrapper = mount(LedgerReport, {
+    props: {
+      expenses: [
+        expenses[0]!,
+        {
+          ...expenses[0]!,
+          id: 'goods',
+          category: '宝宝用品',
+          amountCents: 30000,
+          reimbursedCents: 0,
+        },
+        {
+          ...expenses[0]!,
+          id: 'allowance',
+          kind: 'allowance' as const,
+          amountCents: 50000,
+          reimbursedCents: 0,
+        },
+      ],
+      month: '2026-10',
+      category: '全部',
+    },
+  });
+  const rows = wrapper.findAll('.category-chart li');
+  expect(rows).toHaveLength(2);
+  expect(rows[0]!.text()).toContain('25.0%');
+  expect(rows[1]!.text()).toContain('75.0%');
+  wrapper.unmount();
+});

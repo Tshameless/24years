@@ -251,7 +251,7 @@ async function submit() {
     </p>
     <button
       class="button button-primary"
-        :disabled="recordLocked || !!stale || draftBlocked"
+      :disabled="recordLocked || !!stale || draftBlocked"
     >
       {{ before ? '保存计划修改' : '保存计划' }}
     </button>

@@ -3,7 +3,12 @@ import { computed, shallowRef } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { checkupTemplates } from '@/domain/preparationTemplates';
 import { isDate, localDate, parseMoney, type PregnancyRecord, type Expense } from '@/domain/family';
-import { prenatalSchedule, scheduleDate, hasScheduledCheckup, type PrenatalScheduleItem } from '@/domain/prenatalSchedule';
+import {
+  prenatalSchedule,
+  scheduleDate,
+  hasScheduledCheckup,
+  type PrenatalScheduleItem,
+} from '@/domain/prenatalSchedule';
 import { useFamily } from '@/composables/useFamily';
 
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
@@ -67,21 +72,30 @@ const schedule = computed(() =>
 );
 
 function escapeIcs(value: string) {
-  return value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
 }
 
 function exportCalendar() {
   if (!checkups.value.length) {
     reportError('请先添加至少一项产检安排。');
+
     return;
   }
 
   const events = checkups.value.map((item) => {
     const date = item.date.replace(/-/g, '');
+
     return [
       'BEGIN:VEVENT',
       `UID:${item.id}@24years`,
-      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`,
+      `DTSTAMP:${new Date()
+        .toISOString()
+        .replace(/[-:]/g, '')
+        .replace(/\.\d{3}Z$/, 'Z')}`,
       `DTSTART;VALUE=DATE:${date}`,
       `SUMMARY:${escapeIcs(`产检：${item.title}`)}`,
       `DESCRIPTION:${escapeIcs(item.notes || '请按医院安排准备')}`,
@@ -98,7 +112,12 @@ function exportCalendar() {
       'END:VEVENT',
     ].join('\r\n');
   });
-  const blob = new Blob([`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//24Years//Pregnancy//CN\r\n${events.join('\r\n')}\r\nEND:VCALENDAR\r\n`], { type: 'text/calendar;charset=utf-8' });
+  const blob = new Blob(
+    [
+      `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//24Years//Pregnancy//CN\r\n${events.join('\r\n')}\r\nEND:VCALENDAR\r\n`,
+    ],
+    { type: 'text/calendar;charset=utf-8' },
+  );
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -108,7 +127,10 @@ function exportCalendar() {
 }
 
 function addScheduledCheckup(item: PrenatalScheduleItem & { date: string }) {
-  if (disabled.value || before.value || stale.value) return;
+  if (disabled.value || before.value || stale.value) {
+    return;
+  }
+
   Object.assign(form, {
     title: item.title,
     date: item.date,
@@ -117,6 +139,7 @@ function addScheduledCheckup(item: PrenatalScheduleItem & { date: string }) {
   });
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 }
+
 const linkedExpense = computed(() => !!before.value && hasExpense('checkup-' + before.value.id));
 const canRecordExpense = computed(
   () => !!before.value && !before.value.completed && form.completed && !linkedExpense.value,
@@ -194,7 +217,13 @@ async function submit() {
         <h2>产检安排</h2>
         <div class="heading-actions">
           <span class="tag">{{ checkups.length }} 次记录</span>
-          <button class="text-button" type="button" @click="exportCalendar">导出日历</button>
+          <button
+            class="text-button"
+            type="button"
+            @click="exportCalendar"
+          >
+            导出日历
+          </button>
         </div>
       </div>
       <div class="schedule-card">
@@ -203,10 +232,15 @@ async function submit() {
             <h3>孕周产检参考时间轴</h3>
             <p>根据当前预产期估算，仅用于提前整理；最终项目和日期以医院安排为准。</p>
           </div>
-          <span class="tag">{{ data.profile?.dueDate ? `预产期 ${data.profile.dueDate}` : '未设置预产期' }}</span>
+          <span class="tag">
+            {{ data.profile?.dueDate ? `预产期 ${data.profile.dueDate}` : '未设置预产期' }}
+          </span>
         </div>
         <ol class="schedule-list">
-          <li v-for="item in schedule" :key="item.title">
+          <li
+            v-for="item in schedule"
+            :key="item.title"
+          >
             <div>
               <strong>{{ item.week }} · {{ item.title }}</strong>
               <small>预计 {{ item.date }}</small>
@@ -229,7 +263,6 @@ async function submit() {
       >
         还没有产检安排。按照医生的建议，记下下一次见面的时间。
       </p>
-      <p class="calendar-note">导出的日历包含提前 3 天和 1 天提醒；是否弹出通知取决于导入的日历应用及设备通知设置。</p>
       <ul
         v-else
         class="record-list"
@@ -267,6 +300,9 @@ async function submit() {
           </div>
         </li>
       </ul>
+      <p class="calendar-note">
+        导出的日历包含提前 3 天和 1 天提醒；是否弹出通知取决于导入的日历应用及设备通知设置。
+      </p>
     </section>
     <section class="panel">
       <div class="panel-heading">

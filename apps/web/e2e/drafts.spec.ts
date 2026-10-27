@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-test('同步账目响应丢失后刷新不会重复记账，退出账号清除草稿', async ({ page }) => {
+test('同步账目响应丢失后进入离线队列并安全同步，退出账号清除草稿', async ({ page }) => {
   await page.goto('/family');
   await page
     .getByLabel('同步账号', { exact: true })
@@ -18,20 +18,26 @@ test('同步账目响应丢失后刷新不会重复记账，退出账号清除�
     '**/api/family/records',
     async (route) => {
       await route.fetch();
+      await page.context().setOffline(true);
       await route.abort('failed');
     },
     { times: 1 },
   );
   await page.getByRole('button', { name: '保存账目', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('尚未确认保存');
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.reload();
-  await expect(page.getByLabel('账目名称')).toHaveValue('响应丢失的费用');
+  await expect(page.getByRole('status').filter({ hasText: '1 条未同步记录' })).toBeVisible();
+  await expect(
+    page.getByRole('status').filter({ hasText: '账目已保存在本机，待联网同步。' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('账目名称')).toHaveValue('');
   await expect(page.getByTestId('net-cost')).toHaveText('¥42.50');
-  await expect(page.getByRole('button', { name: '保存账目', exact: true })).toBeDisabled();
   await expect(page.getByText('响应丢失的费用', { exact: true })).toHaveCount(1);
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '清除草稿' }).click();
+
+  await page.context().setOffline(false);
+  await expect(page.getByRole('status').filter({ hasText: '1 条未同步记录' })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId('net-cost')).toHaveText('¥42.50');
+  await expect(page.getByText('响应丢失的费用', { exact: true })).toHaveCount(1);
+
   await page.getByLabel('账目名称').fill('退出前的私有草稿');
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('link', { name: '我的家庭', exact: true }).click();

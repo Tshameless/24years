@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Trash2,
   Pencil,
+  Baby,
 } from '@lucide/vue';
 
 withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 });
@@ -36,6 +37,7 @@ const icons: Record<string, Component> = {
   shield: ShieldCheck,
   trash: Trash2,
   edit: Pencil,
+  baby: Baby,
 };
 </script>
 

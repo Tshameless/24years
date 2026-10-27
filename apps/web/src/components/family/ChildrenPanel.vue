@@ -216,7 +216,13 @@ const genderLabels: Record<string, string> = {
       </button>
     </div>
 
-    <p v-if="actionError" class="form-error" role="alert">{{ actionError }}</p>
+    <p
+      v-if="actionError"
+      class="form-error"
+      role="alert"
+    >
+      {{ actionError }}
+    </p>
 
     <!-- 孩子列表 -->
     <div
@@ -468,6 +474,11 @@ const genderLabels: Record<string, string> = {
   margin-top: 1.5rem;
 }
 
+.children-panel > .panel-heading > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .children-list {
   display: grid;
   gap: 1rem;
@@ -587,6 +598,15 @@ const genderLabels: Record<string, string> = {
 }
 
 @media (max-width: 480px) {
+  .children-panel > .panel-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .children-panel > .panel-heading > button {
+    width: 100%;
+  }
+
   .modal-form .form-row {
     grid-template-columns: 1fr;
   }

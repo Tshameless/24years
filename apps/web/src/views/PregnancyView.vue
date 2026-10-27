@@ -47,7 +47,7 @@ const SymptomsPanel = defineAsyncComponent(
   () => import('@/components/pregnancy/SymptomsPanel.vue'),
 );
 
-const { data, locked, cloud } = useFamily();
+const { data, recordLocked, cloud } = useFamily();
 const route = useRoute();
 const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
 
@@ -120,8 +120,18 @@ const selected = computed(
         <p>把安排和身体的变化轻轻记下，就医时多一份从容。</p>
       </div>
       <div class="pregnancy-emergency-actions">
-        <RouterLink to="/pregnancy?tab=emergency" class="button button-secondary">异常与急救</RouterLink>
-        <a href="tel:120" class="button emergency-call">拨打 120</a>
+        <RouterLink
+          to="/pregnancy?tab=emergency"
+          class="button button-secondary"
+        >
+          异常与急救
+        </RouterLink>
+        <a
+          href="tel:120"
+          class="button emergency-call"
+        >
+          拨打 120
+        </a>
       </div>
     </header>
     <section
@@ -139,7 +149,7 @@ const selected = computed(
     </section>
     <template v-else>
       <p
-        v-if="locked"
+        v-if="recordLocked"
         class="muted"
       >
         {{

@@ -79,7 +79,10 @@ function applyPendingRecord<T extends { id: string }>(
   return updated;
 }
 
-export function applyPendingFamilyChange(data: FamilyData, change: FamilyChange): FamilyData | null {
+export function applyPendingFamilyChange(
+  data: FamilyData,
+  change: FamilyChange,
+): FamilyData | null {
   if (change.type === 'pregnancy') {
     try {
       return applyPregnancyChange(data, change);

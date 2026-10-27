@@ -37,14 +37,19 @@ const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
     notes: item.notes,
   }),
 });
+
 function csvCell(value: string | number | undefined) {
   const text = value === undefined ? '' : String(value);
   const safe = /^[=+@\-\t\r]/.test(text) ? `'${text}` : text;
+
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
 function exportCsv() {
-  if (!entries.value.length) return;
+  if (!entries.value.length) {
+    return;
+  }
+
   const rows = [
     [
       '检查日期',
@@ -81,6 +86,7 @@ function exportCsv() {
 function optional(value: string) {
   return value.trim() ? Number(value) : undefined;
 }
+
 async function submit() {
   reportError('');
   const value: Ultrasound = {
@@ -100,11 +106,16 @@ async function submit() {
     ),
     notes: form.notes.trim(),
   } as Ultrasound;
+
   if (disabled.value || stale.value || !validPregnancyRecord(value) || value.date > localDate()) {
     reportError('请填写有效日期、孕周和数值。');
+
     return;
   }
-  if (await save({ type: 'pregnancy', before: before.value, value })) reset();
+
+  if (await save({ type: 'pregnancy', before: before.value, value })) {
+    reset();
+  }
 }
 </script>
 

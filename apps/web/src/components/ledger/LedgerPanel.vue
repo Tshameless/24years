@@ -8,7 +8,7 @@ import LedgerReport from './LedgerReport.vue';
 import LedgerSummaryBanner from './LedgerSummaryBanner.vue';
 import { filterLedger, type LedgerCategory } from '@/domain/ledgerReport';
 
-const { data, removeExpense, recordLocked, today } = useFamily();
+const { data, removeExpense, recordLocked, today, cloud } = useFamily();
 const filter = shallowRef<LedgerCategory>('全部');
 const month = shallowRef('');
 const categories: LedgerCategory[] = ['全部', ...expenseCategories, '津贴'];
@@ -29,6 +29,12 @@ async function confirmRemove(id: string) {
   if (window.confirm('确定删除这笔账目？此操作无法撤销。') && (await removeExpense(id))) {
     notice.value = '账目已删除。';
   }
+}
+
+function handleSaved() {
+  notice.value =
+    cloud.active.value && !cloud.online.value ? '账目已保存在本机，待联网同步。' : '账目已保存。';
+  editing.value = undefined;
 }
 </script>
 
@@ -111,10 +117,7 @@ async function confirmRemove(id: string) {
       <ExpenseForm
         :key="editing?.id ?? 'new'"
         :expense="editing"
-        @saved="
-          notice = '账目已保存。';
-          editing = undefined;
-        "
+        @saved="handleSaved"
         @cancel="editing = undefined"
       />
     </section>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef } from 'vue';
 import { useRoute } from 'vue-router';
+import { pregnancyOutcome } from '@/domain/family';
 import { useFamily } from '@/composables/useFamily';
 import AppIcon from './AppIcon.vue';
 import AppSidebar from './AppSidebar.vue';
@@ -29,16 +30,19 @@ onUnmounted(() => {
   window.removeEventListener('offline', handleOffline);
 });
 
-const navigation = [
+const navigation = computed(() => [
   { to: '/', label: '今日陪伴', icon: 'home' },
   { to: '/tasks', label: '日常计划', icon: 'calendar' },
   { to: '/pregnancy', label: '孕期记录', icon: 'heart' },
+  ...(pregnancyOutcome(data.value.pregnancyRecords)?.kind === 'birth'
+    ? [{ to: '/children', label: '成长档案', icon: 'baby' }]
+    : []),
   { to: '/ledger', label: '家庭账本', icon: 'wallet' },
   { to: '/family', label: '我的家庭', icon: 'heart' },
-] as const;
+]);
 
 const section = computed(
-  () => navigation.find((item) => item.to === route.path)?.label ?? '24Years',
+  () => navigation.value.find((item) => item.to === route.path)?.label ?? '24Years',
 );
 </script>
 
@@ -95,7 +99,7 @@ const section = computed(
         {{
           active
             ? state.family
-              ? `无法连接云端：当前可排队保存记录，${cloud.outboxCount.value} 条待同步。` 
+              ? `无法连接云端：当前可排队保存记录，${cloud.outboxCount.value} 条待同步。`
               : '无法连接云端：没有可用的家庭快照；恢复连接后可同步记录。'
             : '当前离线：已缓存的应用页面可以打开，本机记录仍保存在当前浏览器。'
         }}

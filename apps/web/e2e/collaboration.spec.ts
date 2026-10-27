@@ -162,14 +162,21 @@ test('本机记录上传、响应丢失后安全重试，以及另一设备登�
     '**/api/family/records',
     async (route) => {
       await route.fetch();
+      await page.context().setOffline(true);
       await route.abort('failed');
     },
     { times: 1 },
   );
   await page.getByRole('button', { name: '保存账目', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('尚未确认保存');
-  await expect(page.getByLabel('账目名称')).toHaveValue('不能重复的账单');
-  await page.getByRole('button', { name: '保存账目', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '1 条未同步记录' })).toBeVisible();
+  await expect(
+    page.getByRole('status').filter({ hasText: '账目已保存在本机，待联网同步。' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('账目名称')).toHaveValue('');
+  await expect(page.getByText('不能重复的账单', { exact: true })).toHaveCount(1);
+
+  await page.context().setOffline(false);
+  await expect(page.getByRole('status').filter({ hasText: '1 条未同步记录' })).toHaveCount(0);
   await expect(page.getByTestId('net-cost')).toHaveText('¥42.50');
   await expect(page.getByText('不能重复的账单', { exact: true })).toHaveCount(1);
   const other = await browser.newContext({ baseURL, viewport: page.viewportSize() });

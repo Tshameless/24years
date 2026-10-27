@@ -537,6 +537,7 @@ export function useCollaboration(enabled = true) {
             retryCount: 1,
           });
           refreshOutbox();
+          error.value = '';
         } catch (reason) {
           pendingOperations.delete(key);
           error.value =

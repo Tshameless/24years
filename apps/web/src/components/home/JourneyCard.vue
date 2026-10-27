@@ -83,12 +83,25 @@ const progress = computed(() =>
           {{ activeChild.name }} · {{ childAge?.label }}（记录日期：{{ outcome.date }}）
         </p>
         <p v-else>记录日期：{{ outcome.date }}。历史记录已保留。</p>
-        <RouterLink
-          class="button button-primary"
-          :to="outcome.kind === 'birth' ? '/pregnancy?tab=postpartum' : '/pregnancy?tab=outcome'"
-        >
-          {{ outcome.kind === 'birth' ? '查看产后交接' : '查看结束记录' }}
-        </RouterLink>
+        <div class="journey-actions">
+          <RouterLink
+            class="button button-primary"
+            :to="outcome.kind === 'birth' ? '/pregnancy?tab=postpartum' : '/pregnancy?tab=outcome'"
+          >
+            {{ outcome.kind === 'birth' ? '查看产后交接' : '查看结束记录' }}
+          </RouterLink>
+          <RouterLink
+            v-if="outcome.kind === 'birth'"
+            class="text-button"
+            to="/children"
+          >
+            孩子成长档案
+            <AppIcon
+              name="arrow"
+              :size="16"
+            />
+          </RouterLink>
+        </div>
       </template>
       <template v-else-if="activeChild && childAge">
         <div
@@ -239,6 +252,13 @@ const progress = computed(() =>
   font-size: 14px;
   line-height: 1.9;
   margin-bottom: 20px;
+}
+
+.journey-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
 }
 
 .journey-copy .gestation {

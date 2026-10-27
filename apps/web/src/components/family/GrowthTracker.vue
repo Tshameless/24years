@@ -16,7 +16,7 @@ const props = defineProps<{
   child: Child;
 }>();
 
-const { updateChild, addTask, recordLocked, today } = useFamily();
+const { updateChild, addTask, recordLocked, today, cloud } = useFamily();
 
 const activeMetric = shallowRef<GrowthMetric>('weightKg');
 const showRecordForm = shallowRef(false);
@@ -226,7 +226,10 @@ async function addReminder() {
     });
 
     if (success) {
-      taskNotice.value = `已添加「${taskTitle}」至日常计划。`;
+      taskNotice.value =
+        cloud.active.value && !cloud.online.value
+          ? `「${taskTitle}」已保存在本机，待联网同步。`
+          : `已添加「${taskTitle}」至日常计划。`;
       reminderTitle.value = '';
     } else {
       reminderError.value = '添加失败，请检查提醒日期和时间。';
@@ -250,7 +253,7 @@ async function addReminder() {
           :name="showRecordForm ? 'cross' : 'plus'"
           :size="14"
         />
-          {{ showRecordForm ? '收起表单' : editingRecordId ? '继续编辑' : '记录生长数据' }}
+        {{ showRecordForm ? '收起表单' : editingRecordId ? '继续编辑' : '记录生长数据' }}
       </button>
     </div>
 
@@ -327,13 +330,7 @@ async function addReminder() {
           type="submit"
           :disabled="savingRecord"
         >
-          {{
-            savingRecord
-              ? '正在保存…'
-              : editingRecordId
-                ? '保存修改'
-                : '保存测量记录'
-          }}
+          {{ savingRecord ? '正在保存…' : editingRecordId ? '保存修改' : '保存测量记录' }}
         </button>
       </div>
     </form>
@@ -422,7 +419,10 @@ async function addReminder() {
       <p class="muted">暂未录入该项测量数据，点击上方“记录生长数据”开始追踪成长曲线。</p>
     </div>
 
-    <section class="growth-history" aria-labelledby="growth-history-title">
+    <section
+      class="growth-history"
+      aria-labelledby="growth-history-title"
+    >
       <div class="history-heading">
         <h5 id="growth-history-title">历史测量</h5>
         <button
@@ -431,12 +431,24 @@ async function addReminder() {
           :disabled="!sortedRecords.length"
           @click="exportCsv"
         >
-          <AppIcon name="download" :size="14" />
+          <AppIcon
+            name="download"
+            :size="14"
+          />
           导出 CSV
         </button>
       </div>
-      <p v-if="historyError" class="form-error" role="alert">{{ historyError }}</p>
-      <div v-if="sortedRecords.length" class="history-table-wrap">
+      <p
+        v-if="historyError"
+        class="form-error"
+        role="alert"
+      >
+        {{ historyError }}
+      </p>
+      <div
+        v-if="sortedRecords.length"
+        class="history-table-wrap"
+      >
         <table class="history-table">
           <thead>
             <tr>
@@ -449,7 +461,10 @@ async function addReminder() {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="record in sortedRecords" :key="record.id">
+            <tr
+              v-for="record in sortedRecords"
+              :key="record.id"
+            >
               <td>{{ record.date }}</td>
               <td>{{ record.weightKg ?? '—' }}</td>
               <td>{{ record.heightCm ?? '—' }}</td>
@@ -464,7 +479,10 @@ async function addReminder() {
                   title="编辑记录"
                   @click="editRecord(record)"
                 >
-                  <AppIcon name="edit" :size="16" />
+                  <AppIcon
+                    name="edit"
+                    :size="16"
+                  />
                 </button>
                 <button
                   class="icon-button text-button-danger"
@@ -474,14 +492,22 @@ async function addReminder() {
                   title="删除记录"
                   @click="removeRecord(record)"
                 >
-                  <AppIcon name="trash" :size="16" />
+                  <AppIcon
+                    name="trash"
+                    :size="16"
+                  />
                 </button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p v-else class="muted">还没有生长测量记录。</p>
+      <p
+        v-else
+        class="muted"
+      >
+        还没有生长测量记录。
+      </p>
     </section>
 
     <section class="custom-reminder-section">
@@ -556,6 +582,10 @@ async function addReminder() {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.75rem;
+}
+
+.tracker-header button {
+  scroll-margin-block: 1rem 100px;
 }
 
 .tracker-header h4 {
@@ -710,6 +740,12 @@ async function addReminder() {
 }
 
 @media (max-width: 700px) {
+  .tracker-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
   .growth-form .form-row {
     grid-template-columns: 1fr;
   }

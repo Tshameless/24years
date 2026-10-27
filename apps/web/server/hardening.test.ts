@@ -54,6 +54,39 @@ test('rate limit survives recreation, caps keys and expires', () => {
   }
 });
 
+test('multiple rate-limit keys are checked in one call while earlier attempts remain charged', () => {
+  const db = openDatabase(':memory:');
+
+  try {
+    const limit = createRateLimiter(db);
+    limit.many(
+      [
+        ['ip', 2],
+        ['account', 1],
+      ],
+      100,
+    );
+    assert.throws(
+      () =>
+        limit.many(
+          [
+            ['ip', 2],
+            ['account', 1],
+          ],
+          101,
+        ),
+      /尝试次数过多/,
+    );
+    assert.throws(() => limit('ip', 2, 102), /尝试次数过多/);
+    const rows = db.prepare('SELECT count(*) AS count FROM rate_limits').get() as {
+      count: number;
+    };
+    assert.equal(rows.count, 2);
+  } finally {
+    db.close();
+  }
+});
+
 test('session validators track invite expiry, revisions and membership without decoding data', async () => {
   const db = openDatabase(':memory:');
 

@@ -1,10 +1,33 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue';
-import { currency, summarizeExpenses, type Expense } from '@/domain/family';
+import { currency, expenseCategories, summarizeExpenses, type Expense } from '@/domain/family';
 import { downloadLedgerCsv } from '@/domain/ledgerReport';
 
 const props = defineProps<{ expenses: readonly Expense[]; month: string; category: string }>();
 const totals = computed(() => summarizeExpenses(props.expenses));
+const categoryColors = ['var(--green)', 'var(--primary)', '#54839a', '#b17a42', '#84709c'];
+const categoryBreakdown = computed(() => {
+  const amounts = new Map(expenseCategories.map((category) => [category, 0]));
+
+  for (const item of props.expenses) {
+    if (item.kind === 'expense') {
+      amounts.set(item.category, (amounts.get(item.category) ?? 0) + item.amountCents);
+    }
+  }
+
+  return expenseCategories
+    .map((category, index) => {
+      const amountCents = amounts.get(category) ?? 0;
+
+      return {
+        category,
+        amountCents,
+        share: totals.value.total > 0 ? (amountCents / totals.value.total) * 100 : 0,
+        color: categoryColors[index % categoryColors.length],
+      };
+    })
+    .filter((item) => item.amountCents > 0);
+});
 const scopeLabel = computed(() => (props.month || '全部月份') + ' · ' + props.category);
 const message = shallowRef('');
 const error = shallowRef('');
@@ -71,6 +94,45 @@ function exportCsv() {
         <dd data-testid="filtered-net">{{ currency(totals.net) }}</dd>
       </div>
     </dl>
+    <div
+      v-if="categoryBreakdown.length"
+      class="category-chart"
+      aria-label="分类支出占比"
+    >
+      <h4>支出分类占比</h4>
+      <ul>
+        <li
+          v-for="item in categoryBreakdown"
+          :key="item.category"
+        >
+          <span>{{ item.category }}</span>
+          <svg
+            viewBox="0 0 100 8"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <rect
+              class="bar-track"
+              x="0"
+              y="0"
+              width="100"
+              height="8"
+              rx="4"
+            />
+            <rect
+              x="0"
+              y="0"
+              :width="item.share"
+              height="8"
+              rx="4"
+              :fill="item.color"
+            />
+          </svg>
+          <strong>{{ item.share.toFixed(1) }}%</strong>
+          <small>{{ currency(item.amountCents) }}</small>
+        </li>
+      </ul>
+    </div>
     <p class="report-note">
       按发生日期归月；已报销金额计入原账目月份，不代表该月实际报销到账。仅统计已保存记录，不含草稿。
     </p>
@@ -148,5 +210,64 @@ function exportCsv() {
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.8;
+}
+
+.category-chart {
+  margin: 0 0 18px;
+}
+
+.category-chart h4 {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.category-chart ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.category-chart li {
+  display: grid;
+  grid-template-columns: minmax(78px, 1fr) minmax(70px, 2fr) 54px minmax(82px, auto);
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.category-chart svg {
+  display: block;
+  width: 100%;
+  height: 8px;
+  overflow: visible;
+}
+
+.bar-track {
+  fill: var(--border);
+}
+
+.category-chart strong,
+.category-chart small {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.category-chart small {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 520px) {
+  .category-chart li {
+    grid-template-columns: minmax(82px, 1fr) minmax(58px, 1.5fr) 48px;
+    gap: 7px;
+  }
+
+  .category-chart small {
+    grid-column: 2 / 4;
+    text-align: left;
+    margin-top: -4px;
+  }
 }
 </style>

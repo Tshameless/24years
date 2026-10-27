@@ -40,7 +40,7 @@ export type PregnancyRecord =
       notes: string;
     }
   | {
-      id: 'mental-screening';
+      id: string;
       type: 'mentalScreening';
       date: string;
       score: number;
@@ -191,7 +191,6 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
       );
     case 'mentalScreening':
       return (
-        value.id === 'mental-screening' &&
         isDate(value.date) &&
         typeof value.score === 'number' &&
         Number.isInteger(value.score) &&
@@ -201,7 +200,9 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         (value.answers === undefined ||
           (Array.isArray(value.answers) &&
             value.answers.length === 10 &&
-            value.answers.every((answer) => Number.isInteger(answer) && answer >= 0 && answer <= 3))) &&
+            value.answers.every(
+              (answer) => Number.isInteger(answer) && answer >= 0 && answer <= 3,
+            ))) &&
         note(value.notes)
       );
     case 'ultrasound':
@@ -211,8 +212,10 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         Number.isInteger(value.gestationWeeks) &&
         value.gestationWeeks >= 0 &&
         value.gestationWeeks <= 42 &&
-        ['bpd', 'fl', 'ac', 'hc', 'afi', 'umbilicalSd'].every((key) =>
-          value[key] === undefined || (typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0),
+        ['bpd', 'fl', 'ac', 'hc', 'afi', 'umbilicalSd'].every(
+          (key) =>
+            value[key] === undefined ||
+            (typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0),
         ) &&
         note(value.notes)
       );
@@ -412,10 +415,15 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
   let updatedChildren = data.children;
 
   if (child) {
-    const linkedOutcome = value?.type === 'outcome' ? value : before?.type === 'outcome' ? before : null;
+    const linkedOutcome =
+      value?.type === 'outcome' ? value : before?.type === 'outcome' ? before : null;
     const { before: childBefore, value: childValue } = child;
     const childId = childBefore?.id ?? childValue?.id;
     const existingChild = data.children?.find((item) => item.id === childId) ?? null;
+
+    if (childBefore && !childValue) {
+      throw new PregnancyChangeError('不能通过更正分娩记录删除孩子档案，请在成长档案中管理。');
+    }
 
     if (
       !linkedOutcome ||

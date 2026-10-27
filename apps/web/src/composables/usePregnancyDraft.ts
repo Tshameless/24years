@@ -56,9 +56,7 @@ export function usePregnancyDraft<
             ? 'postpartum-plan'
             : options.type === 'outcome'
               ? 'pregnancy-outcome'
-              : options.type === 'mentalScreening'
-                ? 'mental-screening'
-                : draft.id.value;
+              : draft.id.value;
 
     return original
       ? !sameValue(records.find((item) => item.id === original.id) ?? null, original)
@@ -76,7 +74,7 @@ export function usePregnancyDraft<
     () => data.value.pregnancyRecords,
     () => {
       if (
-        ['medical', 'birthPlan', 'outcome', 'postpartum', 'mentalScreening'].includes(options.type) &&
+        ['medical', 'birthPlan', 'outcome', 'postpartum'].includes(options.type) &&
         !draft.dirty.value &&
         stale.value
       ) {
@@ -104,7 +102,7 @@ export function usePregnancyDraft<
       return false;
     }
 
-    const singleton = ['medical', 'birthPlan', 'outcome', 'postpartum', 'mentalScreening'].includes(options.type);
+    const singleton = ['medical', 'birthPlan', 'outcome', 'postpartum'].includes(options.type);
     reset(
       singleton
         ? (((data.value.pregnancyRecords ?? []).find((item) => item.type === options.type) as

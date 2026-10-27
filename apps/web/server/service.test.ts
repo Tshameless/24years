@@ -364,6 +364,190 @@ test('独立记录可合并，同一记录并发保护，重试幂等且无重�
   }
 });
 
+test('分娩结局与关联儿童在同一事务保存，任一关联写入失败都会回滚', async () => {
+  const f = await fixture();
+
+  try {
+    f.change(
+      f.owner,
+      'profile',
+      {
+        name: '新家',
+        nickname: '家长',
+        dueDate: '2027-01-01',
+        quietMode: false,
+        familyMode: 'couple',
+        parentRole: 'mother',
+      },
+      null,
+    );
+    const outcome = {
+      id: 'pregnancy-outcome',
+      type: 'outcome',
+      kind: 'birth',
+      date: '2026-10-27',
+      mode: 'unknown',
+      babyName: '小满',
+      notes: '',
+    };
+    const child = {
+      id: 'birth-pregnancy-outcome',
+      name: '小满',
+      birthDate: outcome.date,
+      sourceOutcomeId: outcome.id,
+      growthRecords: [{ id: 'first-measurement', date: outcome.date, weightKg: 3.2 }],
+    };
+    const save = (operationId: string) =>
+      f.service.mutate(f.owner, 'records', {
+        familyId: f.familyId,
+        operationId,
+        change: {
+          type: 'pregnancy',
+          before: null,
+          value: outcome,
+          child: { before: null, value: child },
+        },
+      });
+
+    f.db.exec(
+      `CREATE TRIGGER reject_baby BEFORE INSERT ON family_children
+       WHEN NEW.id = 'birth-pregnancy-outcome'
+       BEGIN SELECT RAISE(ABORT, 'child write rejected'); END;`,
+    );
+    assert.throws(() => save(randomUUID()));
+    assert.equal(f.service.snapshot(f.owner).family!.data.pregnancyRecords?.length, 0);
+    assert.equal(f.service.snapshot(f.owner).family!.data.children?.length ?? 0, 0);
+
+    f.db.exec('DROP TRIGGER reject_baby');
+    save(randomUUID());
+    const saved = f.service.snapshot(f.owner).family!.data;
+    assert.equal(saved.pregnancyRecords?.[0]?.type, 'outcome');
+    assert.deepEqual(saved.children, [child]);
+
+    const ended = {
+      id: outcome.id,
+      type: 'outcome',
+      kind: 'ended',
+      date: outcome.date,
+      notes: '',
+    };
+    assert.throws(
+      () =>
+        f.service.mutate(f.owner, 'records', {
+          familyId: f.familyId,
+          operationId: randomUUID(),
+          change: {
+            type: 'pregnancy',
+            before: outcome,
+            value: ended,
+            child: { before: child, value: null },
+          },
+        }),
+      failsWith(400),
+    );
+    assert.deepEqual(f.service.snapshot(f.owner).family!.data.children, [child]);
+  } finally {
+    f.db.close();
+  }
+});
+
+test('关系表容量在普通新增和孕期自动入账路径都受服务端限制', async () => {
+  const f = await fixture();
+
+  try {
+    const checkup = {
+      id: 'capacity-checkup',
+      type: 'checkup',
+      title: '常规产检',
+      date: '2026-10-27',
+      notes: '',
+      completed: false,
+    };
+    f.change(f.owner, 'pregnancy', checkup, null);
+    const insert = f.db.prepare(
+      `INSERT INTO family_expenses
+       (family_id, id, position, date, category, kind, amount_cents, reimbursed_cents, data, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    for (let index = 0; index < 10000; index += 1) {
+      const record = {
+        id: `seed-expense-${index}`,
+        title: '容量测试账目',
+        date: '2026-10-27',
+        kind: 'expense',
+        category: '其他',
+        amountCents: 100,
+        reimbursedCents: 0,
+      };
+      insert.run(
+        f.familyId,
+        record.id,
+        index,
+        record.date,
+        record.category,
+        record.kind,
+        record.amountCents,
+        record.reimbursedCents,
+        JSON.stringify(record),
+        new Date().toISOString(),
+      );
+    }
+
+    assert.throws(
+      () =>
+        f.change(
+          f.owner,
+          'expense',
+          {
+            id: 'over-limit-expense',
+            title: '超出配额',
+            date: '2026-10-27',
+            kind: 'expense',
+            category: '其他',
+            amountCents: 100,
+            reimbursedCents: 0,
+          },
+          null,
+        ),
+      failsWith(413),
+    );
+    assert.throws(
+      () =>
+        f.service.mutate(f.owner, 'records', {
+          familyId: f.familyId,
+          operationId: randomUUID(),
+          change: {
+            type: 'pregnancy',
+            before: checkup,
+            value: { ...checkup, completed: true },
+            expense: {
+              id: 'checkup-capacity-checkup',
+              title: '常规产检',
+              date: checkup.date,
+              kind: 'expense',
+              category: '产检医疗',
+              amountCents: 10000,
+              reimbursedCents: 0,
+            },
+          },
+        }),
+      failsWith(413),
+    );
+    const storedCheckup = f.db
+      .prepare('SELECT data FROM family_pregnancy_records WHERE family_id = ? AND id = ?')
+      .get(f.familyId, checkup.id) as { data: string };
+    assert.equal(JSON.parse(storedCheckup.data).completed, false);
+    assert.equal(
+      (f.db.prepare('SELECT count(*) AS count FROM family_expenses').get() as { count: number })
+        .count,
+      10000,
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
 test('仅查看成员可主动退出，历史记录保留，管理员不能退出丢弃家庭', async () => {
   const f = await fixture();
 

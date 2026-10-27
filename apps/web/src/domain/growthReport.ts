@@ -3,13 +3,7 @@ import { csvText } from './csv';
 import type { ChildGrowthRecord } from './growth';
 
 export function growthCsv(records: readonly ChildGrowthRecord[]): string {
-  const header = [
-    '测量日期',
-    '体重（kg）',
-    '身长（cm）',
-    '头围（cm）',
-    '备注',
-  ].map(csvText);
+  const header = ['测量日期', '体重（kg）', '身长（cm）', '头围（cm）', '备注'].map(csvText);
   const rows = [...records]
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
     .map((record) =>

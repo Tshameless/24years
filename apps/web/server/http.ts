@@ -272,9 +272,11 @@ export function createApplication(options: {
         );
 
         if (path === '/api/recover') {
-          limit(`recovery-ip:${ip}`, 30);
           const targetUsername = String(body.username).toLowerCase();
-          limit(`recovery-account:${targetUsername}`, 6);
+          limit.many([
+            [`recovery-ip:${ip}`, 30],
+            [`recovery-account:${targetUsername}`, 6],
+          ]);
           const targetAccount = selectAccountByUsername.get(targetUsername) as
             | { id: string }
             | undefined;
@@ -295,8 +297,10 @@ export function createApplication(options: {
         }
 
         if (path === '/api/register' || path === '/api/login') {
-          limit(`auth-ip:${ip}`, 100);
-          limit(`auth-account:${String(body.username).toLowerCase()}`, 12);
+          limit.many([
+            [`auth-ip:${ip}`, 100],
+            [`auth-account:${String(body.username).toLowerCase()}`, 12],
+          ]);
           const result = await service.authenticate(body, path === '/api/register');
           service.logout(token);
           response.setHeader(
@@ -357,13 +361,17 @@ export function createApplication(options: {
         }
 
         if (action === 'join' || action === 'invite') {
-          limit(`pair:${userId}`, 12);
-          limit(`pair-ip:${ip}`, 60);
-          limit('pair-global', 500);
+          const limits: Array<readonly [string, number]> = [
+            [`pair:${userId}`, 12],
+            [`pair-ip:${ip}`, 60],
+            ['pair-global', 500],
+          ];
 
           if (action === 'join' && typeof body.familyId === 'string') {
-            limit(`pair-family:${body.familyId}`, 12);
+            limits.push([`pair-family:${body.familyId}`, 12]);
           }
+
+          limit.many(limits);
         }
 
         const beforeContext = service.familyContext(userId);

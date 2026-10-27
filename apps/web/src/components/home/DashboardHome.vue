@@ -8,7 +8,7 @@ import GettingStarted from './GettingStarted.vue';
 import DashboardAside from './DashboardAside.vue';
 import TaskList from '@/components/tasks/TaskList.vue';
 
-const { data, today, todayTasks, toggleTask, locked, cloud, familyMode } = useFamily();
+const { data, today, todayTasks, toggleTask, recordLocked, cloud, familyMode } = useFamily();
 const { state } = cloud;
 
 const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
@@ -136,7 +136,7 @@ const dateLabel = computed(() =>
           <TaskList
             :tasks="todayTasks"
             :date="today"
-            :disabled="locked"
+            :disabled="recordLocked"
             @toggle="toggleTask($event, today)"
           />
           <p class="task-footnote">留一点时间照顾自己，也是一件重要的事。</p>

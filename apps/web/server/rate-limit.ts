@@ -3,6 +3,11 @@ import type { DatabaseSync } from 'node:sqlite';
 import { transaction } from './database.ts';
 import { ApiError, hash } from './service.ts';
 
+type RateLimitRequest = readonly [key: string, maximum: number];
+type RateLimiter = ((key: string, maximum: number, now?: number) => void) & {
+  many: (requests: readonly RateLimitRequest[], now?: number) => void;
+};
+
 export function clientAddress(peer: string, forwarded: string | undefined, trusted: string[]) {
   const normalize = (value: string) => value.replace(/^::ffff:/, '');
 
@@ -31,36 +36,52 @@ export function createRateLimiter(db: DatabaseSync, capacity = 10000) {
   );
   let nextCleanup = 0;
 
-  return (key: string, maximum: number, now = Date.now()) => {
-    const digest = hash(key);
-
+  const enforce = (requests: readonly RateLimitRequest[], now = Date.now()) => {
+    let rejection: ApiError | undefined;
     transaction(db, () => {
       if (now >= nextCleanup) {
         deleteExpired.run(now);
         nextCleanup = now + 60000;
       }
 
-      const entry = selectEntry.get(digest) as { count: number; until: number } | undefined;
+      for (const [key, maximum] of requests) {
+        const digest = hash(key);
+        const entry = selectEntry.get(digest) as { count: number; until: number } | undefined;
 
-      if (entry && entry.until > now && entry.count >= maximum) {
-        throw new ApiError(429, '尝试次数过多，请 15 分钟后再试。');
-      }
+        if (entry && entry.until > now && entry.count >= maximum) {
+          rejection = new ApiError(429, '尝试次数过多，请 15 分钟后再试。');
 
-      if (!entry) {
-        const { count } = countEntries.get() as { count: number };
+          break;
+        }
 
-        if (count >= capacity) {
-          // Reclaim expired keys on capacity pressure, even between maintenance passes.
-          deleteExpired.run(now);
-          const remaining = countEntries.get() as { count: number };
+        if (!entry) {
+          const { count } = countEntries.get() as { count: number };
 
-          if (remaining.count >= capacity) {
-            throw new ApiError(429, '请求过多，请稍后重试。');
+          if (count >= capacity) {
+            // Reclaim expired keys on capacity pressure, even between maintenance passes.
+            deleteExpired.run(now);
+            const remaining = countEntries.get() as { count: number };
+
+            if (remaining.count >= capacity) {
+              rejection = new ApiError(429, '请求过多，请稍后重试。');
+
+              break;
+            }
           }
         }
-      }
 
-      upsertEntry.run(digest, now + 15 * 60000, now, now);
+        upsertEntry.run(digest, now + 15 * 60000, now, now);
+      }
     });
+
+    if (rejection) {
+      throw rejection;
+    }
   };
+
+  const limit = ((key: string, maximum: number, now?: number) =>
+    enforce([[key, maximum]], now)) as RateLimiter;
+  limit.many = enforce;
+
+  return limit;
 }

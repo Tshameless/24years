@@ -5,7 +5,9 @@ import type { PregnancyRecord } from '@/domain/family';
 
 type MedicalCard = Extract<PregnancyRecord, { type: 'medical' }>;
 const { records } = usePregnancyRecords();
-const card = computed(() => records.value.find((item): item is MedicalCard => item.type === 'medical'));
+const card = computed(() =>
+  records.value.find((item): item is MedicalCard => item.type === 'medical'),
+);
 </script>
 
 <template>
@@ -36,7 +38,12 @@ const card = computed(() => records.value.find((item): item is MedicalCard => it
       </article>
     </div>
     <div class="emergency-actions">
-      <a class="button button-primary" href="tel:120">拨打 120</a>
+      <a
+        class="button button-primary"
+        href="tel:120"
+      >
+        拨打 120
+      </a>
       <a
         v-if="card?.phone"
         class="button button-secondary"
@@ -44,7 +51,12 @@ const card = computed(() => records.value.find((item): item is MedicalCard => it
       >
         联系就医卡电话
       </a>
-      <RouterLink class="button button-secondary" to="/pregnancy?tab=medical">查看就医卡</RouterLink>
+      <RouterLink
+        class="button button-secondary"
+        to="/pregnancy?tab=medical"
+      >
+        查看就医卡
+      </RouterLink>
     </div>
     <p class="muted">本页是应急准备信息，不能替代医生诊断、急救培训或医院分诊。</p>
   </section>

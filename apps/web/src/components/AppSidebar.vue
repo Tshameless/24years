@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { FamilyProfile } from '@/domain/family';
 import AppIcon from './AppIcon.vue';
 
-defineProps<{
+const props = defineProps<{
   navigation: readonly { to: string; label: string; icon: string }[];
   currentPath: string;
   profile: FamilyProfile | null;
   familyMode: 'single' | 'couple';
   active: boolean;
 }>();
+const hasGrowthArchive = computed(() => props.navigation.some((item) => item.to === '/children'));
 </script>
 
 <template>
@@ -33,6 +35,7 @@ defineProps<{
     <div class="sidebar-label">OUR LITTLE JOURNEY</div>
     <nav
       class="primary-nav"
+      :class="{ 'has-growth-archive': hasGrowthArchive }"
       aria-label="主导航"
     >
       <RouterLink
@@ -298,12 +301,23 @@ defineProps<{
     gap: 4px;
   }
 
+  .primary-nav.has-growth-archive {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
   .primary-nav a {
     flex-direction: column;
     padding: 9px 2px;
     gap: 5px;
     font-size: 12px;
     border-radius: 9px;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .primary-nav.has-growth-archive a {
+    padding-inline: 0;
+    font-size: 11px;
   }
 
   .nav-dot {
