@@ -9,7 +9,7 @@ import { isDate, localDate, sameValue, validTask, type FamilyTask } from '@/doma
 
 const props = defineProps<{ task?: FamilyTask }>();
 const emit = defineEmits<{ saved: []; cancel: [] }>();
-const { data, addTask, updateTask, locked, cloud, identity } = useFamily();
+const { data, addTask, updateTask, recordLocked, cloud, identity } = useFamily();
 const before = props.task ? (JSON.parse(JSON.stringify(props.task)) as FamilyTask) : undefined;
 const stale = computed(
   () =>
@@ -50,7 +50,7 @@ function applyTemplate() {
   if (
     template.value === '' ||
     !selected ||
-    locked.value ||
+    recordLocked.value ||
     before ||
     stale.value ||
     draftBlocked.value
@@ -83,7 +83,7 @@ function cancel() {
 async function submit() {
   error.value = '';
 
-  if (locked.value || stale.value || draftBlocked.value) {
+  if (recordLocked.value || stale.value || draftBlocked.value) {
     return;
   }
 
@@ -169,7 +169,7 @@ async function submit() {
       <button
         type="button"
         class="button button-secondary"
-        :disabled="locked || !!stale || draftBlocked || template === ''"
+        :disabled="recordLocked || !!stale || draftBlocked || template === ''"
         @click="applyTemplate"
       >
         填入模板
@@ -251,7 +251,7 @@ async function submit() {
     </p>
     <button
       class="button button-primary"
-      :disabled="locked || !!stale || draftBlocked"
+        :disabled="recordLocked || !!stale || draftBlocked"
     >
       {{ before ? '保存计划修改' : '保存计划' }}
     </button>

@@ -4,16 +4,28 @@ import FormDraftNotice from '@/components/FormDraftNotice.vue';
 import { useFamily } from '@/composables/useFamily';
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
-import { localDate, validPregnancyRecord, type PregnancyOutcome } from '@/domain/family';
+import {
+  childIdForOutcome,
+  localDate,
+  validPregnancyRecord,
+  type Child,
+  type PregnancyOutcome,
+} from '@/domain/family';
 
 const { outcome, outcomeDisabled, saveOutcome, error, message, reportError } =
   usePregnancyRecords();
 const familyStore = useFamily();
-const syncedChild = computed(() =>
-  outcome.value?.kind === 'birth'
-    ? (familyStore.data.value.children ?? []).find((c) => c.birthDate === outcome.value?.date)
-    : null,
-);
+const syncedChild = computed(() => {
+  const currentOutcome = outcome.value;
+
+  return currentOutcome?.kind === 'birth'
+    ? (familyStore.data.value.children ?? []).find(
+        (child) =>
+          child.sourceOutcomeId === currentOutcome.id ||
+          child.id === childIdForOutcome(currentOutcome.id),
+      )
+    : null;
+});
 const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
   type: 'outcome',
   initial: outcome.value,
@@ -104,28 +116,52 @@ async function submit() {
     return;
   }
 
-  if (await saveOutcome({ type: 'pregnancy', before: before.value, value })) {
+  const previousOutcome = before.value?.type === 'outcome' ? before.value : null;
+  const children = familyStore.data.value.children ?? [];
+  const legacyMatches = previousOutcome?.kind === 'birth'
+    ? children.filter(
+        (child) =>
+          child.birthDate === previousOutcome.date &&
+          child.name === (previousOutcome.babyName?.trim() || '宝宝'),
+      )
+    : [];
+  const linkedChild =
+    children.find(
+      (child) => child.sourceOutcomeId === value.id || child.id === childIdForOutcome(value.id),
+    ) ??
+    (legacyMatches.length === 1 ? legacyMatches[0] : null);
+  const change: Parameters<typeof saveOutcome>[0] = {
+    type: 'pregnancy',
+    before: before.value,
+    value,
+  };
+
+  if (birth.value) {
+    const babyName = form.babyName.trim() || '宝宝';
+    const child: Child = {
+      ...linkedChild,
+      id: linkedChild?.id ?? childIdForOutcome(value.id),
+      name: babyName,
+      birthDate: value.date,
+      sourceOutcomeId: value.id,
+      birthWeightGrams: form.birthWeightGrams ? Number(form.birthWeightGrams) : undefined,
+      birthLengthCm: form.birthLengthCm ? Number(form.birthLengthCm) : undefined,
+      headCircumferenceCm: form.headCircumferenceCm
+        ? Number(form.headCircumferenceCm)
+        : undefined,
+      notes: form.notes.trim()
+        ? `出生记录：${form.notes.trim()}`
+        : linkedChild?.notes?.startsWith('出生记录：')
+          ? undefined
+          : linkedChild?.notes,
+    };
+    change.child = { before: linkedChild, value: child };
+  } else if (previousOutcome?.kind === 'birth' && linkedChild) {
+    change.child = { before: linkedChild, value: null };
+  }
+
+  if (await saveOutcome(change)) {
     reset(value as PregnancyOutcome);
-
-    if (birth.value) {
-      const babyName = form.babyName.trim() || '宝宝';
-      const existing = (familyStore.data.value.children ?? []).find(
-        (c) => c.birthDate === form.date && c.name === babyName,
-      );
-
-      if (!existing) {
-        familyStore.addChild({
-          name: babyName,
-          birthDate: form.date,
-          birthWeightGrams: form.birthWeightGrams ? Number(form.birthWeightGrams) : undefined,
-          birthLengthCm: form.birthLengthCm ? Number(form.birthLengthCm) : undefined,
-          headCircumferenceCm: form.headCircumferenceCm
-            ? Number(form.headCircumferenceCm)
-            : undefined,
-          notes: form.notes.trim() ? `出生记录：${form.notes.trim()}` : undefined,
-        });
-      }
-    }
   }
 }
 

@@ -1,5 +1,6 @@
 import { dayDifference, isDate, isObject, shortText } from './primitives.ts';
 import { validGrowthRecord, type ChildGrowthRecord } from './growth.ts';
+import { MAX_FAMILY_COLLECTION_RECORDS } from './capacity.ts';
 
 export type ChildGender = 'boy' | 'girl' | 'other' | 'unknown';
 export type ChildBloodType = 'A' | 'B' | 'AB' | 'O' | 'unknown';
@@ -15,7 +16,12 @@ export interface Child {
   headCircumferenceCm?: number;
   birthGestationalWeeks?: number;
   notes?: string;
+  sourceOutcomeId?: string;
   growthRecords?: readonly ChildGrowthRecord[];
+}
+
+export function childIdForOutcome(outcomeId: string): string {
+  return `birth-${outcomeId}`.slice(0, 64);
 }
 
 export function validChild(value: unknown): value is Child {
@@ -34,6 +40,7 @@ export function validChild(value: unknown): value is Child {
     headCircumferenceCm,
     birthGestationalWeeks,
     notes,
+    sourceOutcomeId,
     growthRecords,
   } = value as Record<string, unknown>;
 
@@ -106,9 +113,14 @@ export function validChild(value: unknown): value is Child {
     return false;
   }
 
+  if (sourceOutcomeId !== undefined && !shortText(sourceOutcomeId, 100)) {
+    return false;
+  }
+
   if (
     growthRecords !== undefined &&
     (!Array.isArray(growthRecords) ||
+      growthRecords.length > MAX_FAMILY_COLLECTION_RECORDS ||
       !growthRecords.every(validGrowthRecord) ||
       !growthRecords.every((record) => record.date >= birthDate) ||
       new Set(growthRecords.map((r) => r.id)).size !== growthRecords.length)

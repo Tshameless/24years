@@ -24,7 +24,12 @@ import type {
   SessionState,
   SharedFamily,
 } from '../src/domain/collaboration.ts';
-import { familyBlobBytes, MAX_CLOUD_BYTES } from '../src/domain/capacity.ts';
+import {
+  familyBlobBytes,
+  MAX_CLOUD_BYTES,
+  MAX_FAMILY_COLLECTION_RECORDS,
+  withinFamilyCollectionLimits,
+} from '../src/domain/capacity.ts';
 import { transaction } from './database.ts';
 import { ApiError, hash, requireValue, type Body } from './auth.ts';
 import {
@@ -113,6 +118,32 @@ export function createFamilyMutations(options: {
     ).run(familyId, userId, 'success', now);
   }
 
+  function requireCollectionRoom(
+    table: 'family_tasks' | 'family_expenses' | 'family_pregnancy_records' | 'family_children',
+    familyId: string,
+  ) {
+    const row = db
+      .prepare(`SELECT count(*) AS count FROM ${table} WHERE family_id = ?`)
+      .get(familyId) as { count: number };
+
+    requireValue(
+      Number(row.count) < MAX_FAMILY_COLLECTION_RECORDS,
+      413,
+      `该家庭的记录数量已达到 ${MAX_FAMILY_COLLECTION_RECORDS} 条上限。`,
+    );
+  }
+
+  function growthRecordCount(familyId: string): number {
+    const row = db
+      .prepare(
+        `SELECT COALESCE(SUM(json_array_length(json_extract(data, '$.growthRecords'))), 0) AS count
+         FROM family_children WHERE family_id = ?`,
+      )
+      .get(familyId) as { count: number };
+
+    return Number(row.count);
+  }
+
   function createFamily(userId: string, body: Body) {
     requireValue(!membership(userId), 409, '你已经拥有家庭，请先查看当前家庭。');
     requireValue(body.mode === 'single' || body.mode === 'couple', 400, '请选择单人或多人模式。');
@@ -133,6 +164,11 @@ export function createFamilyMutations(options: {
       familyBlobBytes(data) < MAX_CLOUD_BYTES,
       413,
       '档案超过云端 800 KB 容量上限，可继续在本机保存。',
+    );
+    requireValue(
+      withinFamilyCollectionLimits(data),
+      413,
+      `每个云端记录集合及单家庭生长记录不能超过 ${MAX_FAMILY_COLLECTION_RECORDS} 条。`,
     );
 
     const familyId = randomUUID();
@@ -194,9 +230,16 @@ export function createFamilyMutations(options: {
       return;
     }
 
-    const family = snapshot(userId).family!;
     const change = body.change as Body | null;
     requireValue(change && typeof change === 'object', 400, '修改内容无效。');
+    const familyId = member.family_id;
+    const familyRow = db
+      .prepare('SELECT revision FROM families WHERE id = ?')
+      .get(familyId) as { revision: number } | undefined;
+    requireValue(familyRow, 404, '家庭不存在。');
+    const familyRevision = Number(familyRow.revision);
+    let familySnapshot: SharedFamily | null = null;
+    const getFamily = () => (familySnapshot ??= snapshot(userId).family!);
     const { before, value } = change;
     const now = new Date().toISOString();
     const deltaEntries: Array<{
@@ -206,34 +249,44 @@ export function createFamilyMutations(options: {
     }> = [];
 
     if (change.type === 'profile') {
+      const familyState = getFamily();
       requireValue(member.role === 'owner', 403, '只有管理员可以修改家庭档案。');
       requireValue(validProfile(value), 400, '家庭档案格式无效。');
       requireValue(
-        isDeepStrictEqual(family.data.profile, before),
+        isDeepStrictEqual(familyState.data.profile, before),
         409,
         '家庭档案已被另一台设备修改。',
       );
-      const mode = value.familyMode ?? family.mode;
-      const currentRole = family.members.find((item) => item.id === userId)!.familyRole;
+      const mode = value.familyMode ?? familyState.mode;
+      const currentRole = familyState.members.find((item) => item.id === userId)!.familyRole;
       const selectedRole = familyRole(
         value.parentRole ?? (mode === 'single' ? 'single_parent' : currentRole),
         mode,
       );
-      updateFamilyChoice(userId, family, mode, selectedRole);
-      family.data.profile = { ...value, familyMode: mode, parentRole: selectedRole };
-      deltaEntries.push({ recordType: 'profile', recordId: 'profile', value: family.data.profile });
+      updateFamilyChoice(userId, familyState, mode, selectedRole);
+      familyState.data.profile = { ...value, familyMode: mode, parentRole: selectedRole };
+      deltaEntries.push({
+        recordType: 'profile',
+        recordId: 'profile',
+        value: familyState.data.profile,
+      });
     } else if (change.type === 'pregnancy') {
-      const previousProfile = family.data.profile;
+      const familyState = getFamily();
+      const previousProfile = familyState.data.profile;
       const pregnancyChange = change as unknown as PregnancyChange;
 
       try {
-        family.data = applyPregnancyChange(family.data, pregnancyChange);
+        familyState.data = applyPregnancyChange(familyState.data, pregnancyChange);
       } catch (reason) {
         if (reason instanceof PregnancyChangeError) {
           throw new ApiError(reason.status, reason.message);
         }
 
         throw reason;
+      }
+
+      if (!pregnancyChange.before && pregnancyChange.value) {
+        requireCollectionRoom('family_pregnancy_records', familyId);
       }
 
       const recordId = (pregnancyChange.before ?? pregnancyChange.value)!.id;
@@ -243,20 +296,54 @@ export function createFamilyMutations(options: {
               .prepare(
                 'SELECT position FROM family_pregnancy_records WHERE family_id = ? AND id = ?',
               )
-              .get(family.id, recordId) as { position: number } | undefined
+              .get(familyId, recordId) as { position: number } | undefined
           )?.position
         : undefined;
-      upsertPregnancyRow(db, family.id, recordId, pregnancyChange.value, now, currentPosition);
+      upsertPregnancyRow(db, familyId, recordId, pregnancyChange.value, now, currentPosition);
       deltaEntries.push({
         recordType: 'pregnancy',
         recordId,
         value: pregnancyChange.value,
       });
 
+      if (pregnancyChange.child) {
+        const { before: childBefore, value: childValue } = pregnancyChange.child;
+        const childId = (childBefore ?? childValue)!.id;
+        const currentChild = readRelationalRecord<Child>(db, 'family_children', familyId, childId);
+        requireValue(
+          isDeepStrictEqual(currentChild?.value ?? null, childBefore),
+          409,
+          '关联的新生儿档案已变化，请刷新后重试。',
+        );
+        if (!childBefore && childValue) {
+          requireCollectionRoom('family_children', familyId);
+        }
+        const oldGrowthCount = currentChild?.value.growthRecords?.length ?? 0;
+        const newGrowthCount = childValue?.growthRecords?.length ?? 0;
+
+        if (oldGrowthCount !== newGrowthCount) {
+          requireValue(
+            growthRecordCount(familyId) - oldGrowthCount + newGrowthCount <=
+              MAX_FAMILY_COLLECTION_RECORDS,
+            413,
+            `单家庭生长记录不能超过 ${MAX_FAMILY_COLLECTION_RECORDS} 条。`,
+          );
+        }
+        upsertChildRow(
+          db,
+          familyId,
+          childId,
+          childValue,
+          now,
+          currentChild?.position,
+        );
+        deltaEntries.push({ recordType: 'child', recordId: childId, value: childValue });
+      }
+
       if (pregnancyChange.expense) {
         upsertExpenseRow(
           db,
-          family.id,
+          familyId,
           pregnancyChange.expense.id,
           pregnancyChange.expense,
           true,
@@ -269,11 +356,11 @@ export function createFamilyMutations(options: {
         });
       }
 
-      if (!isDeepStrictEqual(previousProfile, family.data.profile)) {
+      if (!isDeepStrictEqual(previousProfile, familyState.data.profile)) {
         deltaEntries.push({
           recordType: 'profile',
           recordId: 'profile',
-          value: family.data.profile,
+          value: familyState.data.profile,
         });
       }
     } else if (change.type === 'child') {
@@ -288,14 +375,28 @@ export function createFamilyMutations(options: {
       const next = value as { id: string } | null;
       requireValue(!previous || !next || previous.id === next.id, 400, '不能修改孩子记录编号。');
       const id = (previous ?? next)!.id;
-      const currentRow = readRelationalRecord<Child>(db, 'family_children', family.id, id);
+      if (!previous && next) {
+        requireCollectionRoom('family_children', familyId);
+      }
+      const currentRow = readRelationalRecord<Child>(db, 'family_children', familyId, id);
       const current = currentRow?.value ?? null;
       requireValue(
         isDeepStrictEqual(current, before),
         409,
         '这条孩子记录已被另一位成员修改或删除。',
       );
-      upsertChildRow(db, family.id, id, value as Child | null, now, currentRow?.position);
+      const oldGrowthCount = currentRow?.value.growthRecords?.length ?? 0;
+      const newGrowthCount = next && validChild(next) ? next.growthRecords?.length ?? 0 : 0;
+
+      if (oldGrowthCount !== newGrowthCount) {
+        requireValue(
+          growthRecordCount(familyId) - oldGrowthCount + newGrowthCount <=
+            MAX_FAMILY_COLLECTION_RECORDS,
+          413,
+          `单家庭生长记录不能超过 ${MAX_FAMILY_COLLECTION_RECORDS} 条。`,
+        );
+      }
+      upsertChildRow(db, familyId, id, value as Child | null, now, currentRow?.position);
       deltaEntries.push({ recordType: 'child', recordId: id, value });
     } else {
       requireValue(change.type === 'task' || change.type === 'expense', 400, '不支持的记录类型。');
@@ -312,17 +413,21 @@ export function createFamilyMutations(options: {
       requireValue(!previous || !next || previous.id === next.id, 400, '不能修改记录编号。');
       const id = (previous ?? next)!.id;
       const table = change.type === 'task' ? 'family_tasks' : 'family_expenses';
-      const currentRow = readRelationalRecord<FamilyTask | Expense>(db, table, family.id, id);
+      const currentRow = readRelationalRecord<FamilyTask | Expense>(db, table, familyId, id);
       const current = currentRow?.value ?? null;
       requireValue(isDeepStrictEqual(current, before), 409, '这条记录已被另一位成员修改或删除。');
 
+      if (!previous && next) {
+        requireCollectionRoom(table, familyId);
+      }
+
       if (change.type === 'task') {
-        upsertTaskRow(db, family.id, id, value as FamilyTask | null, now, currentRow?.position);
+        upsertTaskRow(db, familyId, id, value as FamilyTask | null, now, currentRow?.position);
         deltaEntries.push({ recordType: 'task', recordId: id, value });
       } else {
         upsertExpenseRow(
           db,
-          family.id,
+          familyId,
           id,
           value as Expense | null,
           false,
@@ -333,27 +438,28 @@ export function createFamilyMutations(options: {
       }
     }
 
-    requireValue(
-      familyBlobBytes(family.data) < MAX_CLOUD_BYTES,
-      413,
-      '家庭记录已达到当前容量上限，请先导出备份。',
-    );
-    const compactData = JSON.stringify(familyBlobData(family.data));
-    const storedData = db.prepare('SELECT data FROM families WHERE id = ?').get(family.id) as
-      | { data: string }
-      | undefined;
-    // Task, expense, child and pregnancy collection edits are row-local. Only
-    // persist the blob when low-frequency metadata (for example profile) changed.
+    if (change.type === 'profile' || change.type === 'pregnancy') {
+      const familyState = getFamily();
+      requireValue(
+        familyBlobBytes(familyState.data) < MAX_CLOUD_BYTES,
+        413,
+        '家庭记录已达到当前容量上限，请先导出备份。',
+      );
+      const compactData = JSON.stringify(familyBlobData(familyState.data));
+      const storedData = db.prepare('SELECT data FROM families WHERE id = ?').get(familyId) as
+        | { data: string }
+        | undefined;
 
-    if (storedData?.data !== compactData) {
-      db.prepare('UPDATE families SET data = ? WHERE id = ?').run(compactData, family.id);
+      if (storedData?.data !== compactData) {
+        db.prepare('UPDATE families SET data = ? WHERE id = ?').run(compactData, familyId);
+      }
     }
 
-    touch(family.id, userId);
-    recordDeltaEntries(db, family.id, family.revision + 1, deltaEntries);
+    touch(familyId, userId);
+    recordDeltaEntries(db, familyId, familyRevision + 1, deltaEntries);
     db.prepare(
       'INSERT INTO receipts(user_id, operation_id, family_id, payload_hash, created_at) VALUES (?, ?, ?, ?, ?)',
-    ).run(userId, body.operationId, family.id, payloadHash, Date.now());
+    ).run(userId, body.operationId, familyId, payloadHash, Date.now());
   }
 
   function manage(userId: string, action: string, body: Body) {
@@ -580,6 +686,11 @@ export function createFamilyMutations(options: {
       413,
       '备份内容超过云端 800 KB 容量上限，可退出账号后恢复到本机。',
     );
+    requireValue(
+      withinFamilyCollectionLimits(data),
+      413,
+      `每个云端记录集合及单家庭生长记录不能超过 ${MAX_FAMILY_COLLECTION_RECORDS} 条。`,
+    );
     const now = new Date().toISOString();
     db.prepare(
       'INSERT INTO import_backups VALUES (?, ?, ?) ON CONFLICT(family_id) DO UPDATE SET data = excluded.data, created_at = excluded.created_at',
@@ -596,14 +707,17 @@ export function createFamilyMutations(options: {
     ).run(userId, body.operationId, family.id, payloadHash, Date.now());
   }
 
-  function mutate(
+  type MutationResponse = SessionState & {
+    invitation?: { code: string; expiresAt: string };
+    backupData?: FamilyData;
+  };
+
+  function mutateInternal(
     userId: string,
     action: string,
     body: Body,
-  ): SessionState & {
-    invitation?: { code: string; expiresAt: string };
-    backupData?: FamilyData;
-  } {
+    includeSnapshot: boolean,
+  ): MutationResponse | { user: Account } {
     try {
       return transaction(db, () => {
         let invitation;
@@ -630,7 +744,9 @@ export function createFamilyMutations(options: {
           invitation = manage(userId, action, body);
         }
 
-        return { ...snapshot(userId), invitation };
+        return includeSnapshot
+          ? { ...snapshot(userId), invitation }
+          : { user: account(userId) };
       });
     } catch (error) {
       if (action === 'join') {
@@ -646,5 +762,13 @@ export function createFamilyMutations(options: {
     }
   }
 
-  return { mutate };
+  function mutate(userId: string, action: string, body: Body): MutationResponse {
+    return mutateInternal(userId, action, body, true) as MutationResponse;
+  }
+
+  function mutateRecordsCompact(userId: string, body: Body): { user: Account } {
+    return mutateInternal(userId, 'records', body, false) as { user: Account };
+  }
+
+  return { mutate, mutateRecordsCompact };
 }

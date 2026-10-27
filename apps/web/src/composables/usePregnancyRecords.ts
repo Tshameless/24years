@@ -9,7 +9,7 @@ export function usePregnancyRecords() {
   const error = shallowRef('');
   const records = computed(() => store.data.value.pregnancyRecords ?? []);
   const outcome = computed(() => pregnancyOutcome(records.value));
-  const outcomeDisabled = computed(() => store.locked.value || busy.value);
+  const outcomeDisabled = computed(() => store.recordLocked.value || busy.value);
   const disabled = computed(() => outcomeDisabled.value || !!outcome.value);
 
   async function persist(change: PregnancyChange, allowedType?: 'outcome' | 'postpartum') {

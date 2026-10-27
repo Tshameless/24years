@@ -1,8 +1,9 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, isReadonly } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BEFORE_IMPORT_KEY, createFamilyStore, STORAGE_KEY, type FamilyStore } from './useFamily';
 import { emptyFamily } from '@/domain/family';
+import { CLOUD_CACHE_KEY } from './cloudCache';
 
 const wrappers: ReturnType<typeof mount>[] = [];
 
@@ -61,7 +62,7 @@ describe('本地存档', () => {
     expect(setup().data.value.tasks[0]!.completedDates).toEqual(['2026-10-21']);
     expect(await store.toggleTask(id, '2026-10-22')).toBe(true);
   });
-  it('产检完成和费用在本机写入失败时一起回滚，重试可以恢复', () => {
+  it('产检完成和费用在本机写入失败时一起回滚，重试可以恢复', async () => {
     const store = setup();
     const before = {
       id: 'visit',
@@ -71,7 +72,7 @@ describe('本地存档', () => {
       notes: '',
       completed: false,
     };
-    store.savePregnancy({ type: 'pregnancy', before: null, value: before });
+    await store.savePregnancy({ type: 'pregnancy', before: null, value: before });
     const original = localStorage.getItem(STORAGE_KEY);
     const storage = localStorage;
     vi.stubGlobal('localStorage', {
@@ -94,12 +95,12 @@ describe('本地存档', () => {
         reimbursedCents: 0,
       },
     };
-    expect(store.savePregnancy(change)).toBe(false);
+    expect(await store.savePregnancy(change)).toBe(false);
     expect(localStorage.getItem(STORAGE_KEY)).toBe(original);
     expect(store.data.value.expenses).toHaveLength(0);
     expect(store.data.value.pregnancyRecords).toEqual([before]);
     vi.unstubAllGlobals();
-    expect(store.savePregnancy(change)).toBe(true);
+    expect(await store.savePregnancy(change)).toBe(true);
     expect(setup().data.value.expenses).toHaveLength(1);
     expect(setup().data.value.pregnancyRecords).toEqual([change.value]);
   });
@@ -122,7 +123,7 @@ describe('本地存档', () => {
 
   it('无效备份、过时预览和存储失败都不覆盖记录', async () => {
     const store = setup();
-    store.saveProfile(profile);
+    await store.saveProfile(profile);
     const before = localStorage.getItem(STORAGE_KEY);
     const target = store.importTarget();
     await expect(store.importBackup('{invalid', target, 'operation')).rejects.toThrow(
@@ -130,7 +131,7 @@ describe('本地存档', () => {
     );
     expect(localStorage.getItem(STORAGE_KEY)).toBe(before);
     const next = JSON.stringify(emptyFamily());
-    store.saveProfile({ ...profile, name: '已更新' });
+    await store.saveProfile({ ...profile, name: '已更新' });
     await expect(store.importBackup(next, target, 'operation')).rejects.toThrow('本机记录已变化');
     const updated = localStorage.getItem(STORAGE_KEY);
     const latest = store.importTarget();
@@ -144,20 +145,20 @@ describe('本地存档', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe(updated);
     expect(store.data.value.profile?.name).toBe('已更新');
   });
-  it('家庭、账本与打卡可在新实例恢复，每日打卡相互独立', () => {
+  it('家庭、账本与打卡可在新实例恢复，每日打卡相互独立', async () => {
     const store = setup();
-    expect(store.saveProfile(profile)).toBe(true);
-    store.addTask({
+    expect(await store.saveProfile(profile)).toBe(true);
+    await store.addTask({
       title: '写下今天的心情',
       date: '2026-10-09',
       time: '20:00',
       repeat: 'daily',
     });
     const id = store.data.value.tasks[0].id;
-    store.toggleTask(id, '2026-10-09');
-    store.toggleTask(id, '2026-10-10');
-    store.toggleTask(id, '2026-10-09');
-    store.addExpense({
+    await store.toggleTask(id, '2026-10-09');
+    await store.toggleTask(id, '2026-10-10');
+    await store.toggleTask(id, '2026-10-09');
+    await store.addExpense({
       title: '账目',
       date: '2026-10-09',
       kind: 'expense',
@@ -170,9 +171,9 @@ describe('本地存档', () => {
     expect(restored.data.value.tasks[0].completedDates).toEqual(['2026-10-10']);
     expect(restored.data.value.expenses[0].amountCents).toBe(1020);
   });
-  it('写入失败不展示成功状态，也不覆盖已保存记录', () => {
+  it('写入失败不展示成功状态，也不覆盖已保存记录', async () => {
     const store = setup();
-    store.saveProfile(profile);
+    await store.saveProfile(profile);
     const original = localStorage.getItem(STORAGE_KEY);
     // Replace the boundary: happy-dom's Storage proxy hides method descriptors,
     // so an instance method spy cannot be reliably restored between tests.
@@ -182,31 +183,31 @@ describe('本地存档', () => {
         throw new Error('Quota exceeded');
       },
     });
-    expect(store.saveProfile({ ...profile, name: '新名称' })).toBe(false);
+    expect(await store.saveProfile({ ...profile, name: '新名称' })).toBe(false);
     expect(store.data.value.profile?.name).toBe(profile.name);
     expect(localStorage.getItem(STORAGE_KEY)).toBe(original);
     expect(store.error.value).toContain('保存失败');
   });
-  it('损坏存档保持原样，禁止写入', () => {
+  it('损坏存档保持原样，禁止写入', async () => {
     localStorage.setItem(STORAGE_KEY, '{broken');
     const store = setup();
     expect(store.locked.value).toBe(true);
-    expect(store.saveProfile(profile)).toBe(false);
+    expect(await store.saveProfile(profile)).toBe(false);
     expect(localStorage.getItem(STORAGE_KEY)).toBe('{broken');
   });
-  it('发现其他页面已写入时停止覆盖', () => {
+  it('发现其他页面已写入时停止覆盖', async () => {
     const first = setup();
     const second = setup();
-    first.saveProfile(profile);
-    expect(second.saveProfile({ ...profile, name: '过时页面' })).toBe(false);
+    await first.saveProfile(profile);
+    expect(await second.saveProfile({ ...profile, name: '过时页面' })).toBe(false);
     expect(second.error.value).toContain('另一个页面');
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).profile.name).toBe(profile.name);
   });
-  it('页面跨过本地午夜后自动切换今日计划', () => {
+  it('页面跨过本地午夜后自动切换今日计划', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 9, 9, 23, 59, 50));
     const store = setup();
-    store.addTask({
+    await store.addTask({
       title: '明天的事',
       date: '2026-10-10',
       time: '09:00',
@@ -217,12 +218,12 @@ describe('本地存档', () => {
     expect(store.today.value).toBe('2026-10-10');
     expect(store.todayTasks.value).toHaveLength(1);
   });
-  it('支持儿童信息的添加、编辑与删除，并同步本地存档', () => {
+  it('支持儿童信息的添加、编辑与删除，并同步本地存档', async () => {
     const store = setup();
     expect(store.children.value).toHaveLength(0);
 
     const childId = 'child-test-1';
-    const added = store.addChild(
+    const added = await store.addChild(
       {
         name: '安安',
         birthDate: '2026-10-01',
@@ -235,7 +236,7 @@ describe('本地存档', () => {
     expect(store.children.value).toHaveLength(1);
     expect(store.children.value[0].name).toBe('安安');
 
-    const updated = store.updateChild(
+    const updated = await store.updateChild(
       {
         id: childId,
         name: '安安（大名）',
@@ -248,8 +249,61 @@ describe('本地存档', () => {
     expect(updated).toBe(true);
     expect(store.children.value[0].name).toBe('安安（大名）');
 
-    const removed = store.removeChild(childId);
+    const removed = await store.removeChild(childId);
     expect(removed).toBe(true);
     expect(store.children.value).toHaveLength(0);
   });
+});
+
+it('离线云端家庭允许连续排队并立即显示待同步记录', async () => {
+  const user = { id: 'offline-user', username: 'offline', nickname: '家长' };
+  const family = {
+    id: 'offline-family',
+    mode: 'single' as const,
+    revision: 1,
+    data: emptyFamily(),
+    members: [{ ...user, role: 'owner' as const, familyRole: 'single_parent' as const }],
+    updatedAt: new Date().toISOString(),
+    updatedBy: user.id,
+    inviteExpiresAt: null,
+  };
+  localStorage.setItem('24years.cloud.active', 'true');
+  localStorage.setItem(
+    CLOUD_CACHE_KEY,
+    JSON.stringify({ version: 1, savedAt: Date.now(), state: { user, family } }),
+  );
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+  let store!: FamilyStore;
+  wrappers.push(
+    mount(
+      defineComponent({
+        setup() {
+          store = createFamilyStore();
+
+          return () => null;
+        },
+      }),
+    ),
+  );
+
+  await flushPromises();
+  expect(store.locked.value).toBe(true);
+  expect(store.recordLocked.value).toBe(false);
+
+  const first = await store.addTask({
+    title: '离线第一条',
+    date: '2026-10-27',
+    time: '09:00',
+    repeat: 'once',
+  });
+  const second = await store.addTask({
+    title: '离线第二条',
+    date: '2026-10-27',
+    time: '10:00',
+    repeat: 'once',
+  });
+
+  expect([first, second]).toEqual([true, true]);
+  expect(store.outboxCount.value).toBe(2);
+  expect(store.data.value.tasks.map((task) => task.title)).toEqual(['离线第一条', '离线第二条']);
 });

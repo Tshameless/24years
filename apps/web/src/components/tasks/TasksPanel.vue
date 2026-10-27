@@ -5,7 +5,7 @@ import TaskForm from './TaskForm.vue';
 import TaskList from './TaskList.vue';
 import type { FamilyTask } from '@/domain/family';
 
-const { data, today, todayTasks, toggleTask, removeTask, locked } = useFamily();
+const { data, today, todayTasks, toggleTask, removeTask, recordLocked } = useFamily();
 const filter = shallowRef('today');
 const notice = shallowRef('');
 const editing = shallowRef<FamilyTask>();
@@ -47,7 +47,7 @@ async function confirmRemove(id: string) {
       <TaskList
         :tasks="visible"
         :date="today"
-        :disabled="locked"
+        :disabled="recordLocked"
         removable
         @toggle="toggleTask($event, today)"
         @remove="confirmRemove"

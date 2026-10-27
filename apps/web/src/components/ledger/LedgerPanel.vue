@@ -8,7 +8,7 @@ import LedgerReport from './LedgerReport.vue';
 import LedgerSummaryBanner from './LedgerSummaryBanner.vue';
 import { filterLedger, type LedgerCategory } from '@/domain/ledgerReport';
 
-const { data, removeExpense, locked, today } = useFamily();
+const { data, removeExpense, recordLocked, today } = useFamily();
 const filter = shallowRef<LedgerCategory>('全部');
 const month = shallowRef('');
 const categories: LedgerCategory[] = ['全部', ...expenseCategories, '津贴'];
@@ -88,7 +88,7 @@ async function confirmRemove(id: string) {
       />
       <ExpenseList
         :expenses="visible"
-        :disabled="locked"
+        :disabled="recordLocked"
         @remove="confirmRemove"
         @edit="edit"
       />

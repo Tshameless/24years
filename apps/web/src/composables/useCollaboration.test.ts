@@ -349,13 +349,17 @@ it('persists failed mutations to outbox and automatically flushes when online', 
 
     // First attempt fails due to network disconnection
     const result = await cloud.applyChange({ type: 'task', before: null, value: task });
-    expect(result).toBe(false);
+    expect(result).toBe(true);
     expect(cloud.online.value).toBe(false);
     expect(cloud.outboxCount.value).toBe(1);
     expect(cloud.label.value).toContain('1 条待同步');
     const persisted = readOutbox(state.family!.id);
     expect(persisted).toHaveLength(1);
     expect(persisted[0]!.change).toEqual({ type: 'task', before: null, value: task });
+
+    const nextTask = { ...task, id: 'second-outbox-task', title: '离线第二项' };
+    expect(await cloud.applyChange({ type: 'task', before: null, value: nextTask })).toBe(true);
+    expect(cloud.outboxCount.value).toBe(2);
 
     // Restore network and flush
     shouldFail = false;
@@ -366,7 +370,7 @@ it('persists failed mutations to outbox and automatically flushes when online', 
 
     expect(cloud.outboxCount.value).toBe(0);
     expect(readOutbox(state.family!.id)).toHaveLength(0);
-    expect(cloud.state.value.family?.revision).toBe(2);
+    expect(cloud.state.value.family?.revision).toBe(3);
   } finally {
     wrapper.unmount();
   }

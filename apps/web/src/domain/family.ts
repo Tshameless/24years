@@ -49,6 +49,7 @@ export {
   type PregnancyRecord,
 } from './pregnancy.ts';
 export {
+  childIdForOutcome,
   formatChildAge,
   validChild,
   type Child,

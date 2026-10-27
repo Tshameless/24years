@@ -2,7 +2,7 @@ import { isDate, isObject, localDate, sameValue, shortText } from './primitives.
 import { validExpense, type Expense } from './ledger.ts';
 import type { FamilyProfile } from './profile.ts';
 import type { FamilyTask } from './tasks.ts';
-import type { Child } from './child.ts';
+import { validChild, type Child } from './child.ts';
 
 export interface FamilyData {
   version: 1;
@@ -153,6 +153,8 @@ export interface PregnancyChange {
   value: PregnancyRecord | null;
   /** Completing an existing checkup or packing item can atomically create one expense. */
   expense?: Expense;
+  /** A birth outcome and its linked child profile are saved in one transaction. */
+  child?: { before: Child | null; value: Child | null };
 }
 
 export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
@@ -389,7 +391,7 @@ export class PregnancyChangeError extends Error {
 }
 
 export function applyPregnancyChange(data: FamilyData, change: PregnancyChange): FamilyData {
-  const { before, value, expense } = change;
+  const { before, value, expense, child } = change;
 
   if (
     (before !== null && !validPregnancyRecord(before)) ||
@@ -405,6 +407,39 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
 
   if (!sameValue(records.find((item) => item.id === id) ?? null, before)) {
     throw new PregnancyChangeError('这条记录已变化，请重新打开最新记录，输入已保留。', 409);
+  }
+
+  let updatedChildren = data.children;
+
+  if (child) {
+    const linkedOutcome = value?.type === 'outcome' ? value : before?.type === 'outcome' ? before : null;
+    const { before: childBefore, value: childValue } = child;
+    const childId = childBefore?.id ?? childValue?.id;
+    const existingChild = data.children?.find((item) => item.id === childId) ?? null;
+
+    if (
+      !linkedOutcome ||
+      (!childBefore && !childValue) ||
+      (childBefore !== null && !validChild(childBefore)) ||
+      (childValue !== null && !validChild(childValue)) ||
+      (childBefore && childValue && childBefore.id !== childValue.id) ||
+      (childValue?.sourceOutcomeId !== undefined && childValue.sourceOutcomeId !== linkedOutcome.id)
+    ) {
+      throw new PregnancyChangeError('关联的新生儿档案格式无效。');
+    }
+
+    if (!sameValue(existingChild, childBefore)) {
+      throw new PregnancyChangeError('关联的新生儿档案已变化，请刷新后重试。', 409);
+    }
+
+    if (childValue) {
+      updatedChildren = [
+        ...(data.children ?? []).filter((item) => item.id !== childId),
+        childValue,
+      ];
+    } else {
+      updatedChildren = (data.children ?? []).filter((item) => item.id !== childId);
+    }
   }
 
   const currentOutcome = pregnancyOutcome(records);
@@ -501,6 +536,7 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
         : data.profile,
     pregnancyRecords: updated,
     expenses: expense ? [expense, ...data.expenses] : data.expenses,
+    ...(updatedChildren !== undefined ? { children: updatedChildren } : {}),
   };
 }
 

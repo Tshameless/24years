@@ -52,6 +52,7 @@ export function useCollaboration(enabled = true) {
   const pendingOperations = new Map<string, string>();
   const outboxEntries = shallowRef<OutboxEntry[]>([]);
   const outboxCount = computed(() => outboxEntries.value.length);
+  const pendingChanges = computed(() => outboxEntries.value.map((entry) => entry.change));
   let flushingOutbox = false;
 
   function refreshOutbox() {
@@ -492,6 +493,33 @@ export function useCollaboration(enabled = true) {
       const key = canonicalJson({ familyId, change });
       const operationId = pendingOperations.get(key) ?? createId();
       pendingOperations.set(key, operationId);
+
+      if (!online.value) {
+        try {
+          enqueueOutboxEntry(familyId, {
+            id: createId(),
+            familyId,
+            operationId,
+            change,
+            createdAt: Date.now(),
+            retryCount: 0,
+          });
+          refreshOutbox();
+          error.value = '';
+
+          return true;
+        } catch (reason) {
+          pendingOperations.delete(key);
+          error.value =
+            reason instanceof OutboxCapacityError || reason instanceof OutboxStorageError
+              ? reason.message
+              : '离线修改未能保存，请恢复连接后重试。';
+          refreshOutbox();
+
+          return false;
+        }
+      }
+
       const success = await run('family/records', { familyId, change, operationId });
 
       if (success) {
@@ -519,7 +547,7 @@ export function useCollaboration(enabled = true) {
         }
       }
 
-      return success;
+      return success || outboxEntries.value.some((entry) => entry.operationId === operationId);
     });
     mutationQueue = task.catch(() => false);
 
@@ -751,6 +779,7 @@ export function useCollaboration(enabled = true) {
       error.value = '';
     },
     outboxCount: readonly(outboxCount),
+    pendingChanges: readonly(pendingChanges),
     flushOutbox,
   };
 }

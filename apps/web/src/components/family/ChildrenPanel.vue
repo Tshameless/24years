@@ -11,12 +11,14 @@ import {
 import AppIcon from '@/components/AppIcon.vue';
 import GrowthTracker from './GrowthTracker.vue';
 
-const { children, addChild, updateChild, removeChild, locked, today } = useFamily();
+const { children, addChild, updateChild, removeChild, recordLocked, today } = useFamily();
 
 const showModal = shallowRef(false);
 const editingId = shallowRef<string | null>(null);
 const expandedGrowthChildId = shallowRef<string | null>(null);
 const formError = shallowRef('');
+const actionError = shallowRef('');
+const saving = shallowRef(false);
 
 const form = reactive({
   name: '',
@@ -68,7 +70,11 @@ function closeModal() {
   formError.value = '';
 }
 
-function saveChildForm() {
+async function saveChildForm() {
+  if (saving.value) {
+    return;
+  }
+
   formError.value = '';
 
   const name = form.name.trim();
@@ -130,26 +136,46 @@ function saveChildForm() {
         ...payload,
       };
 
-      if (updateChild(updated, existing)) {
-        closeModal();
-      } else {
-        formError.value = '更新失败，请重试。';
+      saving.value = true;
+
+      try {
+        if (await updateChild(updated, existing)) {
+          closeModal();
+        } else {
+          formError.value = '更新失败，请重试。';
+        }
+      } finally {
+        saving.value = false;
       }
+    } else {
+      formError.value = '孩子档案已变化，请关闭后重新打开。';
     }
   } else {
-    if (addChild(payload)) {
-      closeModal();
-    } else {
-      formError.value = '添加失败，请重试。';
+    saving.value = true;
+
+    try {
+      if (await addChild(payload)) {
+        closeModal();
+      } else {
+        formError.value = '添加失败，请重试。';
+      }
+    } finally {
+      saving.value = false;
     }
   }
 }
 
-function confirmDelete(child: Child) {
+async function confirmDelete(child: Child) {
   if (
     window.confirm(`确认删除孩子「${child.name}」的档案及所有生长发育记录？操作将同步至家庭成员。`)
   ) {
-    removeChild(child.id);
+    actionError.value = '';
+
+    if (!(await removeChild(child.id))) {
+      actionError.value = '删除失败，请重试；档案尚未修改。';
+
+      return;
+    }
 
     if (expandedGrowthChildId.value === child.id) {
       expandedGrowthChildId.value = null;
@@ -179,7 +205,7 @@ const genderLabels: Record<string, string> = {
       <button
         class="button button-primary button-sm"
         type="button"
-        :disabled="locked"
+        :disabled="recordLocked"
         @click="openAddModal"
       >
         <AppIcon
@@ -189,6 +215,8 @@ const genderLabels: Record<string, string> = {
         添加孩子档案
       </button>
     </div>
+
+    <p v-if="actionError" class="form-error" role="alert">{{ actionError }}</p>
 
     <!-- 孩子列表 -->
     <div
@@ -228,7 +256,7 @@ const genderLabels: Record<string, string> = {
             <button
               class="button button-secondary button-sm"
               type="button"
-              :disabled="locked"
+              :disabled="recordLocked"
               @click="openEditModal(child)"
             >
               编辑
@@ -236,7 +264,7 @@ const genderLabels: Record<string, string> = {
             <button
               class="text-button text-button-danger button-sm"
               type="button"
-              :disabled="locked"
+              :disabled="recordLocked"
               @click="confirmDelete(child)"
             >
               删除
@@ -416,12 +444,14 @@ const genderLabels: Record<string, string> = {
             <button
               class="button button-primary"
               type="submit"
+              :disabled="saving"
             >
-              {{ editingId ? '保存修改' : '确认添加' }}
+              {{ saving ? '正在保存…' : editingId ? '保存修改' : '确认添加' }}
             </button>
             <button
               class="button button-secondary"
               type="button"
+              :disabled="saving"
               @click="closeModal"
             >
               取消

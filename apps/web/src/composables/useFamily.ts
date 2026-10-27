@@ -28,7 +28,12 @@ import {
   type FamilyTask,
 } from '@/domain/family';
 import { useCollaboration } from './useCollaboration';
-import type { FamilyChange, FamilyMode, FamilyParentRole } from '@/domain/collaboration';
+import {
+  applyPendingFamilyChange,
+  type FamilyChange,
+  type FamilyMode,
+  type FamilyParentRole,
+} from '@/domain/collaboration';
 import { downloadBackup, readFamilyBackup } from '@/domain/backup';
 
 export const STORAGE_KEY = '24years.family.v1';
@@ -46,15 +51,36 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
   const localError = shallowRef('');
   const localLocked = shallowRef(false);
   const cloud = useCollaboration(options.connect ?? true);
-  const data = computed<FamilyData>(
-    () =>
-      ({
-        ...(cloud.active.value
-          ? (cloud.state.value.family?.data ?? emptyFamily())
-          : localData.value),
-        theme: localData.value.theme,
-      }) as FamilyData,
-  );
+  const data = computed<FamilyData>(() => {
+    const source = (cloud.active.value
+      ? (cloud.state.value.family?.data ?? emptyFamily())
+      : localData.value) as FamilyData;
+    let snapshot: FamilyData = {
+      ...source,
+      profile: source.profile ? { ...source.profile } : null,
+      tasks: source.tasks.map((item) => ({ ...item, completedDates: [...item.completedDates] })),
+      expenses: source.expenses.map((item) => ({ ...item })),
+      ...(source.pregnancyRecords
+        ? { pregnancyRecords: source.pregnancyRecords.map((item) => ({ ...item })) }
+        : {}),
+      ...(source.children
+        ? {
+            children: source.children.map((item) => ({
+              ...item,
+              ...(item.growthRecords ? { growthRecords: [...item.growthRecords] } : {}),
+            })),
+          }
+        : {}),
+    };
+
+    if (cloud.active.value) {
+      for (const change of cloud.pendingChanges.value as unknown as FamilyChange[]) {
+        snapshot = applyPendingFamilyChange(snapshot, change) ?? snapshot;
+      }
+    }
+
+    return { ...snapshot, theme: localData.value.theme } as FamilyData;
+  });
   const error = computed(() => cloud.error.value || cloud.cacheWarning.value || localError.value);
   const locked = computed(
     () =>
@@ -62,6 +88,16 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
       (cloud.active.value
         ? !cloud.online.value ||
           cloud.busy.value ||
+          cloud.expired.value ||
+          !cloud.state.value.family ||
+          cloud.role.value === 'viewer'
+        : localLocked.value),
+  );
+  const recordLocked = computed(
+    () =>
+      !cloud.ready.value ||
+      (cloud.active.value
+        ? cloud.busy.value ||
           cloud.expired.value ||
           !cloud.state.value.family ||
           cloud.role.value === 'viewer'
@@ -129,15 +165,22 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     }
   }
 
-  function changeRecords(change: FamilyChange, next: FamilyData) {
-    if (locked.value) {
+  async function changeRecords(change: FamilyChange, next: FamilyData): Promise<boolean> {
+    if (recordLocked.value) {
       return false;
     }
 
-    return cloud.active.value ? cloud.applyChange(change) : commit(next);
+    return cloud.active.value ? await cloud.applyChange(change) : commit(next);
   }
 
-  function saveProfile(profile: FamilyProfile, before = data.value.profile) {
+  async function saveProfile(
+    profile: FamilyProfile,
+    before = data.value.profile,
+  ): Promise<boolean> {
+    if (profileLocked.value) {
+      return false;
+    }
+
     if (
       cloud.active.value &&
       !cloud.state.value.family &&
@@ -146,32 +189,36 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
       profile.familyMode &&
       profile.parentRole
     ) {
-      return cloud.create(profile.familyMode, { ...emptyFamily(), profile }, profile.parentRole);
+      return await cloud.create(profile.familyMode, { ...emptyFamily(), profile }, profile.parentRole);
     }
 
-    return (
-      validProfile(profile) &&
-      canManage.value &&
-      changeRecords({ type: 'profile', value: profile, before }, { ...data.value, profile })
-    );
+    return validProfile(profile) && canManage.value
+      ? await changeRecords(
+          { type: 'profile', value: profile, before },
+          { ...data.value, profile },
+        )
+      : false;
   }
 
-  function addTask(input: Omit<FamilyTask, 'id' | 'completedDates'>, id = createId()) {
+  async function addTask(
+    input: Omit<FamilyTask, 'id' | 'completedDates'>,
+    id = createId(),
+  ): Promise<boolean> {
     const task = { ...input, id, completedDates: [] };
 
     return (
       validTask(task) &&
-      changeRecords(
+      await changeRecords(
         { type: 'task', value: task, before: null },
         { ...data.value, tasks: [...data.value.tasks, task] },
       )
     );
   }
 
-  function updateTask(task: FamilyTask, before: FamilyTask) {
+  async function updateTask(task: FamilyTask, before: FamilyTask): Promise<boolean> {
     return (
       validTask(task) &&
-      changeRecords(
+      await changeRecords(
         { type: 'task', value: task, before },
         {
           ...data.value,
@@ -181,7 +228,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     );
   }
 
-  function toggleTask(id: string, date = localDate()) {
+  async function toggleTask(id: string, date = localDate()): Promise<boolean> {
     const task = data.value.tasks.find((item) => item.id === id);
 
     if (!task || !taskIsDue(task, date)) {
@@ -192,25 +239,25 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
       ? task.completedDates.filter((item) => item !== date)
       : [...task.completedDates, date];
 
-    return updateTask({ ...task, completedDates }, task);
+    return await updateTask({ ...task, completedDates }, task);
   }
 
-  function addExpense(input: Omit<Expense, 'id'>, id = createId()) {
+  async function addExpense(input: Omit<Expense, 'id'>, id = createId()): Promise<boolean> {
     const expense = { ...input, id };
 
     return (
       validExpense(expense) &&
-      changeRecords(
+      await changeRecords(
         { type: 'expense', value: expense, before: null },
         { ...data.value, expenses: [expense, ...data.value.expenses] },
       )
     );
   }
 
-  function updateExpense(expense: Expense, before: Expense) {
+  async function updateExpense(expense: Expense, before: Expense): Promise<boolean> {
     return (
       validExpense(expense) &&
-      changeRecords(
+      await changeRecords(
         { type: 'expense', value: expense, before },
         {
           ...data.value,
@@ -220,12 +267,12 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     );
   }
 
-  function addChild(input: Omit<Child, 'id'>, id = createId()) {
+  async function addChild(input: Omit<Child, 'id'>, id = createId()): Promise<boolean> {
     const child: Child = { ...input, id };
 
     return (
       validChild(child) &&
-      changeRecords(
+      await changeRecords(
         { type: 'child', value: child, before: null },
         {
           ...data.value,
@@ -235,10 +282,10 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     );
   }
 
-  function updateChild(child: Child, before: Child) {
+  async function updateChild(child: Child, before: Child): Promise<boolean> {
     return (
       validChild(child) &&
-      changeRecords(
+      await changeRecords(
         { type: 'child', value: child, before },
         {
           ...data.value,
@@ -250,14 +297,14 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     );
   }
 
-  function removeChild(id: string) {
+  async function removeChild(id: string): Promise<boolean> {
     const current = (data.value.children ?? []).find((item) => item.id === id);
 
     if (!current) {
       return false;
     }
 
-    return changeRecords(
+    return await changeRecords(
       { type: 'child', value: null, before: current },
       {
         ...data.value,
@@ -378,9 +425,9 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
   );
 
   return {
-    savePregnancy: (change: PregnancyChange) => {
+    savePregnancy: async (change: PregnancyChange): Promise<boolean> => {
       try {
-        return changeRecords(change, applyPregnancyChange(data.value, change));
+        return await changeRecords(change, applyPregnancyChange(data.value, change));
       } catch (reason) {
         localError.value = reason instanceof Error ? reason.message : '记录保存失败。';
 
@@ -390,6 +437,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     data: readonly(data),
     error: readonly(error),
     locked: readonly(locked),
+    recordLocked: readonly(recordLocked),
     today: readonly(today),
     todayTasks,
     cloud,
@@ -414,37 +462,47 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     importTarget,
     importBackup,
     exportBeforeImport,
-    removeTask: (id: string) =>
-      changeRecords(
+    removeTask: async (id: string): Promise<boolean> => {
+      const before = data.value.tasks.find((item) => item.id === id) ?? null;
+
+      return before
+        ? await changeRecords(
         {
           type: 'task',
           value: null,
-          before: data.value.tasks.find((item) => item.id === id) ?? null,
+          before,
         },
         {
           ...data.value,
           tasks: data.value.tasks.filter((task) => task.id !== id),
         },
-      ),
-    removeExpense: (id: string) =>
-      changeRecords(
+      )
+        : false;
+    },
+    removeExpense: async (id: string): Promise<boolean> => {
+      const before = data.value.expenses.find((item) => item.id === id) ?? null;
+
+      return before
+        ? await changeRecords(
         {
           type: 'expense',
           value: null,
-          before: data.value.expenses.find((item) => item.id === id) ?? null,
+          before,
         },
         {
           ...data.value,
           expenses: data.value.expenses.filter((expense) => expense.id !== id),
         },
-      ),
-    toggleTheme: () =>
+      )
+        : false;
+    },
+    toggleTheme: async (): Promise<boolean> =>
       commit({
         ...localData.value,
         theme: localData.value.theme === 'light' ? 'dark' : 'light',
       }),
-    uploadLocal: (mode: FamilyMode, parentRole: FamilyParentRole) =>
-      !localLocked.value && cloud.create(mode, localData.value, parentRole),
+    uploadLocal: async (mode: FamilyMode, parentRole: FamilyParentRole): Promise<boolean> =>
+      !localLocked.value && (await cloud.create(mode, localData.value, parentRole)),
   };
 }
 

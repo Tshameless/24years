@@ -1,5 +1,7 @@
 import {
   decodeFamily,
+  applyPregnancyChange,
+  sameValue,
   type Child,
   type FamilyData,
   type FamilyProfile,
@@ -46,6 +48,70 @@ export type FamilyChange =
   | { type: 'task'; value: FamilyTask | null; before: FamilyTask | null }
   | { type: 'expense'; value: Expense | null; before: Expense | null }
   | { type: 'child'; value: Child | null; before: Child | null };
+
+function applyPendingRecord<T extends { id: string }>(
+  records: readonly T[],
+  change: { value: T | null; before: T | null },
+  prepend = false,
+): T[] | null {
+  const id = change.before?.id ?? change.value?.id;
+
+  if (!id || (!change.before && !change.value)) {
+    return null;
+  }
+
+  const current = records.find((item) => item.id === id) ?? null;
+
+  if (!sameValue(current, change.before)) {
+    return sameValue(current, change.value) ? [...records] : null;
+  }
+
+  if (change.value === null) {
+    return records.filter((item) => item.id !== id);
+  }
+
+  const updated = records.map((item) => (item.id === id ? change.value! : item));
+
+  if (!change.before) {
+    return prepend ? [change.value, ...updated] : [...updated, change.value];
+  }
+
+  return updated;
+}
+
+export function applyPendingFamilyChange(data: FamilyData, change: FamilyChange): FamilyData | null {
+  if (change.type === 'pregnancy') {
+    try {
+      return applyPregnancyChange(data, change);
+    } catch {
+      return null;
+    }
+  }
+
+  if (change.type === 'profile') {
+    return sameValue(data.profile, change.before)
+      ? { ...data, profile: change.value }
+      : sameValue(data.profile, change.value)
+        ? data
+        : null;
+  }
+
+  if (change.type === 'task') {
+    const tasks = applyPendingRecord(data.tasks, change);
+
+    return tasks ? { ...data, tasks } : null;
+  }
+
+  if (change.type === 'expense') {
+    const expenses = applyPendingRecord(data.expenses, change, true);
+
+    return expenses ? { ...data, expenses } : null;
+  }
+
+  const children = applyPendingRecord(data.children ?? [], change);
+
+  return children ? { ...data, children } : null;
+}
 
 export type FamilyDeltaRecordType =
   | 'profile'

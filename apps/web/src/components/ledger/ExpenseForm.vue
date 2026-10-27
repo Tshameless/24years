@@ -15,7 +15,7 @@ import {
 
 const props = defineProps<{ expense?: Expense }>();
 const emit = defineEmits<{ saved: []; cancel: [] }>();
-const { data, addExpense, updateExpense, locked, cloud, identity } = useFamily();
+const { data, addExpense, updateExpense, recordLocked, cloud, identity } = useFamily();
 const before = props.expense ? { ...props.expense } : undefined;
 const stale = computed(
   () =>
@@ -62,7 +62,7 @@ function cancel() {
 async function submit() {
   error.value = '';
 
-  if (locked.value || stale.value || draftBlocked.value) {
+  if (recordLocked.value || stale.value || draftBlocked.value) {
     return;
   }
 
@@ -200,7 +200,7 @@ async function submit() {
     </p>
     <button
       class="button button-primary"
-      :disabled="locked || !!stale || draftBlocked"
+        :disabled="recordLocked || !!stale || draftBlocked"
     >
       {{ before ? '保存账目修改' : '保存账目' }}
     </button>

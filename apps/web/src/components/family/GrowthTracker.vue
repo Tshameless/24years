@@ -9,19 +9,24 @@ import {
   type GrowthMetric,
 } from '@/domain/family';
 import { useFamily } from '@/composables/useFamily';
+import { downloadGrowthCsv } from '@/domain/growthReport';
 import AppIcon from '@/components/AppIcon.vue';
 
 const props = defineProps<{
   child: Child;
 }>();
 
-const { updateChild, addTask, locked, today } = useFamily();
+const { updateChild, addTask, recordLocked, today } = useFamily();
 
 const activeMetric = shallowRef<GrowthMetric>('weightKg');
 const showRecordForm = shallowRef(false);
 const formError = shallowRef('');
 const taskNotice = shallowRef('');
 const reminderError = shallowRef('');
+const savingRecord = shallowRef(false);
+const addingReminder = shallowRef(false);
+const editingRecordId = shallowRef<string | null>(null);
+const historyError = shallowRef('');
 const reminderTitle = shallowRef('');
 const reminderDate = shallowRef(localDate());
 const reminderTime = shallowRef('09:00');
@@ -35,7 +40,9 @@ const form = reactive({
 });
 
 const sortedRecords = computed<readonly ChildGrowthRecord[]>(() =>
-  [...(props.child.growthRecords ?? [])].sort((a, b) => a.date.localeCompare(b.date)),
+  [...(props.child.growthRecords ?? [])].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
+  ),
 );
 
 const metricRecords = computed(() =>
@@ -51,6 +58,7 @@ const reminderTitleLimit = computed(() => Math.max(1, 79 - props.child.name.leng
 // SVG Chart plotting points
 const plotData = computed(() => {
   const points = metricRecords.value.map((record) => ({
+    id: record.id,
     date: record.date,
     month: dayDifference(record.date, props.child.birthDate) / (365.2425 / 12),
     value: Number(record[activeMetric.value]),
@@ -80,7 +88,11 @@ const plotData = computed(() => {
   return { points, minVal, maxVal, maxMonth, chartW, chartH, getX, getY, polyline };
 });
 
-function submitRecord() {
+async function submitRecord() {
+  if (savingRecord.value) {
+    return;
+  }
+
   formError.value = '';
 
   if (form.date < props.child.birthDate || form.date > today.value) {
@@ -100,7 +112,7 @@ function submitRecord() {
   }
 
   const record: ChildGrowthRecord = {
-    id: createId(),
+    id: editingRecordId.value ?? createId(),
     date: form.date,
     ...(w !== undefined ? { weightKg: w } : {}),
     ...(h !== undefined ? { heightCm: h } : {}),
@@ -110,21 +122,82 @@ function submitRecord() {
 
   const updated: Child = {
     ...props.child,
-    growthRecords: [...(props.child.growthRecords ?? []), record],
+    growthRecords: editingRecordId.value
+      ? (props.child.growthRecords ?? []).map((item) =>
+          item.id === editingRecordId.value ? record : item,
+        )
+      : [...(props.child.growthRecords ?? []), record],
   };
 
-  if (updateChild(updated, props.child)) {
-    form.weightKg = '';
-    form.heightCm = '';
-    form.headCircumferenceCm = '';
-    form.notes = '';
-    showRecordForm.value = false;
-  } else {
-    formError.value = '记录保存失败，请检查输入格式。';
+  savingRecord.value = true;
+
+  try {
+    if (await updateChild(updated, props.child)) {
+      form.weightKg = '';
+      form.heightCm = '';
+      form.headCircumferenceCm = '';
+      form.notes = '';
+      editingRecordId.value = null;
+      showRecordForm.value = false;
+    } else {
+      formError.value = '记录保存失败，请检查输入格式。';
+    }
+  } finally {
+    savingRecord.value = false;
   }
 }
 
-function addReminder() {
+function editRecord(record: ChildGrowthRecord) {
+  editingRecordId.value = record.id;
+  form.date = record.date;
+  form.weightKg = record.weightKg?.toString() ?? '';
+  form.heightCm = record.heightCm?.toString() ?? '';
+  form.headCircumferenceCm = record.headCircumferenceCm?.toString() ?? '';
+  form.notes = record.notes ?? '';
+  formError.value = '';
+  showRecordForm.value = true;
+}
+
+async function removeRecord(record: ChildGrowthRecord) {
+  if (!window.confirm(`确认删除 ${record.date} 的这条生长测量记录？`)) {
+    return;
+  }
+
+  historyError.value = '';
+  const updated: Child = {
+    ...props.child,
+    growthRecords: (props.child.growthRecords ?? []).filter((item) => item.id !== record.id),
+  };
+
+  if (await updateChild(updated, props.child)) {
+    if (editingRecordId.value === record.id) {
+      editingRecordId.value = null;
+      showRecordForm.value = false;
+    }
+  } else {
+    historyError.value = '删除失败，记录尚未修改；请刷新后重试。';
+  }
+}
+
+function exportCsv() {
+  if (
+    sortedRecords.value.length === 0 ||
+    !window.confirm(
+      `导出 ${props.child.name} 的 ${sortedRecords.value.length} 条生长记录？文件包含儿童健康信息，请妥善保管。`,
+    )
+  ) {
+    return;
+  }
+
+  const safeName = props.child.name.replace(/[\\/:*?"<>|]/g, '_');
+  downloadGrowthCsv(sortedRecords.value, `24years-growth-${safeName}.csv`);
+}
+
+async function addReminder() {
+  if (addingReminder.value) {
+    return;
+  }
+
   reminderError.value = '';
   taskNotice.value = '';
   const title = reminderTitle.value.trim();
@@ -142,18 +215,24 @@ function addReminder() {
   }
 
   const taskTitle = `${props.child.name}：${title}`;
-  const success = addTask({
-    title: taskTitle,
-    date: reminderDate.value,
-    time: reminderTime.value,
-    repeat: 'once',
-  });
+  addingReminder.value = true;
 
-  if (success) {
-    taskNotice.value = `已添加「${taskTitle}」至日常计划。`;
-    reminderTitle.value = '';
-  } else {
-    reminderError.value = '添加失败，请检查提醒日期和时间。';
+  try {
+    const success = await addTask({
+      title: taskTitle,
+      date: reminderDate.value,
+      time: reminderTime.value,
+      repeat: 'once',
+    });
+
+    if (success) {
+      taskNotice.value = `已添加「${taskTitle}」至日常计划。`;
+      reminderTitle.value = '';
+    } else {
+      reminderError.value = '添加失败，请检查提醒日期和时间。';
+    }
+  } finally {
+    addingReminder.value = false;
   }
 }
 </script>
@@ -171,7 +250,7 @@ function addReminder() {
           :name="showRecordForm ? 'cross' : 'plus'"
           :size="14"
         />
-        {{ showRecordForm ? '收起表单' : '记录生长数据' }}
+          {{ showRecordForm ? '收起表单' : editingRecordId ? '继续编辑' : '记录生长数据' }}
       </button>
     </div>
 
@@ -246,8 +325,15 @@ function addReminder() {
         <button
           class="button button-primary button-sm"
           type="submit"
+          :disabled="savingRecord"
         >
-          保存测量记录
+          {{
+            savingRecord
+              ? '正在保存…'
+              : editingRecordId
+                ? '保存修改'
+                : '保存测量记录'
+          }}
         </button>
       </div>
     </form>
@@ -314,7 +400,7 @@ function addReminder() {
         <!-- 数据点圆圈 -->
         <circle
           v-for="p in plotData.points"
-          :key="p.date"
+          :key="p.id"
           :cx="plotData.getX(p.month)"
           :cy="plotData.getY(p.value)"
           r="4.5"
@@ -335,6 +421,68 @@ function addReminder() {
     >
       <p class="muted">暂未录入该项测量数据，点击上方“记录生长数据”开始追踪成长曲线。</p>
     </div>
+
+    <section class="growth-history" aria-labelledby="growth-history-title">
+      <div class="history-heading">
+        <h5 id="growth-history-title">历史测量</h5>
+        <button
+          class="button button-secondary button-sm"
+          type="button"
+          :disabled="!sortedRecords.length"
+          @click="exportCsv"
+        >
+          <AppIcon name="download" :size="14" />
+          导出 CSV
+        </button>
+      </div>
+      <p v-if="historyError" class="form-error" role="alert">{{ historyError }}</p>
+      <div v-if="sortedRecords.length" class="history-table-wrap">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th scope="col">日期</th>
+              <th scope="col">体重（kg）</th>
+              <th scope="col">身长（cm）</th>
+              <th scope="col">头围（cm）</th>
+              <th scope="col">备注</th>
+              <th scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="record in sortedRecords" :key="record.id">
+              <td>{{ record.date }}</td>
+              <td>{{ record.weightKg ?? '—' }}</td>
+              <td>{{ record.heightCm ?? '—' }}</td>
+              <td>{{ record.headCircumferenceCm ?? '—' }}</td>
+              <td>{{ record.notes || '—' }}</td>
+              <td class="history-actions">
+                <button
+                  class="icon-button"
+                  type="button"
+                  :disabled="recordLocked || savingRecord"
+                  :aria-label="`编辑 ${record.date} 的测量记录`"
+                  title="编辑记录"
+                  @click="editRecord(record)"
+                >
+                  <AppIcon name="edit" :size="16" />
+                </button>
+                <button
+                  class="icon-button text-button-danger"
+                  type="button"
+                  :disabled="recordLocked || savingRecord"
+                  :aria-label="`删除 ${record.date} 的测量记录`"
+                  title="删除记录"
+                  @click="removeRecord(record)"
+                >
+                  <AppIcon name="trash" :size="16" />
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-else class="muted">还没有生长测量记录。</p>
+    </section>
 
     <section class="custom-reminder-section">
       <h5>添加自定义计划</h5>
@@ -380,9 +528,9 @@ function addReminder() {
         <button
           class="button button-secondary button-sm"
           type="submit"
-          :disabled="locked"
+          :disabled="recordLocked || addingReminder"
         >
-          添加到计划
+          {{ addingReminder ? '正在添加…' : '添加到计划' }}
         </button>
       </form>
       <p
@@ -490,6 +638,58 @@ function addReminder() {
   border: 1px dashed var(--border);
   border-radius: 8px;
   margin-bottom: 1rem;
+}
+
+.growth-history {
+  margin: 1rem 0 1.25rem;
+}
+
+.history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.history-heading h5 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-heading);
+}
+
+.history-table-wrap {
+  overflow-x: auto;
+}
+
+.history-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 0.825rem;
+  text-align: left;
+}
+
+.history-table th,
+.history-table td {
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.history-actions {
+  white-space: nowrap;
+}
+
+.history-actions .icon-button {
+  width: 2rem;
+  height: 2rem;
+  margin-right: 0.15rem;
 }
 
 .custom-reminder-section h5 {

@@ -185,7 +185,7 @@ export function createService(db: DatabaseSync) {
   }
 
   const accountHandlers = createAccountHandlers(db, account, snapshot);
-  const { mutate } = createFamilyMutations({
+  const { mutate, mutateRecordsCompact } = createFamilyMutations({
     db,
     account,
     membership,
@@ -197,9 +197,13 @@ export function createService(db: DatabaseSync) {
   function mutateCompact(userId: string, action: string, body: Body) {
     const beforeRevision =
       action === 'records' ? (familyContext(userId).revision ?? undefined) : undefined;
-    const result = mutate(userId, action, body);
+    if (action !== 'records') {
+      return mutate(userId, action, body);
+    }
 
-    if (action === 'records' && beforeRevision !== undefined) {
+    const result = mutateRecordsCompact(userId, body);
+
+    if (beforeRevision !== undefined) {
       const delta = changesSince(userId, beforeRevision);
 
       if (delta && !delta.reset) {
@@ -207,7 +211,7 @@ export function createService(db: DatabaseSync) {
       }
     }
 
-    return result;
+    return snapshot(userId);
   }
 
   return {
