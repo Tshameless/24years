@@ -7,6 +7,7 @@ export interface ContractionAnalysis {
   avgDurationSeconds: number;
   avgIntervalMinutes: number | null;
   matches511: boolean;
+  rule: '5-1-1' | '4-1-1';
   status: 'empty' | 'insufficient' | 'irregular' | 'regular_early' | 'active_labor_511';
   title: string;
   advice: string;
@@ -22,7 +23,10 @@ export interface ContractionAnalysis {
 export function analyzeContractions(
   records: readonly Contraction[],
   referenceTime = Date.now(),
+  options: { multiparous?: boolean } = {},
 ): ContractionAnalysis {
+  const rule = options.multiparous ? '4-1-1' : '5-1-1';
+  const intervalLimit = options.multiparous ? 4.5 : 5.5;
   const completed = records
     .filter((item): item is Contraction & { endedAt: number } => item.endedAt !== null)
     .sort((a, b) => b.startedAt - a.startedAt);
@@ -33,6 +37,7 @@ export function analyzeContractions(
       avgDurationSeconds: 0,
       avgIntervalMinutes: null,
       matches511: false,
+      rule,
       status: 'empty',
       badge: '待记录',
       title: '日常观察',
@@ -54,6 +59,7 @@ export function analyzeContractions(
       avgDurationSeconds: durSec,
       avgIntervalMinutes: null,
       matches511: false,
+      rule,
       status: 'insufficient',
       badge: '数据收集中',
       title: '继续记录中',
@@ -91,7 +97,7 @@ export function analyzeContractions(
   // - Average interval is between 2 and 5.5 minutes
   // - Average duration is >= 45 seconds
   // - The pattern has been tracked for at least 40 minutes or has at least 6 consecutive regular contractions
-  const isInterval511 = avgInterval !== null && avgInterval <= 5.5 && avgInterval >= 1.5;
+  const isInterval511 = avgInterval !== null && avgInterval <= intervalLimit && avgInterval >= 1.5;
   const isDuration511 = avgDuration >= 45;
   const isSustained = spanMinutes >= 40 || pool.length >= 6;
 
@@ -101,6 +107,7 @@ export function analyzeContractions(
       avgDurationSeconds: avgDuration,
       avgIntervalMinutes: avgInterval,
       matches511: true,
+      rule,
       status: 'active_labor_511',
       badge: '5-1-1 规律临产',
       title: '已符合 5-1-1 规律临产标准',
@@ -116,6 +123,7 @@ export function analyzeContractions(
       avgDurationSeconds: avgDuration,
       avgIntervalMinutes: avgInterval,
       matches511: false,
+      rule,
       status: 'regular_early',
       badge: '出现规律',
       title: '宫缩逐渐规律',
@@ -128,6 +136,7 @@ export function analyzeContractions(
     avgDurationSeconds: avgDuration,
     avgIntervalMinutes: avgInterval,
     matches511: false,
+    rule,
     status: 'irregular',
     badge: '尚无明显规律',
     title: '不规律宫缩（假临产可能）',

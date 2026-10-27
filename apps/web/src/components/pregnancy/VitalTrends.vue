@@ -116,14 +116,18 @@ const alertY = computed(() => {
     return null;
   }
 
-  const { low, high } = plot.value;
-
-  if (140 < low || 140 > high) {
+  return guidelineY(140);
+});
+const diastolicAlertY = computed(() =>
+  metric.value === 'bloodPressure' && plot.value ? guidelineY(90) : null,
+);
+function guidelineY(value: number) {
+  if (!plot.value || value < plot.value.low || value > plot.value.high) {
     return null;
   }
 
-  return 160 - ((140 - low) / (high - low)) * 130;
-});
+  return 160 - ((value - plot.value.low) / (plot.value.high - plot.value.low)) * 130;
+}
 </script>
 
 <template>
@@ -176,7 +180,7 @@ const alertY = computed(() => {
       </label>
     </div>
     <p class="muted">
-      只展示已保存的原始测量值，不标注正常范围或作诊断。同日测量位于相同横坐标，具体时间与场景见数据表；未记录时间不推断先后，纵轴自动缩放。血糖趋势可按测量场景筛选。
+      只展示已保存的原始测量值，不作诊断。填写测量时间后，同日记录会按时间展开；未记录时间按当天起点绘制。血糖趋势可按测量场景筛选。
     </p>
     <div
       v-if="glucoseSummary"
@@ -262,6 +266,14 @@ const alertY = computed(() => {
           :y2="alertY"
           class="alert-guideline"
         />
+        <line
+          v-if="diastolicAlertY !== null"
+          x1="55"
+          :y1="diastolicAlertY"
+          x2="545"
+          :y2="diastolicAlertY"
+          class="secondary-alert-guideline"
+        />
         <polyline
           :points="primary"
           class="primary-line"
@@ -298,7 +310,7 @@ const alertY = computed(() => {
         v-if="metric === 'bloodPressure' && alertY !== null"
         class="muted alert-caption"
       >
-        红色警戒参考线：140 mmHg（妊娠期高血压警戒线，参考中国妇产学会指南）。
+        血压参考线：收缩压 140、舒张压 90 mmHg；仅作记录整理，请结合医嘱判断。
       </p>
       <details>
         <summary>查看趋势数据（{{ entries.length }} 条）</summary>
@@ -403,6 +415,13 @@ const alertY = computed(() => {
 .alert-guideline {
   stroke: var(--primary);
   stroke-dasharray: 4 4;
+  stroke-width: 1.5;
+  opacity: 70%;
+}
+
+.secondary-alert-guideline {
+  stroke: var(--green);
+  stroke-dasharray: 2 4;
   stroke-width: 1.5;
   opacity: 70%;
 }

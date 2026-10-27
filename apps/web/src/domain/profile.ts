@@ -5,12 +5,15 @@ export interface FamilyProfile {
   nickname: string;
   dueDate: string;
   quietMode: boolean;
+  /** Optional clinical anchors retained alongside the display due date. */
+  lmpDate?: string;
+  prePregnancyWeightKg?: number;
+  heightCm?: number;
   /** Saved for local profiles so the first sync can use the same family choice. */
   familyMode?: 'single' | 'couple';
   parentRole?: 'single_parent' | 'mother' | 'father';
 }
 
-// Keep the existing due-date anchor so older profiles remain compatible.
 // This is a calendar estimate using the project's 40-week convention.
 export function dueDateFromGestation(
   weeks: number,
@@ -60,6 +63,17 @@ export function validProfile(value: unknown): value is FamilyProfile {
     shortText(value.nickname, 20) &&
     isDate(value.dueDate) &&
     typeof value.quietMode === 'boolean' &&
+    (value.lmpDate === undefined || isDate(value.lmpDate)) &&
+    (value.prePregnancyWeightKg === undefined ||
+      (typeof value.prePregnancyWeightKg === 'number' &&
+        Number.isFinite(value.prePregnancyWeightKg) &&
+        value.prePregnancyWeightKg > 0 &&
+        value.prePregnancyWeightKg <= 500)) &&
+    (value.heightCm === undefined ||
+      (typeof value.heightCm === 'number' &&
+        Number.isFinite(value.heightCm) &&
+        value.heightCm >= 50 &&
+        value.heightCm <= 250)) &&
     (value.familyMode === undefined ||
       value.familyMode === 'single' ||
       value.familyMode === 'couple') &&

@@ -41,6 +41,12 @@ const form = reactive({
   nickname: data.value.profile?.nickname ?? '',
   weeks: initialProgress ? String(initialProgress.weeks) : '',
   days: initialProgress?.days ?? 0,
+  lmpDate: data.value.profile?.lmpDate ?? '',
+  prePregnancyWeightKg:
+    data.value.profile?.prePregnancyWeightKg === undefined
+      ? ''
+      : String(data.value.profile.prePregnancyWeightKg),
+  heightCm: data.value.profile?.heightCm === undefined ? '' : String(data.value.profile.heightCm),
   quietMode: data.value.profile?.quietMode ?? false,
 });
 
@@ -82,6 +88,12 @@ function reloadProfile() {
     nickname: before.value?.nickname ?? '',
     weeks: progress ? String(progress.weeks) : '',
     days: progress?.days ?? 0,
+    lmpDate: before.value?.lmpDate ?? '',
+    prePregnancyWeightKg:
+      before.value?.prePregnancyWeightKg === undefined
+        ? ''
+        : String(before.value.prePregnancyWeightKg),
+    heightCm: before.value?.heightCm === undefined ? '' : String(before.value.heightCm),
     quietMode: before.value?.quietMode ?? false,
   });
   draft.accept();
@@ -127,12 +139,32 @@ async function submit() {
     return;
   }
 
+  const prePregnancyWeightKg = form.prePregnancyWeightKg.trim()
+    ? Number(form.prePregnancyWeightKg)
+    : undefined;
+  const heightCm = form.heightCm.trim() ? Number(form.heightCm) : undefined;
+
+  if (
+    (prePregnancyWeightKg !== undefined &&
+      (!Number.isFinite(prePregnancyWeightKg) || prePregnancyWeightKg <= 0 || prePregnancyWeightKg > 500)) ||
+    (heightCm !== undefined &&
+      (!Number.isFinite(heightCm) || heightCm < 50 || heightCm > 250)) ||
+    (form.lmpDate && !/^\d{4}-\d{2}-\d{2}$/.test(form.lmpDate))
+  ) {
+    error.value = '请检查末次月经、孕前体重和身高。';
+
+    return;
+  }
+
   saved.value = await saveProfile(
     {
       name: form.name.trim(),
       nickname: form.nickname.trim(),
       dueDate: estimatedDueDate.value,
       quietMode: form.quietMode,
+      ...(form.lmpDate ? { lmpDate: form.lmpDate } : {}),
+      ...(prePregnancyWeightKg === undefined ? {} : { prePregnancyWeightKg }),
+      ...(heightCm === undefined ? {} : { heightCm }),
       familyMode: form.familyMode,
       parentRole:
         form.familyMode === 'single' ? 'single_parent' : (form.parentRole as FamilyParentRole),
@@ -255,6 +287,39 @@ async function submit() {
         :parent-role="form.parentRole"
         :estimated-due-date="estimatedDueDate"
       />
+      <div class="form-row">
+        <label class="field">
+          末次月经第一天（可选）
+          <input
+            v-model="form.lmpDate"
+            type="date"
+            :max="form.referenceDate"
+          />
+          <small>用于保留孕周推算依据；预产期仍以医生核准为准。</small>
+        </label>
+        <label class="field">
+          孕前体重（kg，可选）
+          <input
+            v-model="form.prePregnancyWeightKg"
+            type="number"
+            min="1"
+            max="500"
+            step="0.1"
+            inputmode="decimal"
+          />
+        </label>
+      </div>
+      <label class="field">
+        身高（cm，可选）
+        <input
+          v-model="form.heightCm"
+          type="number"
+          min="50"
+          max="250"
+          step="0.1"
+          inputmode="decimal"
+        />
+      </label>
       <label class="quiet-option">
         <input
           v-model="form.quietMode"

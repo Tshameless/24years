@@ -2,7 +2,14 @@
 import { computed, shallowRef } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { checkupTemplates } from '@/domain/preparationTemplates';
-import { isDate, localDate, parseMoney, type PregnancyRecord, type Expense } from '@/domain/family';
+import {
+  addDays,
+  isDate,
+  localDate,
+  parseMoney,
+  type PregnancyRecord,
+  type Expense,
+} from '@/domain/family';
 import {
   prenatalSchedule,
   scheduleDate,
@@ -17,7 +24,10 @@ import FormDraftNotice from '@/components/FormDraftNotice.vue';
 type Checkup = Extract<PregnancyRecord, { type: 'checkup' }>;
 const { records, disabled, message, error, reportError, save, remove, hasExpense } =
   usePregnancyRecords();
-const { data } = useFamily();
+const family = useFamily();
+const { data } = family;
+const reminderNotice = shallowRef('');
+const reminderError = shallowRef('');
 const checkups = computed(() =>
   records.value
     .filter((item): item is Checkup => item.type === 'checkup')
@@ -140,9 +150,65 @@ function addScheduledCheckup(item: PrenatalScheduleItem & { date: string }) {
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 }
 
+function reminderTitle(title: string, kind: 'visit' | 'prep') {
+  return kind === 'visit' ? `产检提醒：${title}` : `产检准备：${title}`;
+}
+
+async function addCheckupReminder(item: Checkup) {
+  reminderNotice.value = '';
+  reminderError.value = '';
+
+  const visitTitle = reminderTitle(item.title, 'visit');
+  const prepTitle = reminderTitle(item.title, 'prep');
+  const hasVisit = family.data.value.tasks.some(
+    (task) => task.title === visitTitle && task.date === item.date && task.repeat === 'once',
+  );
+  const prepDate = addDays(item.date, -1);
+  const hasPrep = family.data.value.tasks.some(
+    (task) => task.title === prepTitle && task.date === prepDate && task.repeat === 'once',
+  );
+
+  if (hasVisit && hasPrep) {
+    reminderNotice.value = '这项产检的提醒已经在日常计划中。';
+
+    return;
+  }
+
+  if (item.date < family.today.value) {
+    reminderError.value = '已过日期不能加入日常计划。';
+
+    return;
+  }
+
+  const visitAdded = hasVisit || (await family.addTask({
+    title: visitTitle,
+    date: item.date,
+    time: '09:00',
+    repeat: 'once',
+  }));
+  const prepAdded =
+    hasPrep ||
+    (prepDate >= family.today.value &&
+      (await family.addTask({
+        title: prepTitle,
+        date: prepDate,
+        time: '20:00',
+        repeat: 'once',
+      })));
+
+  if (visitAdded && (prepAdded || prepDate < family.today.value)) {
+    reminderNotice.value = '已加入就诊提醒，并在前一晚加入准备提醒。';
+  } else {
+    reminderError.value = '提醒未完整加入，请检查日常计划状态后重试。';
+  }
+}
+
 const linkedExpense = computed(() => !!before.value && hasExpense('checkup-' + before.value.id));
 const canRecordExpense = computed(
-  () => !!before.value && !before.value.completed && form.completed && !linkedExpense.value,
+  () =>
+    form.completed &&
+    !linkedExpense.value &&
+    (!before.value || !before.value.completed),
 );
 
 async function submit() {
@@ -284,6 +350,14 @@ async function submit() {
           </p>
           <div class="record-actions">
             <button
+              v-if="!item.completed"
+              class="text-button"
+              :disabled="disabled"
+              @click="addCheckupReminder(item)"
+            >
+              加入计划提醒
+            </button>
+            <button
               class="text-button"
               :disabled="disabled"
               @click="edit(item)"
@@ -302,6 +376,20 @@ async function submit() {
       </ul>
       <p class="calendar-note">
         导出的日历包含提前 3 天和 1 天提醒；是否弹出通知取决于导入的日历应用及设备通知设置。
+      </p>
+      <p
+        v-if="reminderNotice"
+        class="success-message"
+        role="status"
+      >
+        {{ reminderNotice }}
+      </p>
+      <p
+        v-if="reminderError"
+        class="form-error"
+        role="alert"
+      >
+        {{ reminderError }}
       </p>
     </section>
     <section class="panel">
@@ -378,7 +466,7 @@ async function submit() {
             />
           </label>
           <label
-            v-if="before && !before.completed"
+            v-if="!before || !before.completed"
             class="check-option"
           >
             <input

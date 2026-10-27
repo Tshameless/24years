@@ -155,7 +155,9 @@ it('待产物品备齐与采购支出原子保存，不允许重复或篡改关�
   ]) {
     expect(() => applyPregnancyChange(original, { ...change, expense })).toThrow();
   }
-  expect(() => applyPregnancyChange(emptyFamily(), { ...change, before: null })).toThrow();
+  const created = applyPregnancyChange(emptyFamily(), { ...change, before: null });
+  expect(created.pregnancyRecords).toEqual([change.value]);
+  expect(created.expenses).toEqual([change.expense]);
   const deleted = applyPregnancyChange(saved, {
     type: 'pregnancy',
     before: change.value,

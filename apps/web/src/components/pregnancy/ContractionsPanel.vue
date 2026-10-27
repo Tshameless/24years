@@ -8,13 +8,16 @@ import type { PregnancyRecord } from '@/domain/family';
 type Contraction = Extract<PregnancyRecord, { type: 'contraction' }>;
 const { quietMode, records, disabled, message, error, save, remove } = usePregnancyRecords();
 const now = shallowRef(Date.now());
+const multiparous = shallowRef(false);
 const entries = computed(() =>
   records.value
     .filter((item): item is Contraction => item.type === 'contraction')
     .sort((a, b) => b.startedAt - a.startedAt),
 );
 const active = computed(() => entries.value.find((item) => item.endedAt === null));
-const analysis = computed(() => analyzeContractions(entries.value, now.value));
+const analysis = computed(() =>
+  analyzeContractions(entries.value, now.value, { multiparous: multiparous.value }),
+);
 let draft: Contraction | null = null;
 let interval: ReturnType<typeof setInterval>;
 onMounted(() => {
@@ -87,6 +90,21 @@ async function toggle() {
       <p class="muted timer-note">
         以开始、结束时间计算。刷新页面后可继续结束正在记录的一次；关闭页面不会自动结束。请及时结束记录，修改系统时间可能影响时长。
       </p>
+      <div class="contraction-options">
+        <label class="field">
+          参考规则
+          <select v-model="multiparous">
+            <option :value="false">初产妇：5-1-1</option>
+            <option :value="true">经产妇：4-1-1</option>
+          </select>
+        </label>
+        <RouterLink
+          to="/pregnancy?tab=emergency"
+          class="text-button"
+        >
+          查看异常与急救
+        </RouterLink>
+      </div>
       <div
         v-if="analysis.completedCount > 0"
         class="pattern-card"
@@ -129,7 +147,7 @@ async function toggle() {
         </div>
       </div>
       <p class="muted">
-        此工具记录宫缩时间并提供 5-1-1
+        此工具记录宫缩时间并提供 {{ analysis.rule }}
         规律统计参考，不替代临床临产诊断；如有不适或疑问，请联系医护人员。
       </p>
       <p
@@ -210,6 +228,14 @@ async function toggle() {
 
 .timer-note {
   margin-top: 24px;
+}
+
+.contraction-options {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0;
 }
 
 .pattern-card {

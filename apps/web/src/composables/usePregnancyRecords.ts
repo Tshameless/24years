@@ -15,7 +15,10 @@ export function usePregnancyRecords() {
   const busy = shallowRef(false);
   const message = shallowRef('');
   const error = shallowRef('');
-  const records = computed(() => store.data.value.pregnancyRecords ?? []);
+  const records = computed(() => [
+    ...(store.data.value.pregnancyRecords ?? []),
+    ...store.privateCareRecords.value,
+  ]);
   const outcome = computed(() => pregnancyOutcome(records.value));
   const outcomeDisabled = computed(() => store.recordLocked.value || busy.value);
   const disabled = computed(() => outcomeDisabled.value || !!outcome.value);
@@ -52,6 +55,12 @@ export function usePregnancyRecords() {
   }
 
   async function persist(change: PregnancyChange, allowedType?: 'outcome' | 'postpartum' | 'care') {
+    const isPrivateCare = (record: PregnancyRecord | null) =>
+      (record?.type === 'mood' || record?.type === 'mentalScreening') &&
+      record.visibility === 'private';
+    const beforePrivate = isPrivateCare(change.before);
+    const valuePrivate = isPrivateCare(change.value);
+
     if (
       outcomeDisabled.value ||
       (!!outcome.value && !allowedType) ||
@@ -59,6 +68,63 @@ export function usePregnancyRecords() {
       (allowedType === 'postpartum' && (change.value ?? change.before)?.type !== 'postpartum')
     ) {
       return false;
+    }
+
+    if (beforePrivate || valuePrivate) {
+      if (beforePrivate && valuePrivate) {
+        const saved = store.savePrivateCareRecord(change.value, change.before);
+        message.value = saved ? '私密记录已保存在本机，不会同步到家庭云。' : '';
+        error.value = saved ? '' : store.privateCareError.value || '本机私密记录已变化，请重新载入。';
+
+        return saved;
+      }
+
+      if (valuePrivate) {
+        const savedPrivate = store.savePrivateCareRecord(change.value, null);
+
+        if (!savedPrivate) {
+          error.value = store.privateCareError.value || '私密记录未能保存在本机。';
+
+          return false;
+        }
+
+        const removedShared = change.before
+          ? await store.savePregnancy({ type: 'pregnancy', before: change.before, value: null })
+          : true;
+
+        if (!removedShared) {
+          store.savePrivateCareRecord(null, change.value);
+          error.value = store.error.value || '未能将原共享记录转为私密记录。';
+
+          return false;
+        }
+
+        message.value = '记录已设为仅自己可见，并保存在本机。';
+
+        return true;
+      }
+
+      const savedShared = change.value
+        ? await store.savePregnancy({ type: 'pregnancy', before: null, value: change.value })
+        : true;
+
+      if (!savedShared) {
+        error.value = store.error.value || '未能保存共享记录，原私密记录仍保留。';
+
+        return false;
+      }
+
+      const removedPrivate = store.savePrivateCareRecord(null, change.before);
+      message.value = removedPrivate
+        ? change.value
+          ? '记录已保存并加入家庭共享。'
+          : '本机私密记录已删除。'
+        : '';
+      error.value = removedPrivate
+        ? ''
+        : store.privateCareError.value || '共享记录已保存，但本机私密副本未能删除。';
+
+      return removedPrivate;
     }
 
     if (allowedType === 'care') {

@@ -19,6 +19,8 @@ import {
   validProfile,
   validTask,
   validChild,
+  validPregnancyRecord,
+  sameValue,
   applyPregnancyChange,
   type Child,
   type PregnancyChange,
@@ -26,6 +28,7 @@ import {
   type FamilyData,
   type FamilyProfile,
   type FamilyTask,
+  type PregnancyRecord,
 } from '@/domain/family';
 import { useCollaboration } from './useCollaboration';
 import {
@@ -48,6 +51,8 @@ export interface ImportTarget {
 
 export function createFamilyStore(options: { connect?: boolean } = {}) {
   const localData = ref<FamilyData>(emptyFamily());
+  const privateCareRecords = shallowRef<readonly PregnancyRecord[]>([]);
+  const privateCareError = shallowRef('');
   const localError = shallowRef('');
   const localLocked = shallowRef(false);
   const cloud = useCollaboration(options.connect ?? true);
@@ -123,6 +128,63 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
   const identity = computed(() =>
     cloud.active.value ? `${cloud.state.value.user?.id}:${cloud.state.value.family?.id}` : 'local',
   );
+  const privateCareStorageKey = computed(
+    () => `24years.private-care.v1:${encodeURIComponent(identity.value)}`,
+  );
+  watch(
+    privateCareStorageKey,
+    (key) => {
+      try {
+        const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
+        privateCareRecords.value = Array.isArray(parsed)
+          ? parsed.filter(
+              (record): record is PregnancyRecord =>
+                validPregnancyRecord(record) &&
+                (record.type === 'mood' || record.type === 'mentalScreening') &&
+                record.visibility === 'private',
+            )
+          : [];
+        privateCareError.value = '';
+      } catch {
+        privateCareRecords.value = [];
+        privateCareError.value = '无法读取本机私密记录。';
+      }
+    },
+    { immediate: true },
+  );
+
+  function savePrivateCareRecord(value: PregnancyRecord | null, before: PregnancyRecord | null) {
+    const id = (before ?? value)?.id;
+    const current = privateCareRecords.value.find((record) => record.id === id) ?? null;
+
+    if (!sameValue(current, before)) {
+      return false;
+    }
+
+    if (
+      value &&
+      (!validPregnancyRecord(value) ||
+        (value.type !== 'mood' && value.type !== 'mentalScreening') ||
+        value.visibility !== 'private')
+    ) {
+      return false;
+    }
+
+    const next = [
+      ...privateCareRecords.value.filter((record) => record.id !== id),
+      ...(value ? [value] : []),
+    ];
+
+    try {
+      localStorage.setItem(privateCareStorageKey.value, JSON.stringify(next));
+      privateCareRecords.value = next;
+      privateCareError.value = '';
+      return true;
+    } catch {
+      privateCareError.value = '私密记录未能保存在本机，请检查浏览器存储空间。';
+      return false;
+    }
+  }
   const today = shallowRef(localDate());
 
   let lastSaved: string | null = null;
@@ -435,6 +497,9 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
         return false;
       }
     },
+    privateCareRecords: readonly(privateCareRecords),
+    privateCareError: readonly(privateCareError),
+    savePrivateCareRecord,
     data: readonly(data),
     error: readonly(error),
     locked: readonly(locked),

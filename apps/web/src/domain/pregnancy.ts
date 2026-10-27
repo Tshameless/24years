@@ -28,7 +28,14 @@ export type PregnancyRecord =
       notes: string;
     }
   | { id: string; type: 'bonding'; date: string; title: string; minutes: number; notes: string }
-  | { id: string; type: 'mood'; date: string; title: string; notes: string }
+  | {
+      id: string;
+      type: 'mood';
+      date: string;
+      title: string;
+      notes: string;
+      visibility: 'private' | 'shared';
+    }
   | {
       id: string;
       type: 'nutrition';
@@ -47,18 +54,23 @@ export type PregnancyRecord =
       selfHarm: boolean;
       answers?: readonly number[];
       notes: string;
+      visibility: 'private' | 'shared';
     }
   | {
       id: string;
       type: 'ultrasound';
       date: string;
       gestationWeeks: number;
+      gestationDays: number;
       bpd?: number;
       fl?: number;
       ac?: number;
       hc?: number;
       afi?: number;
       umbilicalSd?: number;
+      efw?: number;
+      fhr?: number;
+      presentation?: string;
       notes: string;
     }
   | {
@@ -91,6 +103,7 @@ export type PregnancyRecord =
       metric: 'weight' | 'bloodPressure' | 'glucose';
       value: number;
       secondary: number | null;
+      pulse?: number;
       notes: string;
     }
   | { id: string; type: 'contraction'; startedAt: number; endedAt: number | null }
@@ -109,6 +122,10 @@ export type PregnancyRecord =
       hospital: string;
       contact: string;
       phone: string;
+      bloodType?: string;
+      hospitalNumber?: string;
+      obstetrician?: string;
+      obstetricPhone?: string;
       notes: string;
     }
   | {
@@ -201,7 +218,8 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
       return (
         isDate(value.date) &&
         ['愉悦', '平静', '烦躁', '低落', '疲惫'].includes(String(value.title)) &&
-        note(value.notes)
+        note(value.notes) &&
+        (value.visibility === 'private' || value.visibility === 'shared')
       );
     case 'nutrition':
       return (
@@ -210,7 +228,8 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         typeof value.protein === 'boolean' &&
         typeof value.vegetables === 'boolean' &&
         typeof value.supplement === 'boolean' &&
-        note(value.notes)
+        note(value.notes) &&
+        (value.visibility === 'private' || value.visibility === 'shared')
       );
     case 'mentalScreening':
       return (
@@ -235,11 +254,16 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         Number.isInteger(value.gestationWeeks) &&
         value.gestationWeeks >= 0 &&
         value.gestationWeeks <= 42 &&
-        ['bpd', 'fl', 'ac', 'hc', 'afi', 'umbilicalSd'].every(
+        typeof value.gestationDays === 'number' &&
+        Number.isInteger(value.gestationDays) &&
+        value.gestationDays >= 0 &&
+        value.gestationDays <= 6 &&
+        ['bpd', 'fl', 'ac', 'hc', 'afi', 'umbilicalSd', 'efw', 'fhr'].every(
           (key) =>
             value[key] === undefined ||
             (typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0),
         ) &&
+        (value.presentation === undefined || shortText(value.presentation, 40)) &&
         note(value.notes)
       );
     case 'symptom':
@@ -277,6 +301,7 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
           (typeof value.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time))) &&
         (value.context === undefined || shortText(value.context, 80)) &&
         note(value.notes) &&
+        (value.pulse === undefined || positive(value.pulse, 300)) &&
         ((value.metric === 'weight' && positive(value.value, 1000) && value.secondary === null) ||
           (value.metric === 'glucose' && positive(value.value, 100) && value.secondary === null) ||
           (value.metric === 'bloodPressure' &&
@@ -315,6 +340,12 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         value.contact.length <= 50 &&
         typeof value.phone === 'string' &&
         /^[+\d ()-]{0,30}$/.test(value.phone) &&
+        (value.bloodType === undefined || shortText(value.bloodType, 20)) &&
+        (value.hospitalNumber === undefined || shortText(value.hospitalNumber, 50)) &&
+        (value.obstetrician === undefined || shortText(value.obstetrician, 50)) &&
+        (value.obstetricPhone === undefined ||
+          (typeof value.obstetricPhone === 'string' &&
+            /^[+\d ()-]{0,30}$/.test(value.obstetricPhone))) &&
         note(value.notes)
       );
     case 'postpartum':
@@ -609,8 +640,7 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
     (!validExpense(expense) ||
       (value?.type !== 'checkup' && value?.type !== 'packing') ||
       !value.completed ||
-      before?.type !== value.type ||
-      before.completed ||
+      (before !== null && (before?.type !== value.type || before.completed)) ||
       expense.id !== `${value.type}-${id}` ||
       expense.kind !== 'expense' ||
       expense.category !== (value.type === 'checkup' ? '产检医疗' : '待产准备') ||

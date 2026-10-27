@@ -3,15 +3,26 @@ export const packingTemplates = [
   {
     title: '证件与就诊资料袋',
     notes: '按医院清单核对证件、预约信息和既往报告；存放位置：',
+    category: '证件资料',
+    quantity: 1,
   },
   {
     title: '个人洗漱与换洗用品',
     notes: '先核对医院提供的用品，避免重复购买；存放位置：',
+    category: '妈妈用品',
+    quantity: 1,
   },
-  { title: '宝宝出院衣物', notes: '根据天气与医院要求准备；存放位置：' },
+  {
+    title: '宝宝出院衣物',
+    notes: '根据天气与医院要求准备；存放位置：',
+    category: '宝宝用品',
+    quantity: 1,
+  },
   {
     title: '手机充电与交通准备',
     notes: '确认充电设备、接送联系人和就医路线；存放位置：',
+    category: '证件资料',
+    quantity: 1,
   },
 ] as const;
 

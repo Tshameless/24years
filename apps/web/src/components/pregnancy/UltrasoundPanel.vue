@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, shallowRef } from 'vue';
 import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
@@ -12,28 +12,75 @@ const entries = computed(() =>
     .filter((item): item is Ultrasound => item.type === 'ultrasound')
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
+const chartMetric = shallowRef<'bpd' | 'fl' | 'ac' | 'hc' | 'afi'>('bpd');
+const chartLabels = { bpd: 'BPD', fl: 'FL', ac: 'AC', hc: 'HC', afi: 'AFI' } as const;
+const chartEntries = computed(() =>
+  entries.value
+    .filter((item) => item[chartMetric.value] !== undefined)
+    .slice()
+    .sort((a, b) =>
+      (a.gestationWeeks * 7 + (a.gestationDays ?? 0)) -
+      (b.gestationWeeks * 7 + (b.gestationDays ?? 0)),
+    ),
+);
+const chart = computed(() => {
+  const values = chartEntries.value.map((item) => item[chartMetric.value] as number);
+
+  if (!values.length) {
+    return null;
+  }
+
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const padding = Math.max((high - low) * 0.15, 1);
+  const min = low - padding;
+  const max = high + padding;
+  const x = (index: number) =>
+    chartEntries.value.length === 1 ? 300 : 55 + (index / (chartEntries.value.length - 1)) * 490;
+  const y = (value: number) => 160 - ((value - min) / (max - min)) * 130;
+
+  return {
+    min,
+    max,
+    points: chartEntries.value.map((item, index) => ({
+      id: item.id,
+      week: `${item.gestationWeeks}+${item.gestationDays ?? 0}`,
+      value: item[chartMetric.value] as number,
+      x: x(index),
+      y: y(item[chartMetric.value] as number),
+    })),
+  };
+});
 const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
   type: 'ultrasound',
   defaults: () => ({
     date: localDate(),
     gestationWeeks: '20',
+    gestationDays: 0,
     bpd: '',
     fl: '',
     ac: '',
     hc: '',
     afi: '',
     umbilicalSd: '',
+    efw: '',
+    fhr: '',
+    presentation: '',
     notes: '',
   }),
   fields: (item: Ultrasound) => ({
     date: item.date,
     gestationWeeks: String(item.gestationWeeks),
+    gestationDays: item.gestationDays ?? 0,
     bpd: String(item.bpd ?? ''),
     fl: String(item.fl ?? ''),
     ac: String(item.ac ?? ''),
     hc: String(item.hc ?? ''),
     afi: String(item.afi ?? ''),
     umbilicalSd: String(item.umbilicalSd ?? ''),
+    efw: String(item.efw ?? ''),
+    fhr: String(item.fhr ?? ''),
+    presentation: item.presentation ?? '',
     notes: item.notes,
   }),
 });
@@ -60,17 +107,24 @@ function exportCsv() {
       'HC (mm)',
       'AFI (cm)',
       '脐动脉 S/D',
+      'EFW (g)',
+      'FHR (次/分)',
+      '胎位',
       '备注',
     ],
     ...entries.value.map((item) => [
       item.date,
       item.gestationWeeks,
+      item.gestationDays,
       item.bpd,
       item.fl,
       item.ac,
       item.hc,
       item.afi,
       item.umbilicalSd,
+      item.efw,
+      item.fhr,
+      item.presentation,
       item.notes,
     ]),
   ];
@@ -94,6 +148,7 @@ async function submit() {
     type: 'ultrasound',
     date: form.date,
     gestationWeeks: Number(form.gestationWeeks),
+    gestationDays: Number(form.gestationDays),
     ...Object.fromEntries(
       Object.entries({
         bpd: optional(form.bpd),
@@ -102,8 +157,11 @@ async function submit() {
         hc: optional(form.hc),
         afi: optional(form.afi),
         umbilicalSd: optional(form.umbilicalSd),
+        efw: optional(form.efw),
+        fhr: optional(form.fhr),
       }).filter(([, v]) => v !== undefined),
     ),
+    ...(form.presentation.trim() ? { presentation: form.presentation.trim() } : {}),
     notes: form.notes.trim(),
   } as Ultrasound;
 
@@ -137,6 +195,48 @@ async function submit() {
         </div>
       </div>
       <p class="muted">保存报告中的结构化数值，方便复诊时查看趋势；不自动解读或诊断。</p>
+      <div
+        v-if="entries.length"
+        class="ultrasound-chart-tools"
+      >
+        <label class="field">
+          趋势指标
+          <select v-model="chartMetric">
+            <option
+              v-for="(label, key) in chartLabels"
+              :key="key"
+              :value="key"
+            >
+              {{ label }}
+            </option>
+          </select>
+        </label>
+      </div>
+      <div
+        v-if="chart"
+        class="ultrasound-chart"
+      >
+        <svg
+          viewBox="0 0 600 200"
+          role="img"
+          :aria-label="`${chartLabels[chartMetric]} 随孕周变化趋势图`"
+        >
+          <line x1="55" y1="30" x2="55" y2="160" class="axis" />
+          <line x1="55" y1="160" x2="545" y2="160" class="axis" />
+          <text x="5" y="34">{{ chart.max.toFixed(1) }}</text>
+          <text x="5" y="160">{{ chart.min.toFixed(1) }}</text>
+          <polyline
+            :points="chart.points.map((point) => `${point.x},${point.y}`).join(' ')"
+            class="ultrasound-line"
+          />
+          <g v-for="point in chart.points" :key="point.id">
+            <circle :cx="point.x" :cy="point.y" r="3" class="ultrasound-point">
+              <title>{{ point.week }} 周 · {{ point.value }}</title>
+            </circle>
+          </g>
+        </svg>
+        <small>按已填写孕周排序；仅用于复诊时整理原始记录。</small>
+      </div>
       <p
         v-if="!entries.length"
         class="empty-state"
@@ -159,6 +259,9 @@ async function submit() {
               <th scope="col">HC (mm)</th>
               <th scope="col">AFI (cm)</th>
               <th scope="col">脐动脉 S/D</th>
+              <th scope="col">EFW (g)</th>
+              <th scope="col">FHR</th>
+              <th scope="col">胎位</th>
               <th scope="col">操作</th>
             </tr>
           </thead>
@@ -168,13 +271,16 @@ async function submit() {
               :key="item.id"
             >
               <th scope="row">{{ item.date }}</th>
-              <td>{{ item.gestationWeeks }}</td>
+              <td>{{ item.gestationWeeks }}+{{ item.gestationDays ?? 0 }}</td>
               <td>{{ item.bpd ?? '—' }}</td>
               <td>{{ item.fl ?? '—' }}</td>
               <td>{{ item.ac ?? '—' }}</td>
               <td>{{ item.hc ?? '—' }}</td>
               <td>{{ item.afi ?? '—' }}</td>
               <td>{{ item.umbilicalSd ?? '—' }}</td>
+              <td>{{ item.efw ?? '—' }}</td>
+              <td>{{ item.fhr ?? '—' }}</td>
+              <td>{{ item.presentation ?? '—' }}</td>
               <td class="row-actions">
                 <button
                   class="text-button"
@@ -240,6 +346,12 @@ async function submit() {
                 step="1"
               />
             </label>
+            <label class="field">
+              天数（天）
+              <select v-model.number="form.gestationDays">
+                <option v-for="day in 7" :key="day" :value="day - 1">{{ day - 1 }} 天</option>
+              </select>
+            </label>
           </div>
           <div class="form-row">
             <label class="field">
@@ -261,6 +373,20 @@ async function submit() {
               />
             </label>
           </div>
+          <div class="form-row">
+            <label class="field">
+              胎儿预估体重 EFW（g，可选）
+              <input v-model="form.efw" type="number" min="0" step="any" />
+            </label>
+            <label class="field">
+              胎心率 FHR（次/分，可选）
+              <input v-model="form.fhr" type="number" min="0" step="1" />
+            </label>
+          </div>
+          <label class="field">
+            胎位（可选）
+            <input v-model="form.presentation" maxlength="40" placeholder="例如：头位" />
+          </label>
           <div class="form-row">
             <label class="field">
               AC（mm）

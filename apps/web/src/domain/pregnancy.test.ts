@@ -78,6 +78,7 @@ describe('孕期记录和原子入账', () => {
       score: 1,
       selfHarm: false,
       answers: Array(10).fill(0),
+      visibility: 'shared' as const,
       notes: '',
     };
     const next = { ...legacy, id: 'screening-2026-10-27', date: '2026-10-27' };
@@ -202,6 +203,7 @@ describe('孕期记录和原子入账', () => {
       type: 'mood',
       date: '2027-01-01',
       title: '平静',
+      visibility: 'shared',
       notes: '',
     };
 
@@ -221,6 +223,7 @@ describe('孕期记录和原子入账', () => {
       type: 'mood',
       date: '2025-12-15',
       title: '平静',
+      visibility: 'shared',
       notes: '',
     };
     const withPreBirth = {

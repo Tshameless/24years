@@ -14,11 +14,24 @@ const card = computed(
 const { form, before, stale, draft, reset, edit } = usePregnancyDraft({
   type: 'medical',
   initial: card.value,
-  defaults: () => ({ hospital: '', contact: '', phone: '', notes: '' }),
+  defaults: () => ({
+    hospital: '',
+    contact: '',
+    phone: '',
+    bloodType: '',
+    hospitalNumber: '',
+    obstetrician: '',
+    obstetricPhone: '',
+    notes: '',
+  }),
   fields: (item: MedicalCard) => ({
     hospital: item.hospital,
     contact: item.contact,
     phone: item.phone,
+    bloodType: item.bloodType ?? '',
+    hospitalNumber: item.hospitalNumber ?? '',
+    obstetrician: item.obstetrician ?? '',
+    obstetricPhone: item.obstetricPhone ?? '',
     notes: item.notes,
   }),
 });
@@ -48,6 +61,10 @@ async function submit() {
     hospital: form.hospital.trim(),
     contact: form.contact.trim(),
     phone: form.phone.trim(),
+    ...(form.bloodType.trim() ? { bloodType: form.bloodType.trim() } : {}),
+    ...(form.hospitalNumber.trim() ? { hospitalNumber: form.hospitalNumber.trim() } : {}),
+    ...(form.obstetrician.trim() ? { obstetrician: form.obstetrician.trim() } : {}),
+    ...(form.obstetricPhone.trim() ? { obstetricPhone: form.obstetricPhone.trim() } : {}),
     notes: form.notes.trim(),
   };
 
@@ -84,6 +101,23 @@ async function submit() {
             class="text-button"
           >
             {{ card.phone }}
+          </a>
+          <span v-else>尚未填写</span>
+        </dd>
+        <dt>孕妇血型（ABO / Rh）</dt>
+        <dd>{{ card?.bloodType || '尚未填写' }}</dd>
+        <dt>建档号 / 病历号</dt>
+        <dd>{{ card?.hospitalNumber || '尚未填写' }}</dd>
+        <dt>主诊医生</dt>
+        <dd>{{ card?.obstetrician || '尚未填写' }}</dd>
+        <dt>产科急诊电话</dt>
+        <dd>
+          <a
+            v-if="card?.obstetricPhone"
+            :href="`tel:${card.obstetricPhone.replace(/[^+\d]/g, '')}`"
+            class="text-button"
+          >
+            {{ card.obstetricPhone }}
           </a>
           <span v-else>尚未填写</span>
         </dd>
@@ -138,6 +172,40 @@ async function submit() {
               maxlength="30"
             />
           </label>
+          <div class="form-row">
+            <label class="field">
+              孕妇血型（ABO / Rh，可选）
+              <input
+                v-model="form.bloodType"
+                maxlength="20"
+                placeholder="例如：A Rh+"
+              />
+            </label>
+            <label class="field">
+              建档号 / 病历号（可选）
+              <input
+                v-model="form.hospitalNumber"
+                maxlength="50"
+              />
+            </label>
+          </div>
+          <div class="form-row">
+            <label class="field">
+              主诊医生（可选）
+              <input
+                v-model="form.obstetrician"
+                maxlength="50"
+              />
+            </label>
+            <label class="field">
+              产科急诊电话（可选）
+              <input
+                v-model="form.obstetricPhone"
+                type="tel"
+                maxlength="30"
+              />
+            </label>
+          </div>
           <label class="field">
             过敏史、用药与其他备注
             <textarea

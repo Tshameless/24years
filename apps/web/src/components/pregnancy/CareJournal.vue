@@ -36,6 +36,7 @@ const defaults = () => ({
   date: localDate(),
   minutes: '10',
   notes: '',
+  visibility: 'shared',
 });
 const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
   type: kind,
@@ -45,6 +46,7 @@ const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
     date: item.date,
     notes: item.notes,
     minutes: item.type === 'bonding' ? String(item.minutes) : '10',
+    visibility: item.type === 'mood' ? item.visibility : 'shared',
   }),
 });
 
@@ -64,7 +66,7 @@ async function submit() {
   const value: Entry =
     kind === 'bonding'
       ? { ...base, type: 'bonding', minutes: Number(form.minutes) }
-      : { ...base, type: 'mood' };
+      : { ...base, type: 'mood', visibility: form.visibility as 'private' | 'shared' };
 
   if (!validPregnancyRecord(value) || value.date > localDate()) {
     reportError('请检查内容、不晚于今天的记录日期与陪伴时长（1–1440 分钟整数）。');
@@ -87,7 +89,15 @@ async function submit() {
         <h2>{{ labels[kind] }}</h2>
         <span class="tag">{{ entries.length }} 条记录</span>
       </div>
-      <p class="muted">启用家庭同步后，所有家庭成员都能看到这些记录。请只填写愿意共享的内容。</p>
+      <p class="muted">
+        心情日记可设为仅自己可见；陪伴记录在家庭同步后对家庭成员可见。
+      </p>
+      <p
+        v-if="kind === 'mood' && form.visibility === 'private'"
+        class="privacy-notice"
+      >
+        仅自己可见：这条记录只保存在本机，不会上传家庭云或出现在其他设备。
+      </p>
       <p
         v-if="kind === 'mood'"
         class="muted"
@@ -191,6 +201,16 @@ async function submit() {
               :min="kind === 'mood' ? careMinDate : undefined"
               :max="kind === 'mood' ? careMaxDate : localDate()"
             />
+          </label>
+          <label
+            v-if="kind === 'mood'"
+            class="field"
+          >
+            可见范围
+            <select v-model="form.visibility">
+              <option value="private">仅自己可见</option>
+              <option value="shared">允许家庭成员查看</option>
+            </select>
           </label>
           <label
             v-if="kind === 'bonding'"

@@ -46,6 +46,7 @@ const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
     metric: 'weight' as Vital['metric'],
     value: '',
     secondary: '',
+    pulse: '',
     notes: '',
   }),
   fields: (item: Vital) => ({
@@ -55,6 +56,7 @@ const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
     metric: item.metric,
     value: String(item.value),
     secondary: item.secondary === null ? '' : String(item.secondary),
+    pulse: item.pulse === undefined ? '' : String(item.pulse),
     notes: item.notes,
   }),
 });
@@ -76,6 +78,9 @@ async function submit() {
     metric: form.metric,
     value: Number(form.value),
     secondary: form.metric === 'bloodPressure' ? Number(form.secondary) : null,
+    ...(form.metric === 'bloodPressure' && form.pulse.trim()
+      ? { pulse: Number(form.pulse) }
+      : {}),
     notes: form.notes.trim(),
   };
 
@@ -125,6 +130,7 @@ async function submit() {
             <div class="vital-value-group">
               <span class="numbers">
                 {{ item.value }}{{ item.secondary === null ? '' : ` / ${item.secondary}` }}
+                <small v-if="item.pulse !== undefined"> · 脉搏 {{ item.pulse }}</small>
               </span>
               <span
                 class="tag"
@@ -274,6 +280,19 @@ async function submit() {
               step="any"
               required
               @input="form.secondary = ($event.target as HTMLInputElement).value"
+            />
+          </label>
+          <label
+            v-if="form.metric === 'bloodPressure'"
+            class="field"
+          >
+            脉搏/心率（次/分，可选）
+            <input
+              v-model="form.pulse"
+              type="number"
+              min="1"
+              max="300"
+              step="1"
             />
           </label>
           <label class="field">

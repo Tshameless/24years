@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue';
 import { useRoute } from 'vue-router';
-import { pregnancyOutcome } from '@/domain/family';
+import { pregnancyOutcome, pregnancyProgress } from '@/domain/family';
 import { useFamily } from '@/composables/useFamily';
 import '@/assets/pregnancy.css';
 
@@ -50,6 +50,11 @@ const SymptomsPanel = defineAsyncComponent(
 const { data, recordLocked, cloud } = useFamily();
 const route = useRoute();
 const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
+const progress = computed(() =>
+  data.value.profile
+    ? pregnancyProgress(data.value.profile.dueDate, new Date().toISOString().slice(0, 10))
+    : null,
+);
 
 const tabGroups = [
   {
@@ -100,6 +105,32 @@ const tabGroups = [
 ];
 
 const tabs = computed(() => tabGroups.flatMap((group) => group.tabs));
+const quickTabIds = computed(() => {
+  if (outcome.value?.kind === 'birth') {
+    return ['postpartum', 'medical', 'overview'];
+  }
+
+  const week = progress.value?.weeks ?? 0;
+
+  if (week >= 36) {
+    return ['movements', 'contractions', 'packing', 'medical'];
+  }
+
+  if (week >= 28) {
+    return ['movements', 'vitals', 'checkups', 'packing'];
+  }
+
+  if (week >= 13) {
+    return ['checkups', 'vitals', 'ultrasound', 'nutrition'];
+  }
+
+  return ['checkups', 'medical', 'vitals', 'mood'];
+});
+const quickTabs = computed(() =>
+  quickTabIds.value
+    .map((id) => tabs.value.find((tab) => tab.id === id))
+    .filter((tab): tab is (typeof tabs.value)[number] => !!tab),
+);
 const selected = computed(
   () =>
     tabs.value.find((item) => item.id === route.query.tab) ??
@@ -169,6 +200,25 @@ const selected = computed(
         可在“分娩与孕期结束”更正状态。
       </p>
       <nav
+        v-if="quickTabs.length"
+        class="pregnancy-quick-nav"
+        aria-label="当前阶段常用入口"
+      >
+        <span class="quick-nav-label">
+          当前阶段常用
+          <small v-if="progress">孕 {{ progress.weeks }}+{{ progress.days }}</small>
+        </span>
+        <RouterLink
+          v-for="item in quickTabs"
+          :key="item.id"
+          :to="{ path: '/pregnancy', query: { tab: item.id } }"
+          class="pregnancy-tab quick-tab"
+          :class="{ selected: selected.id === item.id }"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </nav>
+      <nav
         class="pregnancy-groups"
         aria-label="孕期记录类型"
       >
@@ -218,6 +268,36 @@ const selected = computed(
   background: var(--surface);
   border-radius: 14px;
   margin-bottom: 24px;
+}
+
+.pregnancy-quick-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.quick-nav-label {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 2px;
+  margin-right: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.quick-nav-label small {
+  font-weight: 400;
+}
+
+.quick-tab {
+  flex: 0 0 auto;
 }
 
 .pregnancy-heading-copy {

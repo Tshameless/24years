@@ -28,6 +28,7 @@ const {
   message,
   reportError,
   saveCare: save,
+  removeCare,
   cloudActive,
 } = usePregnancyRecords();
 const history = computed(() =>
@@ -38,13 +39,21 @@ const history = computed(() =>
 const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
   type: 'mentalScreening',
   initial: history.value[0] ?? null,
-  defaults: () => ({ date: localDate(), answers: '[]', score: '0', selfHarm: false, notes: '' }),
+  defaults: () => ({
+    date: localDate(),
+    answers: '[]',
+    score: '0',
+    selfHarm: false,
+    notes: '',
+    visibility: 'shared',
+  }),
   fields: (item: Screening) => ({
     date: item.date,
     answers: JSON.stringify(item.answers ?? []),
     score: String(item.score),
     selfHarm: item.selfHarm,
     notes: item.notes,
+    visibility: item.visibility,
   }),
 });
 const selectedAnswers = computed(() => {
@@ -99,6 +108,7 @@ async function submit() {
     score: score.value,
     selfHarm: selfHarm.value,
     answers: selectedAnswers.value,
+    visibility: form.visibility as 'private' | 'shared',
     notes: form.notes.trim(),
   };
 
@@ -130,11 +140,14 @@ async function submit() {
       这是非诊断性的自我观察，不是经过验证的 EPDS
       量表，汇总分不设医学阈值。若情绪持续影响生活，请联系专业人员；若出现自伤想法或无法保证自身安全，请立即联系可信任的人和当地急救服务。
     </p>
-    <p
-      v-if="cloudActive"
-      class="privacy-notice"
-    >
-      家庭同步已开启：此记录会对家庭成员可见，请只填写愿意共享的信息。
+    <p class="privacy-notice">
+      {{
+        form.visibility === 'private'
+          ? '仅自己可见：记录只保存在本机，不会上传家庭云或出现在其他设备。'
+          : cloudActive
+            ? '家庭同步已开启：共享记录会对家庭成员可见。'
+            : '当前未开启家庭同步：共享记录会保存在当前浏览器。'
+      }}
     </p>
     <div class="screening-layout">
       <aside
@@ -181,6 +194,15 @@ async function submit() {
               >
                 曾选择自伤想法
               </small>
+              <small>{{ item.visibility === 'private' ? '仅自己可见' : '家庭共享' }}</small>
+            </button>
+            <button
+              type="button"
+              class="text-button history-delete"
+              :disabled="disabled || !canEditCareRecord(item)"
+              @click.stop="removeCare(item)"
+            >
+              删除
             </button>
           </li>
         </ul>
@@ -208,6 +230,13 @@ async function submit() {
               :min="careMinDate"
               :max="careMaxDate"
             />
+          </label>
+          <label class="field">
+            可见范围
+            <select v-model="form.visibility">
+              <option value="private">仅自己可见</option>
+              <option value="shared">允许家庭成员查看</option>
+            </select>
           </label>
           <p class="muted">
             请按近两周的实际感受逐题选择。每题的 0–3 仅用于整理回答，不用于诊断或风险分级。
