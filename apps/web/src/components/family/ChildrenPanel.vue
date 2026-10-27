@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import { reactive, shallowRef } from 'vue';
+import { computed, reactive, shallowRef } from 'vue';
 import { useFamily } from '@/composables/useFamily';
+import { useFormDraft } from '@/composables/useFormDraft';
 import {
   formatChildAge,
   localDate,
   type Child,
   type ChildBloodType,
   type ChildGender,
+  sameValue,
+  validChild,
 } from '@/domain/family';
 import AppIcon from '@/components/AppIcon.vue';
+import FormDraftNotice from '@/components/FormDraftNotice.vue';
 import GrowthTracker from './GrowthTracker.vue';
 
-const { children, addChild, updateChild, removeChild, recordLocked, today } = useFamily();
+const { children, addChild, updateChild, removeChild, recordLocked, today, identity, cloud } =
+  useFamily();
 
 const showModal = shallowRef(false);
-const editingId = shallowRef<string | null>(null);
 const expandedGrowthChildId = shallowRef<string | null>(null);
 const formError = shallowRef('');
 const actionError = shallowRef('');
@@ -30,10 +34,45 @@ const form = reactive({
   headCircumferenceCm: '',
   birthGestationalWeeks: '',
   notes: '',
+  childId: '',
+  source: 'null',
 });
 
-function openAddModal() {
-  editingId.value = null;
+const draft = useFormDraft({
+  form,
+  scope: () => `${identity.value}:${cloud.role.value ?? 'local'}`,
+  name: 'children:editor',
+  baseline: () => children.value.find((child) => child.id === form.childId) ?? null,
+});
+const editingId = computed(() => form.childId || null);
+const sourceChild = computed(() => {
+  try {
+    const value: unknown = JSON.parse(form.source);
+
+    return value === null || validChild(value) ? value : null;
+  } catch {
+    return null;
+  }
+});
+const stale = computed(() => {
+  if (draft.changedSource.value) {
+    return true;
+  }
+
+  const existing = editingId.value
+    ? (children.value.find((child) => child.id === editingId.value) ?? null)
+    : null;
+
+  return editingId.value
+    ? !sourceChild.value || !existing || !sameValue(sourceChild.value, existing)
+    : sourceChild.value !== null;
+});
+
+if (draft.dirty.value) {
+  showModal.value = true;
+}
+
+function clearFields() {
   form.name = '';
   form.birthDate = localDate();
   form.gender = '';
@@ -43,12 +82,19 @@ function openAddModal() {
   form.headCircumferenceCm = '';
   form.birthGestationalWeeks = '';
   form.notes = '';
+  form.childId = '';
+  form.source = 'null';
+}
+
+function openAddModal() {
+  clearFields();
+  draft.accept();
   formError.value = '';
   showModal.value = true;
 }
 
 function openEditModal(child: Child) {
-  editingId.value = child.id;
+  form.childId = child.id;
   form.name = child.name;
   form.birthDate = child.birthDate;
   form.gender = child.gender ?? '';
@@ -60,13 +106,18 @@ function openEditModal(child: Child) {
     ? String(child.birthGestationalWeeks)
     : '';
   form.notes = child.notes ?? '';
+  form.source = JSON.stringify(child);
+  draft.accept();
   formError.value = '';
   showModal.value = true;
 }
 
 function closeModal() {
+  if (saving.value || !draft.confirmDiscard()) {
+    return;
+  }
+
   showModal.value = false;
-  editingId.value = null;
   formError.value = '';
 }
 
@@ -76,6 +127,12 @@ async function saveChildForm() {
   }
 
   formError.value = '';
+
+  if (stale.value) {
+    formError.value = '孩子档案已变化，草稿仍保留；请核对最新资料后再编辑。';
+
+    return;
+  }
 
   const name = form.name.trim();
 
@@ -129,10 +186,11 @@ async function saveChildForm() {
 
   if (editingId.value) {
     const existing = children.value.find((c) => c.id === editingId.value);
+    const original = sourceChild.value;
 
-    if (existing) {
+    if (existing && original && sameValue(existing, original)) {
       const updated: Child = {
-        ...existing,
+        ...original,
         ...payload,
       };
 
@@ -140,7 +198,8 @@ async function saveChildForm() {
 
       try {
         if (await updateChild(updated, existing)) {
-          closeModal();
+          draft.accept();
+          showModal.value = false;
         } else {
           formError.value = '更新失败，请重试。';
         }
@@ -148,14 +207,15 @@ async function saveChildForm() {
         saving.value = false;
       }
     } else {
-      formError.value = '孩子档案已变化，请关闭后重新打开。';
+      formError.value = '孩子档案已变化，请清除草稿并重新打开。';
     }
   } else {
     saving.value = true;
 
     try {
       if (await addChild(payload)) {
-        closeModal();
+        draft.accept();
+        showModal.value = false;
       } else {
         formError.value = '添加失败，请重试。';
       }
@@ -336,6 +396,20 @@ const genderLabels: Record<string, string> = {
           class="modal-form"
           @submit.prevent="saveChildForm"
         >
+          <FormDraftNotice
+            :dirty="draft.dirty.value"
+            :restored="draft.restored.value"
+            :error="draft.storageError.value"
+            :blocked="stale"
+            @discard="closeModal"
+          />
+          <p
+            v-if="stale"
+            class="form-error"
+            role="alert"
+          >
+            孩子档案已变化，草稿仍保留；请先核对最新资料。
+          </p>
           <div class="form-row">
             <label class="field">
               孩子姓名或昵称 *
@@ -450,7 +524,7 @@ const genderLabels: Record<string, string> = {
             <button
               class="button button-primary"
               type="submit"
-              :disabled="saving"
+              :disabled="saving || stale"
             >
               {{ saving ? '正在保存…' : editingId ? '保存修改' : '确认添加' }}
             </button>

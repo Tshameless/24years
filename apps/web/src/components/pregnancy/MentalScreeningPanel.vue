@@ -18,7 +18,15 @@ const questions = [
   '我因为不开心而哭泣。',
   '我曾有伤害自己的想法。',
 ];
-const { records, disabled, error, message, reportError, save, cloudActive } = usePregnancyRecords();
+const {
+  records,
+  careDisabled: disabled,
+  error,
+  message,
+  reportError,
+  saveCare: save,
+  cloudActive,
+} = usePregnancyRecords();
 const history = computed(() =>
   records.value
     .filter((item): item is Screening => item.type === 'mentalScreening')

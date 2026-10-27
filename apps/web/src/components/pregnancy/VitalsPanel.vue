@@ -9,7 +9,15 @@ import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
 
 type Vital = Extract<PregnancyRecord, { type: 'vital' }>;
-const { records, disabled, message, error, reportError, save, remove } = usePregnancyRecords();
+const {
+  records,
+  careDisabled: disabled,
+  message,
+  error,
+  reportError,
+  saveCare: save,
+  removeCare: remove,
+} = usePregnancyRecords();
 const labels = { weight: '体重（kg）', bloodPressure: '血压（mmHg）', glucose: '血糖（mmol/L）' };
 const glucoseContexts = ['空腹', '餐后1小时', '餐后2小时', '随机', '其他'];
 const entries = computed(() =>

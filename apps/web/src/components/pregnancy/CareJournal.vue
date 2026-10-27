@@ -8,7 +8,19 @@ import FormDraftNotice from '@/components/FormDraftNotice.vue';
 type Entry = Extract<PregnancyRecord, { type: 'bonding' | 'mood' }>;
 const { kind } = defineProps<{ kind: Entry['type'] }>();
 const labels = { bonding: '陪伴记录', mood: '心情日记' };
-const { records, disabled, save, remove, error, reportError, message } = usePregnancyRecords();
+const {
+  records,
+  disabled: pregnancyDisabled,
+  careDisabled,
+  save,
+  saveCare,
+  remove,
+  removeCare,
+  error,
+  reportError,
+  message,
+} = usePregnancyRecords();
+const disabled = computed(() => (kind === 'mood' ? careDisabled.value : pregnancyDisabled.value));
 const entries = computed(() =>
   records.value
     .filter((item): item is Entry => item.type === kind)
@@ -55,7 +67,9 @@ async function submit() {
     return;
   }
 
-  if (await save({ type: 'pregnancy', before: before.value, value })) {
+  const persist = kind === 'mood' ? saveCare : save;
+
+  if (await persist({ type: 'pregnancy', before: before.value, value })) {
     reset();
   }
 }
@@ -111,7 +125,7 @@ async function submit() {
             <button
               class="text-button"
               :disabled="disabled"
-              @click="remove(item)"
+              @click="kind === 'mood' ? removeCare(item) : remove(item)"
             >
               删除
             </button>

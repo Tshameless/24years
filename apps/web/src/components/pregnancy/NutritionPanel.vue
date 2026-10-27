@@ -6,7 +6,15 @@ import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
 
 type Nutrition = Extract<PregnancyRecord, { type: 'nutrition' }>;
-const { records, disabled, error, message, reportError, save, remove } = usePregnancyRecords();
+const {
+  records,
+  careDisabled: disabled,
+  error,
+  message,
+  reportError,
+  saveCare: save,
+  removeCare: remove,
+} = usePregnancyRecords();
 const entries = computed(() =>
   records.value
     .filter((item): item is Nutrition => item.type === 'nutrition')
@@ -65,10 +73,10 @@ async function submit() {
         <span class="tag">{{ entries.length }} 天</span>
       </div>
       <p class="muted">
-        记录今天是否完成饮水、优质蛋白、蔬菜和遵医嘱补剂。这里不替代个体化营养方案。
+        记录饮水、优质蛋白、蔬菜和遵医嘱补剂。这里不替代个体化营养方案；分娩后可继续记录至 24 个月。
       </p>
       <div class="nutrition-guide">
-        <strong>按阶段提醒</strong>
+        <strong>孕期记录参考</strong>
         <p>
           孕早期优先保证能进食和补水；孕中晚期关注多样饮食、蛋白质和铁钙来源。补剂剂量、咖啡因和特殊饮食请按产科或营养科建议。
         </p>

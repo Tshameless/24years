@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const apiPort = process.env.PLAYWRIGHT_API_PORT ?? '8788';
+const webPort = process.env.PLAYWRIGHT_WEB_PORT ?? '4173';
+const apiOrigin = `http://127.0.0.1:${apiPort}`;
+const webOrigin = `http://127.0.0.1:${webPort}`;
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 45000,
@@ -10,7 +15,7 @@ export default defineConfig({
   retries: 1,
   fullyParallel: true,
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: webOrigin,
     timezoneId: 'Asia/Shanghai',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
@@ -28,14 +33,14 @@ export default defineConfig({
   webServer: [
     {
       command: 'node server/index.ts',
-      env: { API_PORT: '8788', FAMILY_DB: ':memory:', APP_ORIGIN: 'http://127.0.0.1:4173' },
-      url: 'http://127.0.0.1:8788/api/health',
+      env: { API_PORT: apiPort, FAMILY_DB: ':memory:', APP_ORIGIN: webOrigin },
+      url: `${apiOrigin}/api/health`,
       reuseExistingServer: false,
     },
     {
-      command: 'node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4173 --strictPort',
-      env: { API_PROXY_TARGET: 'http://127.0.0.1:8788' },
-      url: 'http://127.0.0.1:4173',
+      command: `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${webPort} --strictPort`,
+      env: { API_PROXY_TARGET: apiOrigin },
+      url: webOrigin,
       reuseExistingServer: false,
     },
   ],

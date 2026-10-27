@@ -384,6 +384,92 @@ test('missing configured origin never trusts a request-supplied Host/Origin pair
   }
 });
 
+test('invalid account names consume only the IP limiter key', async () => {
+  const app = createApplication({ database: ':memory:' });
+  await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+  const address = app.server.address() as { port: number };
+  const base = `http://127.0.0.1:${address.port}`;
+  const post = (username: string, nickname = 'New User') =>
+    fetch(`${base}/api/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-24Years-Client': 'web' },
+      body: JSON.stringify({ username, nickname, password: 'safe-password-2026' }),
+    });
+
+  try {
+    for (let index = 0; index < 50; index += 1) {
+      assert.equal((await post(`bad-${index}`)).status, 400);
+    }
+
+    assert.equal(
+      (app.db.prepare('SELECT count(*) AS count FROM rate_limits').get() as { count: number })
+        .count,
+      1,
+    );
+    assert.equal((await post('validuser')).status, 200);
+    assert.equal(
+      (app.db.prepare('SELECT count(*) AS count FROM rate_limits').get() as { count: number })
+        .count,
+      2,
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      app.server.close((error) => (error ? reject(error) : resolve())),
+    );
+    app.db.close();
+  }
+});
+
+test('revoked account sessions close their existing SSE connection on the next notification', async () => {
+  const app = createApplication({ database: ':memory:' });
+  await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+  const address = app.server.address() as { port: number };
+  const base = `http://127.0.0.1:${address.port}`;
+  const service = createService(app.db);
+  const credentials = {
+    username: 'streamuser',
+    nickname: 'Stream User',
+    password: 'safe-password-2026',
+  };
+  const current = await service.authenticate(credentials, true);
+  const revoked = await service.authenticate(credentials, false);
+  const eventController = new AbortController();
+  const events = await fetch(`${base}/api/events`, {
+    headers: { Cookie: `family_session=${revoked.token}` },
+    signal: eventController.signal,
+  });
+  const reader = events.body!.getReader();
+
+  try {
+    assert.equal(events.status, 200);
+    await reader.read();
+    const response = await fetch(`${base}/api/account/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-24Years-Client': 'web',
+        Cookie: `family_session=${current.token}`,
+      },
+      body: JSON.stringify({
+        currentPassword: credentials.password,
+        newPassword: 'safer-password-2026',
+      }),
+    });
+    assert.equal(response.status, 200);
+    const closed = await Promise.race([
+      reader.read().then((result) => result.done),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1500)),
+    ]);
+    assert.equal(closed, true);
+  } finally {
+    eventController.abort();
+    await new Promise<void>((resolve, reject) =>
+      app.server.close((error) => (error ? reject(error) : resolve())),
+    );
+    app.db.close();
+  }
+});
+
 test('backup import accepts an archive over the ordinary API body limit', async () => {
   const app = createApplication({ database: ':memory:', origin: 'http://trusted.test' });
   await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));

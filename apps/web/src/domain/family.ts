@@ -41,6 +41,8 @@ export {
   applyPregnancyChange,
   PregnancyChangeError,
   pregnancyOutcome,
+  isPostpartumCareRecord,
+  withinPostpartumWindow,
   validPregnancyLifecycle,
   validPregnancyRecord,
   type FamilyData,
@@ -59,6 +61,7 @@ export {
 } from './child.ts';
 export {
   ageInMonthsAt,
+  correctedAgeInMonthsAt,
   validGrowthRecord,
   type ChildGrowthRecord,
   type GrowthMetric,

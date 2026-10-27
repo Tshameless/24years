@@ -3,6 +3,23 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 
+async function createLocalProfile(page: Page, name = '产后记录家庭') {
+  await page.goto('/family');
+  await page.getByRole('radio', { name: '单人', exact: true }).check();
+  await page.getByLabel('家庭名称').fill(name);
+  await page.getByLabel('怎么称呼你').fill('小叶');
+  await page.getByLabel('孕周（周）').fill('24');
+  await page.getByRole('button', { name: '保存家庭档案' }).click();
+  await expect(page.getByText('家庭档案已保存', { exact: true })).toBeVisible();
+}
+
+function addDays(date: string, days: number) {
+  const result = new Date(`${date}T00:00:00.000Z`);
+  result.setUTCDate(result.getUTCDate() + days);
+
+  return result.toISOString().slice(0, 10);
+}
+
 test('孕期记录双端同步，草稿冲突保留输入，只读成员不能修改', async ({ page, browser, baseURL }) => {
   test.setTimeout(60000);
   const otherContext = await browser.newContext({ baseURL, viewport: page.viewportSize() });
@@ -172,5 +189,84 @@ test('孕期闭环：产检原子入账、体征、计时、就医卡和备份�
   await expect(page.getByText('已完成', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: '家庭账本', exact: true }).click();
   await expect(page.getByTestId('net-cost')).toHaveText('¥80.05');
+  expect(errors).toEqual([]);
+});
+
+test('更正分娩结局时取消删除会保留孩子并解除自动关联', async ({ page }) => {
+  await createLocalProfile(page, '结局更正家庭');
+  await page.goto('/pregnancy?tab=outcome');
+  await page.getByLabel('宝宝称呼（可留空）').fill('小芽');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '确认结束孕期' }).click();
+  await expect(page.locator('.child-sync-banner')).toContainText('小芽');
+
+  await page.getByLabel('结束方式', { exact: true }).selectOption('ended');
+  const dialogMessages: string[] = [];
+  page.on('dialog', async (dialog) => {
+    dialogMessages.push(dialog.message());
+    if (dialogMessages.length === 1) {
+      await dialog.accept();
+    } else {
+      await dialog.dismiss();
+    }
+  });
+  await page.getByRole('button', { name: '保存结束记录修改' }).click();
+  await expect(page.getByRole('status').filter({ hasText: '记录已保存' })).toBeVisible();
+  expect(dialogMessages).toHaveLength(2);
+
+  await page.goto('/family');
+  await expect(page.locator('.child-card')).toContainText('小芽');
+  const children = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('24years.family.v1')!).children,
+  );
+  expect(children).toHaveLength(1);
+  expect(children[0]).not.toHaveProperty('sourceOutcomeId');
+});
+
+test('产后随访可加入日常计划，心情与体征记录仍可保存', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      errors.push(message.text());
+    }
+  });
+
+  await createLocalProfile(page, '产后闭环家庭');
+  await page.goto('/pregnancy?tab=outcome');
+  const outcomeDate = await page.getByLabel('实际结束日期').inputValue();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '确认结束孕期' }).click();
+
+  await page.goto('/pregnancy?tab=postpartum');
+  const postpartumFollowup = addDays(outcomeDate, 1);
+  const newbornFollowup = addDays(outcomeDate, 2);
+  await page.getByLabel('产后复诊日期（按医嘱）').fill(postpartumFollowup);
+  await page.getByLabel('新生儿随访日期（按医嘱）').fill(newbornFollowup);
+  await page.getByRole('button', { name: '保存产后交接' }).click();
+  await expect(page.getByRole('status').filter({ hasText: '记录已保存' })).toBeVisible();
+  await page.getByRole('button', { name: /产后复诊加入计划/ }).click();
+  await expect(page.getByRole('status').filter({ hasText: '已加入日常计划' })).toBeVisible();
+  await page.getByRole('button', { name: /新生儿随访加入计划/ }).click();
+  await expect(page.getByRole('button', { name: /新生儿随访已加入/ })).toBeVisible();
+
+  await page.goto('/tasks');
+  await page.getByLabel('筛选计划').selectOption('all');
+  await expect(page.getByText('产后复诊（按医嘱）', { exact: true })).toBeVisible();
+  await expect(page.getByText('新生儿随访（按医嘱）', { exact: true })).toBeVisible();
+
+  await page.goto('/pregnancy?tab=mood');
+  await page.getByLabel('记录备注').fill('产后心情记录');
+  await page.getByRole('button', { name: '保存心情日记' }).click();
+  await expect(page.getByText('产后心情记录', { exact: true })).toBeVisible();
+
+  await page.goto('/pregnancy?tab=vitals');
+  await page.getByLabel('体重（kg）', { exact: true }).fill('61.8');
+  await page.getByRole('button', { name: '保存体征', exact: true }).click();
+  await expect(page.locator('.record-list').getByText('61.8', { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: join(tmpdir(), `24years-postpartum-care-${test.info().project.name}.png`),
+    fullPage: true,
+  });
   expect(errors).toEqual([]);
 });

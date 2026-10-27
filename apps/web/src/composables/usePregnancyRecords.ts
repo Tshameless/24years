@@ -1,6 +1,13 @@
 import { computed, readonly, shallowRef } from 'vue';
 import { useFamily } from './useFamily';
-import { pregnancyOutcome, type PregnancyChange, type PregnancyRecord } from '@/domain/family';
+import {
+  isPostpartumCareRecord,
+  localDate,
+  pregnancyOutcome,
+  withinPostpartumWindow,
+  type PregnancyChange,
+  type PregnancyRecord,
+} from '@/domain/family';
 
 export function usePregnancyRecords() {
   const store = useFamily();
@@ -11,14 +18,36 @@ export function usePregnancyRecords() {
   const outcome = computed(() => pregnancyOutcome(records.value));
   const outcomeDisabled = computed(() => store.recordLocked.value || busy.value);
   const disabled = computed(() => outcomeDisabled.value || !!outcome.value);
+  const careDisabled = computed(
+    () =>
+      outcomeDisabled.value ||
+      (!!outcome.value &&
+        (outcome.value.kind !== 'birth' ||
+          !withinPostpartumWindow(outcome.value.date, localDate()))),
+  );
 
-  async function persist(change: PregnancyChange, allowedType?: 'outcome' | 'postpartum') {
+  async function persist(change: PregnancyChange, allowedType?: 'outcome' | 'postpartum' | 'care') {
     if (
       outcomeDisabled.value ||
       (!!outcome.value && !allowedType) ||
-      (allowedType && (change.value ?? change.before)?.type !== allowedType)
+      (allowedType === 'outcome' && (change.value ?? change.before)?.type !== 'outcome') ||
+      (allowedType === 'postpartum' && (change.value ?? change.before)?.type !== 'postpartum')
     ) {
       return false;
+    }
+
+    if (allowedType === 'care') {
+      const record = (change.value ?? change.before) as PregnancyRecord | null;
+
+      if (
+        !record ||
+        !isPostpartumCareRecord(record) ||
+        (outcome.value &&
+          (outcome.value.kind !== 'birth' ||
+            !withinPostpartumWindow(outcome.value.date, record.date)))
+      ) {
+        return false;
+      }
     }
 
     busy.value = true;
@@ -47,10 +76,17 @@ export function usePregnancyRecords() {
   const saveOutcome = (change: PregnancyChange) => persist(change, 'outcome');
 
   const savePostpartum = (change: PregnancyChange) => persist(change, 'postpartum');
+  const saveCare = (change: PregnancyChange) => persist(change, 'care');
 
   async function remove(before: PregnancyRecord) {
     if (window.confirm('确认删除这条记录？已生成的账目会保留在家庭账本中。')) {
       await save({ type: 'pregnancy', before: { ...before }, value: null });
+    }
+  }
+
+  async function removeCare(before: PregnancyRecord) {
+    if (isPostpartumCareRecord(before) && window.confirm('确认删除这条身心记录？')) {
+      await saveCare({ type: 'pregnancy', before: { ...before }, value: null });
     }
   }
 
@@ -66,6 +102,7 @@ export function usePregnancyRecords() {
     records,
     outcome,
     disabled,
+    careDisabled,
     outcomeDisabled,
     message: readonly(message),
     error: readonly(error),
@@ -73,7 +110,9 @@ export function usePregnancyRecords() {
     save,
     saveOutcome,
     savePostpartum,
+    saveCare,
     remove,
+    removeCare,
     quietMode,
     cloudActive,
     hasExpense,

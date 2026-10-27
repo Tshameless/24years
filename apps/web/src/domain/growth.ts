@@ -1,4 +1,4 @@
-import { isDate, isObject, shortText } from './primitives.ts';
+import { addDays, isDate, isObject, shortText } from './primitives.ts';
 
 export interface ChildGrowthRecord {
   id: string;
@@ -79,4 +79,18 @@ export function ageInMonthsAt(birthDate: string, date: string): number {
   }
 
   return Math.max(0, months);
+}
+
+export function correctedAgeInMonthsAt(
+  birthDate: string,
+  date: string,
+  birthGestationalWeeks: number,
+): number | null {
+  if (birthGestationalWeeks >= 37 || birthGestationalWeeks > 45) {
+    return null;
+  }
+
+  const correctedBirthDate = addDays(birthDate, Math.max(0, 40 - birthGestationalWeeks) * 7);
+
+  return ageInMonthsAt(correctedBirthDate, date);
 }

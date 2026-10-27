@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ageInMonthsAt, validGrowthRecord, type ChildGrowthRecord } from './growth.ts';
+import {
+  ageInMonthsAt,
+  correctedAgeInMonthsAt,
+  validGrowthRecord,
+  type ChildGrowthRecord,
+} from './growth.ts';
 
 describe('validGrowthRecord', () => {
   const baseRecord: ChildGrowthRecord = {
@@ -54,5 +59,13 @@ describe('ageInMonthsAt', () => {
     expect(ageInMonthsAt('2026-01-15', '2026-04-14')).toBe(2);
     expect(ageInMonthsAt('2026-01-15', '2026-04-15')).toBe(3);
     expect(ageInMonthsAt('2026-01-15', '2026-01-14')).toBe(0);
+  });
+});
+
+describe('correctedAgeInMonthsAt', () => {
+  it('subtracts the weeks before 40 weeks only for preterm birth', () => {
+    expect(correctedAgeInMonthsAt('2026-01-01', '2026-02-26', 32)).toBe(0);
+    expect(correctedAgeInMonthsAt('2026-01-01', '2026-03-26', 32)).toBe(1);
+    expect(correctedAgeInMonthsAt('2026-01-01', '2026-03-01', 37)).toBeNull();
   });
 });

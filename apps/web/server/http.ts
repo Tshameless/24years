@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { pipeline, Readable } from 'node:stream';
 import { constants, createBrotliCompress, createGzip } from 'node:zlib';
-import { ApiError, createService } from './service.ts';
+import { ApiError, createService, hash } from './service.ts';
 import { openDatabase } from './database.ts';
 import { clientAddress, createRateLimiter } from './rate-limit.ts';
 import { compressionEncoding } from './compression.ts';
@@ -94,21 +94,45 @@ export function createApplication(options: {
   const service = createService(db);
   const limit = createRateLimiter(db);
   const selectAccountByUsername = db.prepare('SELECT id FROM accounts WHERE username = ?');
-  const eventClients = new Set<{ userId: string; response: ServerResponse }>();
+  type EventClient = { userId: string; tokenHash: string; response: ServerResponse };
+  const eventClients = new Set<EventClient>();
   const maxEventsPerUser = 4;
   const maxEventClients = 1000;
+  const activeEventSession = db.prepare(
+    'SELECT 1 AS active FROM sessions WHERE token_hash = ? AND expires_at > ?',
+  );
+
+  function closeEventClient(client: EventClient) {
+    eventClients.delete(client);
+
+    if (!client.response.writableEnded) {
+      client.response.end();
+    }
+  }
 
   function notifyUsers(userIds: Iterable<string>, fromRevision?: number) {
     const targets = new Set(userIds);
 
     for (const client of eventClients) {
       if (targets.has(client.userId) && !client.response.writableEnded) {
-        const payload =
+        if (!activeEventSession.get(client.tokenHash, Date.now())) {
+          closeEventClient(client);
+          continue;
+        }
+
+        const delta =
           fromRevision !== undefined
-            ? JSON.stringify({
-                delta: service.changesSince(client.userId, fromRevision),
-                etag: service.sessionTag(client.userId),
-              })
+            ? service.changesSince(client.userId, fromRevision)
+            : undefined;
+
+        if (delta === null) {
+          closeEventClient(client);
+          continue;
+        }
+
+        const payload =
+          delta !== undefined
+            ? JSON.stringify({ delta, etag: service.sessionTag(client.userId) })
             : String(Date.now());
         client.response.write(`event: sync\ndata: ${payload}\n\n`);
       }
@@ -139,7 +163,11 @@ export function createApplication(options: {
   const heartbeat = setInterval(() => {
     for (const client of eventClients) {
       if (!client.response.writableEnded) {
-        client.response.write(': ping\n\n');
+        if (!activeEventSession.get(client.tokenHash, Date.now())) {
+          closeEventClient(client);
+        } else {
+          client.response.write(': ping\n\n');
+        }
       }
     }
   }, 25000);
@@ -212,7 +240,7 @@ export function createApplication(options: {
           'X-Accel-Buffering': 'no',
         });
         response.write(`event: ready\ndata: ${service.sessionTag(userId)}\n\n`);
-        const client = { userId, response };
+        const client = { userId, tokenHash: hash(token), response };
         eventClients.add(client);
         const removeClient = () => {
           eventClients.delete(client);
@@ -273,10 +301,13 @@ export function createApplication(options: {
 
         if (path === '/api/recover') {
           const targetUsername = String(body.username).toLowerCase();
-          limit.many([
-            [`recovery-ip:${ip}`, 30],
-            [`recovery-account:${targetUsername}`, 6],
-          ]);
+          const limits: Array<readonly [string, number]> = [[`recovery-ip:${ip}`, 30]];
+
+          if (typeof body.username === 'string' && /^[a-zA-Z0-9_]{3,32}$/.test(body.username)) {
+            limits.push([`recovery-account:${targetUsername}`, 6]);
+          }
+
+          limit.many(limits);
           const targetAccount = selectAccountByUsername.get(targetUsername) as
             | { id: string }
             | undefined;
@@ -297,10 +328,13 @@ export function createApplication(options: {
         }
 
         if (path === '/api/register' || path === '/api/login') {
-          limit.many([
-            [`auth-ip:${ip}`, 100],
-            [`auth-account:${String(body.username).toLowerCase()}`, 12],
-          ]);
+          const limits: Array<readonly [string, number]> = [[`auth-ip:${ip}`, 100]];
+
+          if (typeof body.username === 'string' && /^[a-zA-Z0-9_]{3,32}$/.test(body.username)) {
+            limits.push([`auth-account:${body.username.toLowerCase()}`, 12]);
+          }
+
+          limit.many(limits);
           const result = await service.authenticate(body, path === '/api/register');
           service.logout(token);
           response.setHeader(
@@ -381,6 +415,15 @@ export function createApplication(options: {
             ? service.mutateCompact(userId, action, body)
             : service.mutate(userId, action, body);
         const afterContext = service.familyContext(userId);
+
+        if ((action === 'role' || action === 'remove') && typeof body.userId === 'string') {
+          for (const client of eventClients) {
+            if (client.userId === body.userId) {
+              closeEventClient(client);
+            }
+          }
+        }
+
         notifyUsers([...beforeUsers, ...afterContext.userIds], beforeContext.revision ?? undefined);
         json(response, 200, result);
 

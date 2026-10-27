@@ -12,7 +12,9 @@ const { server, db } = createApplication({
   database:
     process.env.FAMILY_DB ?? fileURLToPath(new URL('../data/family.sqlite', import.meta.url)),
   staticDir: fileURLToPath(new URL('../dist', import.meta.url)),
-  origin: process.env.APP_ORIGIN,
+  origin:
+    process.env.APP_ORIGIN ??
+    (process.env.NODE_ENV === 'production' ? undefined : 'http://localhost:5173'),
   secureCookie: process.env.COOKIE_SECURE === 'true',
   trustedProxies: process.env.TRUSTED_PROXIES?.split(',')
     .map((value) => value.trim())

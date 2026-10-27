@@ -2,21 +2,27 @@
 import { computed, reactive, shallowRef } from 'vue';
 import { createId } from '@/domain/id';
 import {
+  ageInMonthsAt,
+  correctedAgeInMonthsAt,
   dayDifference,
   localDate,
+  sameValue,
+  validChild,
   type Child,
   type ChildGrowthRecord,
   type GrowthMetric,
 } from '@/domain/family';
 import { useFamily } from '@/composables/useFamily';
+import { useFormDraft } from '@/composables/useFormDraft';
 import { downloadGrowthCsv } from '@/domain/growthReport';
 import AppIcon from '@/components/AppIcon.vue';
+import FormDraftNotice from '@/components/FormDraftNotice.vue';
 
 const props = defineProps<{
   child: Child;
 }>();
 
-const { updateChild, addTask, recordLocked, today, cloud } = useFamily();
+const { updateChild, addTask, recordLocked, today, cloud, identity } = useFamily();
 
 const activeMetric = shallowRef<GrowthMetric>('weightKg');
 const showRecordForm = shallowRef(false);
@@ -25,7 +31,6 @@ const taskNotice = shallowRef('');
 const reminderError = shallowRef('');
 const savingRecord = shallowRef(false);
 const addingReminder = shallowRef(false);
-const editingRecordId = shallowRef<string | null>(null);
 const historyError = shallowRef('');
 const reminderTitle = shallowRef('');
 const reminderDate = shallowRef(localDate());
@@ -37,6 +42,41 @@ const form = reactive({
   heightCm: '',
   headCircumferenceCm: '',
   notes: '',
+  recordId: '',
+  source: JSON.stringify(props.child),
+});
+
+const draft = useFormDraft({
+  form,
+  scope: () => `${identity.value}:${cloud.role.value ?? 'local'}`,
+  name: `child-growth:${props.child.id}`,
+  baseline: () => props.child,
+});
+
+const sourceChild = computed(() => {
+  try {
+    const value: unknown = JSON.parse(form.source);
+
+    return validChild(value) ? value : null;
+  } catch {
+    return null;
+  }
+});
+const stale = computed(
+  () =>
+    !sourceChild.value || !sameValue(sourceChild.value, props.child) || draft.changedSource.value,
+);
+const editingRecordId = computed(() => form.recordId || null);
+
+if (draft.dirty.value) {
+  showRecordForm.value = true;
+}
+const correctedAge = computed(() => {
+  const weeks = props.child.birthGestationalWeeks;
+
+  return weeks !== undefined && weeks < 37
+    ? correctedAgeInMonthsAt(props.child.birthDate, today.value, weeks)
+    : null;
 });
 
 const sortedRecords = computed<readonly ChildGrowthRecord[]>(() =>
@@ -71,7 +111,7 @@ const plotData = computed(() => {
   const values = points.map((p) => p.value);
   const minVal = Math.floor(Math.min(...values) * 0.85);
   const maxVal = Math.ceil(Math.max(...values) * 1.15);
-  const maxMonth = Math.max(12, ...points.map((p) => p.month));
+  const maxMonth = Math.max(12, Math.ceil(Math.max(...points.map((p) => p.month))));
 
   const chartW = 340;
   const chartH = 140;
@@ -89,7 +129,9 @@ const plotData = computed(() => {
 });
 
 async function submitRecord() {
-  if (savingRecord.value) {
+  if (savingRecord.value || stale.value || !sourceChild.value) {
+    formError.value = '孩子档案已变化，请先核对并重新打开记录表单。';
+
     return;
   }
 
@@ -121,24 +163,26 @@ async function submitRecord() {
   };
 
   const updated: Child = {
-    ...props.child,
+    ...sourceChild.value,
     growthRecords: editingRecordId.value
-      ? (props.child.growthRecords ?? []).map((item) =>
+      ? (sourceChild.value.growthRecords ?? []).map((item) =>
           item.id === editingRecordId.value ? record : item,
         )
-      : [...(props.child.growthRecords ?? []), record],
+      : [...(sourceChild.value.growthRecords ?? []), record],
   };
 
   savingRecord.value = true;
 
   try {
-    if (await updateChild(updated, props.child)) {
+    if (await updateChild(updated, sourceChild.value)) {
       form.weightKg = '';
       form.heightCm = '';
       form.headCircumferenceCm = '';
       form.notes = '';
-      editingRecordId.value = null;
+      form.recordId = '';
       showRecordForm.value = false;
+      form.source = JSON.stringify(updated);
+      draft.accept();
     } else {
       formError.value = '记录保存失败，请检查输入格式。';
     }
@@ -148,13 +192,43 @@ async function submitRecord() {
 }
 
 function editRecord(record: ChildGrowthRecord) {
-  editingRecordId.value = record.id;
+  if (draft.dirty.value && !draft.confirmDiscard()) {
+    return;
+  }
+
+  form.recordId = record.id;
   form.date = record.date;
   form.weightKg = record.weightKg?.toString() ?? '';
   form.heightCm = record.heightCm?.toString() ?? '';
   form.headCircumferenceCm = record.headCircumferenceCm?.toString() ?? '';
   form.notes = record.notes ?? '';
   formError.value = '';
+  form.source = JSON.stringify(props.child);
+  draft.accept();
+  showRecordForm.value = true;
+}
+
+function toggleRecordForm() {
+  if (showRecordForm.value) {
+    if (draft.confirmDiscard()) {
+      form.recordId = '';
+      showRecordForm.value = false;
+      form.source = JSON.stringify(props.child);
+      draft.accept();
+    }
+
+    return;
+  }
+
+  form.date = localDate();
+  form.weightKg = '';
+  form.heightCm = '';
+  form.headCircumferenceCm = '';
+  form.notes = '';
+  form.source = JSON.stringify(props.child);
+  form.recordId = '';
+  formError.value = '';
+  draft.accept();
   showRecordForm.value = true;
 }
 
@@ -171,7 +245,7 @@ async function removeRecord(record: ChildGrowthRecord) {
 
   if (await updateChild(updated, props.child)) {
     if (editingRecordId.value === record.id) {
-      editingRecordId.value = null;
+      form.recordId = '';
       showRecordForm.value = false;
     }
   } else {
@@ -247,7 +321,7 @@ async function addReminder() {
       <button
         class="button button-secondary button-sm"
         type="button"
-        @click="showRecordForm = !showRecordForm"
+        @click="toggleRecordForm"
       >
         <AppIcon
           :name="showRecordForm ? 'cross' : 'plus'"
@@ -263,6 +337,20 @@ async function addReminder() {
       class="growth-form panel"
       @submit.prevent="submitRecord"
     >
+      <FormDraftNotice
+        :dirty="draft.dirty.value"
+        :restored="draft.restored.value"
+        :error="draft.storageError.value"
+        :blocked="stale"
+        @discard="toggleRecordForm"
+      />
+      <p
+        v-if="stale"
+        class="form-error"
+        role="alert"
+      >
+        孩子档案已变化，草稿仍保留；请先核对最新档案再继续。
+      </p>
       <div class="form-row">
         <label class="field">
           测量日期
@@ -328,7 +416,7 @@ async function addReminder() {
         <button
           class="button button-primary button-sm"
           type="submit"
-          :disabled="savingRecord"
+          :disabled="savingRecord || stale || recordLocked"
         >
           {{ savingRecord ? '正在保存…' : editingRecordId ? '保存修改' : '保存测量记录' }}
         </button>
@@ -365,6 +453,13 @@ async function addReminder() {
 
     <p class="muted growth-note">
       此处只记录家庭测量与变化趋势，不提供生长标准评估或接种建议；相关安排请遵循医护人员和当地要求。
+    </p>
+    <p
+      v-if="correctedAge !== null && ageInMonthsAt(child.birthDate, today) <= 24"
+      class="muted growth-note"
+    >
+      早产儿矫正月龄约 {{ correctedAge }} 个月（按出生孕周
+      {{ child.birthGestationalWeeks }} 周计算，仅供年龄记录参考）
     </p>
 
     <!-- SVG 趋势曲线 -->

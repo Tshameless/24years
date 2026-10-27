@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, shallowRef } from 'vue';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
+import { useFamily } from '@/composables/useFamily';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
@@ -8,6 +9,9 @@ import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/
 type Postpartum = Extract<PregnancyRecord, { type: 'postpartum' }>;
 const { records, outcome, outcomeDisabled, savePostpartum, error, message, reportError } =
   usePregnancyRecords();
+const family = useFamily();
+const reminderNotice = shallowRef('');
+const reminderError = shallowRef('');
 const saved = computed(
   () => records.value.find((item): item is Postpartum => item.type === 'postpartum') ?? null,
 );
@@ -41,6 +45,45 @@ const fields = [
   { key: 'questions', label: '复诊想问的问题' },
   { key: 'notes', label: '出院交代与其他备注' },
 ] as const;
+
+function reminderTitle(title: string) {
+  return `${title}（按医嘱）`;
+}
+
+function reminderExists(title: string, date: string) {
+  return family.data.value.tasks.some(
+    (task) => task.title === reminderTitle(title) && task.date === date && task.repeat === 'once',
+  );
+}
+
+async function addFollowupReminder(title: string, date: string) {
+  reminderError.value = '';
+  reminderNotice.value = '';
+
+  if (date < family.today.value) {
+    reminderError.value = '已过日期不能加入日常计划。';
+
+    return;
+  }
+
+  if (reminderExists(title, date)) {
+    reminderNotice.value = '这条随访提醒已在日常计划中。';
+
+    return;
+  }
+
+  const task = reminderTitle(title);
+  const added = await family.addTask({ title: task, date, time: '09:00', repeat: 'once' });
+
+  if (added) {
+    reminderNotice.value =
+      family.cloud.active.value && !family.cloud.online.value
+        ? '提醒已保存在本机，待联网同步。'
+        : '已加入日常计划。';
+  } else {
+    reminderError.value = '加入失败，请检查日常计划状态后重试。';
+  }
+}
 
 async function submit() {
   if (outcomeDisabled.value || stale.value) {
@@ -156,6 +199,64 @@ async function remove() {
             />
           </label>
         </div>
+        <div
+          v-if="saved?.followupDate || saved?.newbornFollowupDate"
+          class="followup-reminders"
+        >
+          <p class="muted">已保存的随访日期</p>
+          <div class="form-actions">
+            <button
+              v-if="saved?.followupDate"
+              class="button button-secondary button-sm"
+              type="button"
+              :disabled="
+                outcomeDisabled ||
+                saved.followupDate < family.today.value ||
+                reminderExists('产后复诊', saved.followupDate)
+              "
+              @click="addFollowupReminder('产后复诊', saved.followupDate)"
+            >
+              {{
+                reminderExists('产后复诊', saved.followupDate)
+                  ? '产后复诊已加入'
+                  : '产后复诊加入计划'
+              }}
+              · {{ saved.followupDate }}
+            </button>
+            <button
+              v-if="saved?.newbornFollowupDate"
+              class="button button-secondary button-sm"
+              type="button"
+              :disabled="
+                outcomeDisabled ||
+                saved.newbornFollowupDate < family.today.value ||
+                reminderExists('新生儿随访', saved.newbornFollowupDate)
+              "
+              @click="addFollowupReminder('新生儿随访', saved.newbornFollowupDate)"
+            >
+              {{
+                reminderExists('新生儿随访', saved.newbornFollowupDate)
+                  ? '新生儿随访已加入'
+                  : '新生儿随访加入计划'
+              }}
+              · {{ saved.newbornFollowupDate }}
+            </button>
+          </div>
+        </div>
+        <p
+          v-if="reminderNotice"
+          class="success-message"
+          role="status"
+        >
+          {{ reminderNotice }}
+        </p>
+        <p
+          v-if="reminderError"
+          class="form-error"
+          role="alert"
+        >
+          {{ reminderError }}
+        </p>
         <label class="field">
           照护支持与联系人
           <input
@@ -239,3 +340,14 @@ async function remove() {
     </div>
   </section>
 </template>
+
+<style scoped>
+.followup-reminders {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.followup-reminders > p {
+  margin: 0;
+}
+</style>

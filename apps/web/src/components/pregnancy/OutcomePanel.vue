@@ -67,6 +67,52 @@ const measurements = [
 ] as const;
 const birth = computed(() => form.kind === 'birth');
 
+function linkedChildFor(outcome: PregnancyOutcome | null) {
+  if (!outcome) {
+    return null;
+  }
+
+  const children = familyStore.data.value.children ?? [];
+  const linked = children.find(
+    (child) => child.sourceOutcomeId === outcome.id || child.id === childIdForOutcome(outcome.id),
+  );
+
+  if (linked || outcome.kind !== 'birth') {
+    return linked ?? null;
+  }
+
+  const matches = children.filter(
+    (child) =>
+      child.birthDate === outcome.date && child.name === (outcome.babyName?.trim() || '宝宝'),
+  );
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function childChangeWhenEnding(outcome: PregnancyOutcome | null) {
+  const child = linkedChildFor(outcome);
+
+  if (!child || !outcome || outcome.kind !== 'birth') {
+    return null;
+  }
+
+  const canDelete =
+    child.sourceOutcomeId === outcome.id && (child.growthRecords?.length ?? 0) === 0;
+  const remove =
+    canDelete &&
+    window.confirm(
+      `「${child.name}」档案由本次分娩记录自动创建且没有成长记录。确定同时删除该档案？取消将保留档案并解除关联。`,
+    );
+
+  if (remove) {
+    return { before: child, value: null };
+  }
+
+  const { sourceOutcomeId: _sourceOutcomeId, ...detached } = child;
+
+  return { before: child, value: detached };
+}
+
 async function submit() {
   if (outcomeDisabled.value || stale.value) {
     return;
@@ -95,13 +141,28 @@ async function submit() {
       : {}),
   };
 
+  const previousOutcome = before.value?.type === 'outcome' ? before.value : null;
+  const children = familyStore.data.value.children ?? [];
+  const linkedChild =
+    linkedChildFor(previousOutcome) ??
+    children.find(
+      (child) =>
+        child.sourceOutcomeId === 'pregnancy-outcome' ||
+        child.id === childIdForOutcome('pregnancy-outcome'),
+    ) ??
+    null;
+
   if (
     !validPregnancyRecord(value) ||
     value.date > localDate() ||
     (birth.value &&
-      measurements.some(({ key }) => form[key] !== '' && !/^\d+(?:\.\d+)?$/.test(form[key])))
+      measurements.some(
+        ({ key, step }) =>
+          form[key] !== '' &&
+          (!/^\d+(?:\.\d+)?$/.test(form[key]) || (step === 1 && !/^\d+$/.test(form[key]))),
+      ))
   ) {
-    reportError('请检查日期与出生数据；实际结束日期不能晚于今天，出生数据可留空。');
+    reportError('请检查日期与出生数据；体重和 Apgar 须为整数，实际结束日期不能晚于今天。');
 
     return;
   }
@@ -116,20 +177,6 @@ async function submit() {
     return;
   }
 
-  const previousOutcome = before.value?.type === 'outcome' ? before.value : null;
-  const children = familyStore.data.value.children ?? [];
-  const legacyMatches =
-    previousOutcome?.kind === 'birth'
-      ? children.filter(
-          (child) =>
-            child.birthDate === previousOutcome.date &&
-            child.name === (previousOutcome.babyName?.trim() || '宝宝'),
-        )
-      : [];
-  const linkedChild =
-    children.find(
-      (child) => child.sourceOutcomeId === value.id || child.id === childIdForOutcome(value.id),
-    ) ?? (legacyMatches.length === 1 ? legacyMatches[0] : null);
   const change: Parameters<typeof saveOutcome>[0] = {
     type: 'pregnancy',
     before: before.value,
@@ -154,6 +201,8 @@ async function submit() {
           : linkedChild?.notes,
     };
     change.child = { before: linkedChild, value: child };
+  } else if (previousOutcome?.kind === 'birth') {
+    change.child = childChangeWhenEnding(previousOutcome) ?? undefined;
   }
 
   if (await saveOutcome(change)) {
@@ -174,7 +223,18 @@ async function reopen() {
     return;
   }
 
-  if (await saveOutcome({ type: 'pregnancy', before: before.value, value: null })) {
+  const previousOutcome = before.value.type === 'outcome' ? before.value : null;
+  const change: Parameters<typeof saveOutcome>[0] = {
+    type: 'pregnancy',
+    before: before.value,
+    value: null,
+  };
+
+  if (previousOutcome?.kind === 'birth') {
+    change.child = childChangeWhenEnding(previousOutcome) ?? undefined;
+  }
+
+  if (await saveOutcome(change)) {
     reset();
   }
 }
@@ -264,12 +324,13 @@ async function reopen() {
           >
             {{ item.label }}
             <input
-              v-model="form[item.key]"
-              type="text"
-              inputmode="decimal"
+              :value="form[item.key]"
+              type="number"
+              :inputmode="item.step === 1 ? 'numeric' : 'decimal'"
               :min="item.min"
               :max="item.max"
               :step="item.step"
+              @input="form[item.key] = ($event.target as HTMLInputElement).value"
             />
           </label>
         </template>

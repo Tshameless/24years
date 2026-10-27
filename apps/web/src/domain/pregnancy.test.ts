@@ -95,7 +95,7 @@ describe('孕期记录和原子入账', () => {
     expect(saved.pregnancyRecords).toEqual([legacy, next]);
     expect(decodeFamily(JSON.stringify(saved)).pregnancyRecords).toEqual([legacy, next]);
   });
-  it('更正分娩结局类型不会删除关联孩子或其成长记录', () => {
+  it('更正分娩结局必须解除关联，含成长记录的孩子不能随结局删除', () => {
     const birth: Extract<PregnancyRecord, { type: 'outcome' }> = {
       id: 'pregnancy-outcome',
       type: 'outcome' as const,
@@ -125,9 +125,9 @@ describe('孕期记录和原子入账', () => {
       children: [child],
     };
 
-    expect(
-      applyPregnancyChange(data, { type: 'pregnancy', before: birth, value: ended }).children,
-    ).toEqual([child]);
+    expect(() =>
+      applyPregnancyChange(data, { type: 'pregnancy', before: birth, value: ended }),
+    ).toThrow('请先处理关联孩子档案');
     expect(() =>
       applyPregnancyChange(data, {
         type: 'pregnancy',
@@ -136,6 +136,85 @@ describe('孕期记录和原子入账', () => {
         child: { before: child, value: null },
       }),
     ).toThrow('不能通过更正分娩记录删除孩子档案');
+    const detached = { ...child };
+    delete (detached as { sourceOutcomeId?: string }).sourceOutcomeId;
+    expect(
+      applyPregnancyChange(data, {
+        type: 'pregnancy',
+        before: birth,
+        value: ended,
+        child: { before: child, value: detached },
+      }).children,
+    ).toEqual([detached]);
+  });
+
+  it('撤销分娩记录时可原子删除无成长记录的自动孩子档案', () => {
+    const birth: PregnancyRecord = {
+      id: 'pregnancy-outcome',
+      type: 'outcome',
+      kind: 'birth',
+      date: '2026-10-20',
+      mode: 'unknown',
+      notes: '',
+    };
+    const child = {
+      id: 'birth-pregnancy-outcome',
+      name: '宝宝',
+      birthDate: birth.date,
+      sourceOutcomeId: birth.id,
+    };
+    const data = {
+      ...emptyFamily(),
+      profile: { name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: false },
+      pregnancyRecords: [birth],
+      children: [child],
+    };
+
+    const result = applyPregnancyChange(data, {
+      type: 'pregnancy',
+      before: birth,
+      value: null,
+      child: { before: child, value: null },
+    });
+
+    expect(result.pregnancyRecords).toEqual([]);
+    expect(result.children).toEqual([]);
+    expect(data.pregnancyRecords).toEqual([birth]);
+    expect(data.children).toEqual([child]);
+  });
+
+  it('允许分娩后的身心记录继续维护，但不允许超过两年窗口', () => {
+    const birth: PregnancyRecord = {
+      id: 'pregnancy-outcome',
+      type: 'outcome',
+      kind: 'birth',
+      date: '2026-01-01',
+      mode: 'unknown',
+      notes: '',
+    };
+    const data = {
+      ...emptyFamily(),
+      profile: { name: '家', nickname: '我', dueDate: '2026-01-01', quietMode: false },
+      pregnancyRecords: [birth],
+    };
+    const mood: PregnancyRecord = {
+      id: 'post-birth-mood',
+      type: 'mood',
+      date: '2027-01-01',
+      title: '平静',
+      notes: '',
+    };
+
+    expect(
+      applyPregnancyChange(data, { type: 'pregnancy', before: null, value: mood }).pregnancyRecords,
+    ).toContainEqual(mood);
+    expect(() =>
+      applyPregnancyChange(data, {
+        type: 'pregnancy',
+        before: null,
+        value: { ...mood, date: '2028-01-02' },
+      }),
+    ).toThrow('24 个月内');
   });
   it('产检和费用一起保存，旧快照不能覆盖，失败不修改输入', () => {
     const data = { ...emptyFamily(), pregnancyRecords: [checkup] };

@@ -2,7 +2,7 @@ import { isDate, isObject, localDate, sameValue, shortText } from './primitives.
 import { validExpense, type Expense } from './ledger.ts';
 import type { FamilyProfile } from './profile.ts';
 import type { FamilyTask } from './tasks.ts';
-import { validChild, type Child } from './child.ts';
+import { childIdForOutcome, validChild, type Child } from './child.ts';
 
 export interface FamilyData {
   version: 1;
@@ -145,6 +145,23 @@ export type PregnancyOutcome = Extract<PregnancyRecord, { type: 'outcome' }>;
 
 export function pregnancyOutcome(records: readonly PregnancyRecord[] | undefined) {
   return records?.find((record): record is PregnancyOutcome => record.type === 'outcome') ?? null;
+}
+
+export function isPostpartumCareRecord(
+  record: PregnancyRecord,
+): record is Extract<
+  PregnancyRecord,
+  { type: 'mood' | 'nutrition' | 'mentalScreening' | 'vital' }
+> {
+  return ['mood', 'nutrition', 'mentalScreening', 'vital'].includes(record.type);
+}
+
+export function withinPostpartumWindow(outcomeDate: string, recordDate: string): boolean {
+  const end = new Date(`${outcomeDate}T00:00:00Z`);
+  end.setUTCFullYear(end.getUTCFullYear() + 2);
+  const endDate = end.toISOString().slice(0, 10);
+
+  return recordDate >= outcomeDate && recordDate <= endDate;
 }
 
 export interface PregnancyChange {
@@ -416,12 +433,29 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
 
   if (child) {
     const linkedOutcome =
-      value?.type === 'outcome' ? value : before?.type === 'outcome' ? before : null;
+      value?.type === 'outcome' && value.kind === 'birth'
+        ? value
+        : before?.type === 'outcome' && before.kind === 'birth'
+          ? before
+          : value?.type === 'outcome'
+            ? value
+            : before?.type === 'outcome'
+              ? before
+              : null;
     const { before: childBefore, value: childValue } = child;
     const childId = childBefore?.id ?? childValue?.id;
     const existingChild = data.children?.find((item) => item.id === childId) ?? null;
+    const endingBirth =
+      linkedOutcome?.kind === 'birth' &&
+      (!value || value.type !== 'outcome' || value.kind !== 'birth');
 
-    if (childBefore && !childValue) {
+    if (
+      childBefore &&
+      !childValue &&
+      (!endingBirth ||
+        childBefore.sourceOutcomeId !== linkedOutcome?.id ||
+        (childBefore.growthRecords?.length ?? 0) > 0)
+    ) {
       throw new PregnancyChangeError('不能通过更正分娩记录删除孩子档案，请在成长档案中管理。');
     }
 
@@ -431,7 +465,8 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
       (childBefore !== null && !validChild(childBefore)) ||
       (childValue !== null && !validChild(childValue)) ||
       (childBefore && childValue && childBefore.id !== childValue.id) ||
-      (childValue?.sourceOutcomeId !== undefined && childValue.sourceOutcomeId !== linkedOutcome.id)
+      (childValue?.sourceOutcomeId !== undefined &&
+        (endingBirth || childValue.sourceOutcomeId !== linkedOutcome.id))
     ) {
       throw new PregnancyChangeError('关联的新生儿档案格式无效。');
     }
@@ -451,13 +486,47 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
   }
 
   const currentOutcome = pregnancyOutcome(records);
+  const changedOutcome = (before ?? value)?.type === 'outcome';
+
+  if (
+    currentOutcome?.kind === 'birth' &&
+    changedOutcome &&
+    (!value || (value.type === 'outcome' && value.kind !== 'birth'))
+  ) {
+    const linkedChild = (data.children ?? []).find(
+      (item) =>
+        item.sourceOutcomeId === currentOutcome.id ||
+        item.id === childIdForOutcome(currentOutcome.id),
+    );
+
+    if (linkedChild && !child) {
+      throw new PregnancyChangeError('请先处理关联孩子档案，再更正或撤销分娩记录。', 409);
+    }
+  }
 
   if (
     currentOutcome &&
     (before ?? value)?.type !== 'outcome' &&
-    (before ?? value)?.type !== 'postpartum'
+    (before ?? value)?.type !== 'postpartum' &&
+    !isPostpartumCareRecord((before ?? value)!)
   ) {
     throw new PregnancyChangeError('孕期记录已结束，历史记录仅供查阅。', 409);
+  }
+
+  const currentCareRecord = (value ?? before)!;
+
+  if (
+    currentOutcome &&
+    isPostpartumCareRecord((before ?? value)!) &&
+    isPostpartumCareRecord(currentCareRecord)
+  ) {
+
+    if (
+      currentOutcome.kind !== 'birth' ||
+      !withinPostpartumWindow(currentOutcome.date, currentCareRecord.date)
+    ) {
+      throw new PregnancyChangeError('产后身心记录仅可在分娩后 24 个月内保存。', 409);
+    }
   }
 
   if (value?.type === 'outcome' && (!data.profile || value.date > localDate())) {
