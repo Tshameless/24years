@@ -38,7 +38,6 @@ const entries = computed(() =>
 );
 const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
   type: 'vital',
-  optionalFields: ['time', 'context'],
   defaults: () => ({
     date: localDate(),
     time: '',

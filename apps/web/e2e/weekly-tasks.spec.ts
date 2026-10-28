@@ -5,19 +5,23 @@ import { join } from 'node:path';
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-21T10:00:00+08:00'));
   await page.addInitScript(() => {
-    if (!localStorage.getItem('24years.family.v1')) {
+    if (!localStorage.getItem('24years.family.v2')) {
       localStorage.setItem(
-        '24years.family.v1',
+        '24years.family.v2',
         JSON.stringify({
-          version: 1,
+          version: 2,
           theme: 'light',
           tasks: [],
           expenses: [],
+          pregnancyRecords: [],
+          children: [],
           profile: {
             name: '每周计划测试',
             nickname: '小叶',
             dueDate: '2027-02-01',
             quietMode: false,
+            familyMode: 'single',
+            parentRole: 'single_parent',
           },
         }),
       );
@@ -73,7 +77,7 @@ test('每周计划校验、草稿恢复、按日打卡和周期编辑', async ({
   await page.getByLabel('重复方式').selectOption('daily');
   await page.getByRole('button', { name: '保存计划修改' }).click();
   const saved = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('24years.family.v1')!).tasks[0],
+    () => JSON.parse(localStorage.getItem('24years.family.v2')!).tasks[0],
   );
   expect(saved.repeat).toBe('daily');
   expect(saved.weekdays).toBeUndefined();

@@ -26,8 +26,8 @@ function snapshot(id = 'user', revision = 1): SessionState {
 }
 
 function cache(state: SessionState, savedAt = Date.now()) {
-  localStorage.setItem('24years.cloud.active', 'true');
-  localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify({ version: 1, savedAt, state }));
+  localStorage.setItem('24years.cloud.active.v2', 'true');
+  localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify({ version: 2, savedAt, state }));
 }
 
 function mountCloud() {
@@ -76,6 +76,11 @@ it('rejects expired, malformed and mismatched snapshots', () => {
   state.user!.id = 'another-account';
   cache(state);
   expect(readCloudCache()).toBeNull();
+  localStorage.setItem(
+    CLOUD_CACHE_KEY,
+    JSON.stringify({ version: 1, savedAt: Date.now(), state: snapshot() }),
+  );
+  expect(readCloudCache()).toBeNull();
   localStorage.setItem(CLOUD_CACHE_KEY, '{broken');
   expect(readCloudCache()).toBeNull();
 });
@@ -94,7 +99,7 @@ it('persists a successful session and removes its snapshot on logout', async () 
     fetcher.mockResolvedValue(new Response(JSON.stringify({ user: null, family: null })));
     expect(await cloud.logout()).toBe(true);
     expect(readCloudCache()).toBeNull();
-    expect(localStorage.getItem('24years.cloud.active')).toBe('false');
+    expect(localStorage.getItem('24years.cloud.active.v2')).toBe('false');
   } finally {
     wrapper.unmount();
   }

@@ -4,7 +4,6 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
 import { openDatabase } from './database.ts';
 import { ApiError, createService, hash } from './service.ts';
 import { createApplication } from './http.ts';
@@ -192,51 +191,6 @@ test('档案中切换家庭类型与身份原子保存，旧邀请码撤销', as
   }
 });
 
-test('旧数据库升级保留记录和权限，多人成员不猜测父母身份，可自行补选', async () => {
-  const directory = mkdtempSync(join(tmpdir(), '24years-migration-'));
-  const file = join(directory, 'old.sqlite');
-  let db = openDatabase(file);
-
-  try {
-    let service = createService(db);
-    const owner = (
-      await service.authenticate(
-        { username: 'oldowner', nickname: '旧成员', password: 'old-password-2026' },
-        true,
-      )
-    ).state.user!.id;
-    service.mutate(owner, 'create', {
-      mode: 'couple',
-      familyRole: 'father',
-      data: { ...emptyFamily(), tasks: [task('旧计划')] },
-    });
-    db.close();
-    const legacy = new DatabaseSync(file);
-    legacy.exec(
-      'ALTER TABLE members DROP COLUMN family_role; ALTER TABLE accounts DROP COLUMN recovery_hash; DROP TABLE import_backups;',
-    );
-    legacy.close();
-    db = openDatabase(file);
-    service = createService(db);
-    const family = service.snapshot(owner).family!;
-    assert.equal(family.members[0].familyRole, null);
-    assert.equal(family.members[0].role, 'owner');
-    assert.equal(family.data.tasks[0].title, '旧计划');
-    service.mutate(owner, 'identity', {
-      familyId: family.id,
-      revision: family.revision,
-      familyRole: 'father',
-    });
-    db.close();
-    db = openDatabase(file);
-    service = createService(db);
-    assert.equal(service.snapshot(owner).family!.members[0].familyRole, 'father');
-  } finally {
-    db.close();
-    rmSync(directory, { recursive: true });
-  }
-});
-
 test('邀请仅可使用一次、限制两人、支持撤销和过期', async () => {
   const f = await fixture();
 
@@ -262,7 +216,10 @@ test('邀请仅可使用一次、限制两人、支持撤销和过期', async ()
     );
     assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
     assert.equal(f.service.snapshot(f.owner).family!.members.length, 2);
-    assert.throws(() => f.manage('mode', { mode: 'single' }), failsWith(409));
+    assert.throws(
+      () => f.manage('mode', { mode: 'single', familyRole: 'single_parent' }),
+      failsWith(409),
+    );
     assert.throws(() => f.manage('invite'), failsWith(409));
   } finally {
     f.db.close();
@@ -305,7 +262,7 @@ test('权限由服务端强制执行、撤销成员立即失去访问、跨家�
     assert.equal(f.service.snapshot(f.partner).family, null);
     assert.throws(() => f.change(f.partner, 'task', task('已移除'), null), failsWith(403));
     assert.equal(f.service.snapshot(f.owner).family!.data.tasks.length, 1);
-    f.manage('mode', { mode: 'single' });
+    f.manage('mode', { mode: 'single', familyRole: 'single_parent' });
     assert.equal(f.service.snapshot(f.owner).family!.mode, 'single');
   } finally {
     f.db.close();
@@ -571,7 +528,7 @@ test('仅查看成员可主动退出，历史记录保留，管理员不能退�
   }
 });
 
-test('数据库重启后账号、会话与家庭数据仍在，旧档案上传保留数据', async () => {
+test('数据库重启后账号、会话与家庭数据仍在', async () => {
   const directory = mkdtempSync(join(tmpdir(), '24years-api-'));
   const file = join(directory, 'test.sqlite');
   let db = openDatabase(file);
@@ -582,38 +539,22 @@ test('数据库重启后账号、会话与家庭数据仍在，旧档案上传�
       { username: 'persist', nickname: '测试', password: 'persist-password' },
       true,
     );
-    const data = { ...emptyFamily(), tasks: [task('旧计划')] };
-    const created = service.mutate(state.user!.id, 'create', { mode: 'single', data });
+    const data = { ...emptyFamily(), tasks: [task('持久计划')] };
+    const created = service.mutate(state.user!.id, 'create', {
+      mode: 'single',
+      familyRole: 'single_parent',
+      data,
+    });
     const familyId = created.family!.id;
     const compactData = db.prepare('SELECT data FROM families WHERE id = ?').get(familyId) as {
       data: string;
     };
     assert.equal('tasks' in JSON.parse(compactData.data), false);
 
-    // Simulate a database created before migration 3: records still live in the
-    // JSON blob, while relational tables have not been populated yet.
-    db.prepare('UPDATE families SET data = ? WHERE id = ?').run(JSON.stringify(data), familyId);
-    db.prepare('DELETE FROM family_tasks WHERE family_id = ?').run(familyId);
-    db.prepare('DELETE FROM schema_migrations WHERE version = 3').run();
     db.close();
     db = openDatabase(file);
     service = createService(db);
-    assert.equal(service.userForToken(token), state.user!.id);
-    assert.equal(service.snapshot(state.user!.id).family!.data.tasks[0].title, '旧计划');
-    const migratedData = db.prepare('SELECT data FROM families WHERE id = ?').get(familyId) as {
-      data: string;
-    };
-    assert.equal('tasks' in JSON.parse(migratedData.data), false);
-
-    // Once migrated, a stale blob must not overwrite the relational source.
-    db.prepare('UPDATE families SET data = ? WHERE id = ?').run(
-      JSON.stringify({ version: 1, profile: null, theme: 'light' }),
-      familyId,
-    );
-    db.close();
-    db = openDatabase(file);
-    service = createService(db);
-    assert.equal(service.snapshot(state.user!.id).family!.data.tasks[0].title, '旧计划');
+    assert.equal(service.snapshot(state.user!.id).family!.data.tasks[0].title, '持久计划');
 
     const login = await service.authenticate(
       { username: 'PERSIST', password: 'persist-password' },

@@ -89,7 +89,7 @@ test('孕期记录双端同步，草稿冲突保留输入，只读成员不能�
     await expect(
       partner.getByRole('button', { name: '记录一次胎动 +1', exact: true }),
     ).toBeDisabled();
-    await partner.getByRole('link', { name: '产检安排', exact: true }).click();
+    await partner.getByLabel('孕期记录类型').getByRole('link', { name: '产检安排', exact: true }).click();
     await expect(partner.getByRole('button', { name: '保存产检安排' })).toBeDisabled();
     await partner.getByRole('link', { name: '就医卡', exact: true }).click();
     await expect(partner.getByRole('button', { name: '保存就医卡' })).toBeDisabled();
@@ -128,7 +128,7 @@ test('孕期闭环：产检原子入账、体征、计时、就医卡和备份�
   await page.getByRole('link', { name: '家庭账本', exact: true }).click();
   await expect(page.getByTestId('net-cost')).toHaveText('¥80.05');
   await page.getByRole('link', { name: '孕期记录', exact: true }).click();
-  await page.getByRole('link', { name: '体征记录', exact: true }).click();
+  await page.getByLabel('孕期记录类型').getByRole('link', { name: '体征记录', exact: true }).click();
   await page.getByLabel('体重（kg）', { exact: true }).fill('62.5');
   await page.getByRole('button', { name: '保存体征', exact: true }).click();
   await expect(page.locator('.record-list').getByText('62.5', { exact: true })).toBeVisible();
@@ -157,7 +157,7 @@ test('孕期闭环：产检原子入账、体征、计时、就医卡和备份�
     fullPage: true,
   });
   await page.getByRole('button', { name: '切换日间模式' }).click();
-  await page.getByRole('link', { name: '产检安排', exact: true }).click();
+  await page.getByLabel('孕期记录类型').getByRole('link', { name: '产检安排', exact: true }).click();
   await page.screenshot({
     path: join(tmpdir(), `24years-pregnancy-checkups-${test.info().project.name}.png`),
     fullPage: true,
@@ -168,12 +168,12 @@ test('孕期闭环：产检原子入账、体征、计时、就医卡和备份�
   const download = await downloadEvent;
   const raw = await readFile((await download.path())!, 'utf8');
   expect(JSON.parse(raw).pregnancyRecords).toHaveLength(4);
-  // Replace with a valid older archive to verify new records are actually restored.
+  // Replace with a valid current-schema archive with different records.
   await page.evaluate(() => {
-    const data = JSON.parse(localStorage.getItem('24years.family.v1')!);
-    delete data.pregnancyRecords;
+    const data = JSON.parse(localStorage.getItem('24years.family.v2')!);
+    data.pregnancyRecords = [];
     data.expenses = [];
-    localStorage.setItem('24years.family.v1', JSON.stringify(data));
+    localStorage.setItem('24years.family.v2', JSON.stringify(data));
   });
   await page.reload();
   await page.getByText('从 JSON 备份恢复', { exact: true }).click();
@@ -218,7 +218,7 @@ test('更正分娩结局时取消删除会保留孩子并解除自动关联', as
   await page.goto('/family');
   await expect(page.locator('.child-card')).toContainText('小芽');
   const children = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('24years.family.v1')!).children,
+    () => JSON.parse(localStorage.getItem('24years.family.v2')!).children,
   );
   expect(children).toHaveLength(1);
   expect(children[0]).not.toHaveProperty('sourceOutcomeId');

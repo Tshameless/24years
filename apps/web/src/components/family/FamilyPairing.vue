@@ -10,18 +10,12 @@ const { state, busy, role, expired } = cloud;
 const family = computed(() => state.value.family);
 const joinMode = shallowRef<'couple'>('couple');
 const joinRole = shallowRef<FamilyParentRole | ''>('');
-const ownRole = shallowRef<FamilyParentRole | ''>('');
-const currentMember = computed(() =>
-  family.value?.members.find((member) => member.id === state.value.user?.id),
-);
 const code = shallowRef(new URLSearchParams(window.location.search).get('invite') ?? '');
 const inviteFamilyId = shallowRef(new URLSearchParams(window.location.search).get('family') ?? '');
 
 async function create() {
   if (localProfile.value) {
-    const mode = localProfile.value.familyMode ?? 'single';
-    const parentRole = localProfile.value.parentRole ?? 'single_parent';
-    await uploadLocal(mode, parentRole);
+    await uploadLocal(localProfile.value.familyMode, localProfile.value.parentRole);
   }
 }
 
@@ -72,7 +66,7 @@ function disconnect(userId?: string) {
           }}
           ·
           {{
-            familyRoleLabels[localProfile.parentRole ?? 'single_parent']
+            familyRoleLabels[localProfile.parentRole]
           }}。上传后沿用建档时的选择，同时上传计划和账本，本机原始记录保留。
         </p>
         <button
@@ -128,25 +122,6 @@ function disconnect(userId?: string) {
               : '多人模式 · 等待另一位家长'
         }}
       </p>
-      <form
-        v-if="family.mode === 'couple' && !currentMember?.familyRole"
-        class="form-grid"
-        @submit.prevent="ownRole && cloud.manage('identity', { familyRole: ownRole })"
-      >
-        <p class="muted">旧档案还没有你的家长身份，请补选。</p>
-        <FamilySetupChoice
-          v-model:mode="joinMode"
-          v-model:parent-role="ownRole"
-          identity-only
-          :disabled="busy"
-        />
-        <button
-          class="button button-secondary"
-          :disabled="busy"
-        >
-          保存我的身份
-        </button>
-      </form>
       <ul class="member-list">
         <li
           v-for="member in family.members"
@@ -155,10 +130,7 @@ function disconnect(userId?: string) {
           <span class="member-avatar">{{ member.nickname.slice(0, 1) }}</span>
           <div class="member-detail">
             <strong>{{ member.nickname }}{{ member.id === state.user.id ? '（我）' : '' }}</strong>
-            <small>
-              {{ member.familyRole ? familyRoleLabels[member.familyRole] : '身份待补充' }} ·
-              {{ roleLabels[member.role] }}
-            </small>
+            <small>{{ familyRoleLabels[member.familyRole] }} · {{ roleLabels[member.role] }}</small>
             <template v-if="role === 'owner' && member.role !== 'owner'">
               <select
                 :value="member.role"

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const password = 'reliability-password';
 const backup = {
-  version: 1,
+  version: 2,
   profile: {
     name: '恢复的小家',
     nickname: '小叶',
@@ -32,6 +32,8 @@ const backup = {
       reimbursedCents: 100,
     },
   ],
+  pregnancyRecords: [],
+  children: [],
   theme: 'light',
 };
 
@@ -57,7 +59,7 @@ async function selectBackup(page: Page, value: unknown = backup) {
   });
 }
 
-test('旧版大备份可恢复并紧凑导出，本机保留超过云端额度的数据', async ({ page }) => {
+test('大备份可恢复并紧凑导出，本机保留超过云端额度的数据', async ({ page }) => {
   const large = {
     ...backup,
     expenses: Array.from({ length: 6500 }, (_, i) => ({
@@ -97,21 +99,21 @@ test('旧版大备份可恢复并紧凑导出，本机保留超过云端额度�
 
 test('本机恢复先预览确认，拒绝错误文件并保留损坏存档副本', async ({ page }) => {
   await page.goto('/family');
-  await page.evaluate(() => localStorage.setItem('24years.family.v1', '{broken'));
+  await page.evaluate(() => localStorage.setItem('24years.family.v2', '{broken'));
   await page.reload();
   await page.getByText('从 JSON 备份恢复', { exact: true }).click();
   await selectBackup(page, { bad: true });
   await expect(page.getByText(/备份格式无效或版本不受支持/)).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem('24years.family.v1'))).toBe('{broken');
+  expect(await page.evaluate(() => localStorage.getItem('24years.family.v2'))).toBe('{broken');
   await selectBackup(page);
   await expect(page.getByText('1 条计划 · 1 笔账目')).toBeVisible();
   await expect(page.getByRole('button', { name: '确认恢复备份' })).toBeDisabled();
-  expect(await page.evaluate(() => localStorage.getItem('24years.family.v1'))).toBe('{broken');
+  expect(await page.evaluate(() => localStorage.getItem('24years.family.v2'))).toBe('{broken');
   await page.getByLabel('我理解恢复会替换当前记录').check();
   await page.getByRole('button', { name: '确认恢复备份' }).click();
   await expect(page.getByRole('status')).toContainText('备份已恢复');
   await expect(page.getByLabel('家庭名称')).toHaveValue('恢复的小家');
-  expect(await page.evaluate(() => localStorage.getItem('24years.family.v1.before-import'))).toBe(
+  expect(await page.evaluate(() => localStorage.getItem('24years.family.v2.before-import'))).toBe(
     '{broken',
   );
   const download = page.waitForEvent('download');

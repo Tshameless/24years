@@ -46,7 +46,7 @@ test('同步账目响应丢失后进入离线队列并安全同步，退出账�
   await expect(page.getByRole('button', { name: '注册并开启同步' })).toBeVisible();
   expect(
     await page.evaluate(() =>
-      Object.keys(sessionStorage).filter((key) => key.startsWith('24years.draft.v1:')),
+      Object.keys(sessionStorage).filter((key) => key.startsWith('24years.draft.v2:')),
     ),
   ).toEqual([]);
   await page.getByRole('link', { name: '家庭账本', exact: true }).click();
@@ -55,15 +55,24 @@ test('同步账目响应丢失后进入离线队列并安全同步，退出账�
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    if (!localStorage.getItem('24years.family.v1')) {
+    if (!localStorage.getItem('24years.family.v2')) {
       localStorage.setItem(
-        '24years.family.v1',
+        '24years.family.v2',
         JSON.stringify({
-          version: 1,
+          version: 2,
           theme: 'light',
           tasks: [],
           expenses: [],
-          profile: { name: '草稿测试', nickname: '小叶', dueDate: '2027-02-01', quietMode: false },
+          profile: {
+            name: '草稿测试',
+            nickname: '小叶',
+            dueDate: '2027-02-01',
+            quietMode: false,
+            familyMode: 'single',
+            parentRole: 'single_parent',
+          },
+          pregnancyRecords: [],
+          children: [],
         }),
       );
     }
@@ -135,9 +144,9 @@ test('编辑草稿保留原始快照，刷新后不能覆盖已变化的账目',
   await page.getByRole('button', { name: /编辑/ }).first().click();
   await page.getByLabel('账单总额（元）').fill('200');
   await page.evaluate(() => {
-    const data = JSON.parse(localStorage.getItem('24years.family.v1')!);
+    const data = JSON.parse(localStorage.getItem('24years.family.v2')!);
     data.expenses[0].amountCents = 15000;
-    localStorage.setItem('24years.family.v1', JSON.stringify(data));
+    localStorage.setItem('24years.family.v2', JSON.stringify(data));
   });
   page.once('dialog', (dialog) => dialog.accept());
   await page.reload();

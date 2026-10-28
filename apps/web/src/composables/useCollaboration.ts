@@ -20,7 +20,7 @@ import {
 import { CLOUD_CACHE_KEY, readCloudCache } from './cloudCache';
 import { parseCloudResponse, request, RequestError } from './cloudClient';
 
-const ACTIVE_KEY = '24years.cloud.active';
+const ACTIVE_KEY = '24years.cloud.active.v2';
 
 export function useCollaboration(enabled = true) {
   const state = shallowRef<SessionState>({ user: null, family: null });
@@ -240,7 +240,7 @@ export function useCollaboration(enabled = true) {
       if (state.value.user && state.value.family) {
         localStorage.setItem(
           CLOUD_CACHE_KEY,
-          JSON.stringify({ version: 1, savedAt: Date.now(), state: state.value }),
+          JSON.stringify({ version: 2, savedAt: Date.now(), state: state.value }),
         );
       } else {
         localStorage.removeItem(CLOUD_CACHE_KEY);

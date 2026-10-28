@@ -24,8 +24,8 @@ const task: FamilyTask = {
   completedDates: [],
 };
 
-it('体征时间和场景校验，旧记录与备份往返兼容', () => {
-  const legacy: Vital = {
+it('体征时间和场景按业务选填，完整记录可备份往返', () => {
+  const measurement: Vital = {
     id: 'measurement',
     type: 'vital',
     date: '2026-10-21',
@@ -34,9 +34,9 @@ it('体征时间和场景校验，旧记录与备份往返兼容', () => {
     secondary: null,
     notes: '',
   };
-  expect(validPregnancyRecord(legacy)).toBe(true);
+  expect(validPregnancyRecord(measurement)).toBe(true);
   for (const time of ['00:00', '09:05', '23:59']) {
-    const record = { ...legacy, time, context: '晨起' };
+    const record = { ...measurement, time, context: '晨起' };
     expect(
       decodeFamily(JSON.stringify({ ...emptyFamily(), pregnancyRecords: [record] }))
         .pregnancyRecords,
@@ -55,12 +55,12 @@ it('体征时间和场景校验，旧记录与备份往返兼容', () => {
     { context: 'a'.repeat(81) },
     { context: null },
   ]) {
-    expect(validPregnancyRecord({ ...legacy, ...invalid })).toBe(false);
+    expect(validPregnancyRecord({ ...measurement, ...invalid })).toBe(false);
   }
 });
 
-it('待产独立字段校验且兼容旧存档', () => {
-  const legacy = {
+it('待产分类、数量和负责人为独立选填字段', () => {
+  const packing = {
     id: 'bag',
     type: 'packing',
     date: '2026-10-21',
@@ -68,8 +68,8 @@ it('待产独立字段校验且兼容旧存档', () => {
     notes: '',
     completed: false,
   };
-  expect(validPregnancyRecord(legacy)).toBe(true);
-  const record = { ...legacy, category: '证件', quantity: 2, assignee: 'father' };
+  expect(validPregnancyRecord(packing)).toBe(true);
+  const record = { ...packing, category: '证件', quantity: 2, assignee: 'father' };
   expect(
     decodeFamily(JSON.stringify({ ...emptyFamily(), pregnancyRecords: [record] })).pregnancyRecords,
   ).toEqual([record]);

@@ -22,7 +22,6 @@ const entries = computed(() =>
 const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
   type: 'movement',
   defaults: () => ({ date: localDate(), time: '', minutes: '', count: '0', notes: '', timer: '' }),
-  optionalFields: ['timer'],
   fields: (item: Movement) => ({
     date: item.date,
     time: item.time,

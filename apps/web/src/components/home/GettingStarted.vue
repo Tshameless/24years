@@ -25,7 +25,7 @@ function readDismissed() {
 const steps = computed(() => {
   const profileReady = Boolean(data.value.profile);
   const hasTask = data.value.tasks.length > 0;
-  const hasCheckup = (data.value.pregnancyRecords ?? []).some(
+  const hasCheckup = data.value.pregnancyRecords.some(
     (record) => record.type === 'checkup',
   );
 

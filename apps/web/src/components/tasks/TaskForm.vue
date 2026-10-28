@@ -40,7 +40,6 @@ const {
   scope: () => `${identity.value}:${cloud.role.value ?? 'local'}`,
   name: `task:${before?.id ?? 'new'}`,
   baseline: before,
-  optionalFields: ['weekdays', 'assignee', 'endDate'],
 });
 const template = shallowRef('');
 

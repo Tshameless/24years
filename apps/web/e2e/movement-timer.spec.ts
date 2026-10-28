@@ -5,15 +5,16 @@ import { join } from 'node:path';
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-21T20:00:00+08:00'));
   await page.addInitScript(() => {
-    if (!localStorage.getItem('24years.family.v1')) {
+    if (!localStorage.getItem('24years.family.v2')) {
       localStorage.setItem(
-        '24years.family.v1',
+        '24years.family.v2',
         JSON.stringify({
-          version: 1,
+          version: 2,
           theme: 'light',
           tasks: [],
           expenses: [],
           pregnancyRecords: [],
+          children: [],
           profile: {
             name: '计时验收',
             nickname: '小叶',
@@ -55,7 +56,7 @@ test('计时刷新恢复、到时补算、确认后手动保存', async ({ page 
   await expect(page.getByText('观察计时已结束', { exact: true })).toBeVisible();
   await expect(page.getByLabel('实际观察时长（分钟）')).toHaveValue('1');
   const records = () =>
-    page.evaluate(() => JSON.parse(localStorage.getItem('24years.family.v1')!).pregnancyRecords);
+    page.evaluate(() => JSON.parse(localStorage.getItem('24years.family.v2')!).pregnancyRecords);
   expect(await records()).toHaveLength(0);
   await page.locator('.observation-timer').scrollIntoViewIfNeeded();
   await page.screenshot({
@@ -78,9 +79,9 @@ test('计时刷新恢复、到时补算、确认后手动保存', async ({ page 
 
 test('静默模式保留站内结果，提前结束可保存零次记录', async ({ page }) => {
   await page.addInitScript(() => {
-    const data = JSON.parse(localStorage.getItem('24years.family.v1')!);
+    const data = JSON.parse(localStorage.getItem('24years.family.v2')!);
     data.profile.quietMode = true;
-    localStorage.setItem('24years.family.v1', JSON.stringify(data));
+    localStorage.setItem('24years.family.v2', JSON.stringify(data));
   });
   await page.goto('/pregnancy?tab=movements');
   await expect(page.getByRole('button', { name: '开启计时提示音与振动' })).toBeDisabled();

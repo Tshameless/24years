@@ -1,8 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import { closeSync, existsSync, mkdirSync, openSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { decodeFamily } from '../src/domain/family.ts';
-import { readRelationalRecords } from './records-store.ts';
+import { decodeFamilyMetadata } from '../src/domain/family.ts';
+import { decodeFamilyRecords } from './records-store.ts';
 
 // Runtime requires Node 24.9+. The project's Node 22 type definitions predate readOnly.
 const readOnlyOptions = { open: true, readOnly: true };
@@ -38,14 +38,9 @@ export function verifyDatabase(path: string) {
       data: string;
     }>;
 
-    const hasRelationalTables = Boolean(
-      db
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'family_tasks'")
-        .get(),
-    );
-
     for (const family of families) {
-      const decoded = decodeFamily(String(family.data));
+      decodeFamilyMetadata(String(family.data));
+      decodeFamilyRecords(db, family.id, String(family.data));
       const owners = db
         .prepare("SELECT count(*) AS count FROM members WHERE family_id = ? AND role = 'owner'")
         .get(family.id) as { count: number };
@@ -54,15 +49,6 @@ export function verifyDatabase(path: string) {
         throw new Error('家庭管理员数据不完整。');
       }
 
-      if (hasRelationalTables) {
-        const relational = readRelationalRecords(db, family.id);
-
-        try {
-          decodeFamily(JSON.stringify({ ...decoded, ...relational }));
-        } catch {
-          throw new Error('家庭关系表中包含无效记录。');
-        }
-      }
     }
 
     return {
@@ -109,13 +95,7 @@ export function copyDatabase(source: string, destination: string, restore = fals
         restored.exec(
           'BEGIN; DELETE FROM sessions; DELETE FROM invites; DELETE FROM family_invite_security; DELETE FROM invite_audit; COMMIT;',
         );
-        const columns = restored.prepare('PRAGMA table_info(accounts)').all() as Array<{
-          name: string;
-        }>;
-
-        if (columns.some((column) => column.name === 'recovery_hash')) {
-          restored.exec('UPDATE accounts SET recovery_hash = NULL');
-        }
+        restored.exec('UPDATE accounts SET recovery_hash = NULL');
       } finally {
         restored.close();
       }

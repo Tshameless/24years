@@ -82,7 +82,7 @@ function reloadProfile() {
   Object.assign(form, {
     referenceDate,
     familyMode:
-      state.value.family?.mode ?? before.value?.familyMode ?? (before.value ? 'single' : ''),
+      state.value.family?.mode ?? before.value?.familyMode ?? '',
     parentRole: (active.value ? currentMember.value?.familyRole : before.value?.parentRole) ?? '',
     name: before.value?.name ?? '',
     nickname: before.value?.nickname ?? '',

@@ -33,7 +33,7 @@ const completion = {
 };
 
 describe('孕期记录和原子入账', () => {
-  it('兼容旧存档，并在导入时拒绝损坏记录和多个活动计时', () => {
+  it('接受完整新 schema，并在导入时拒绝损坏记录和多个活动计时', () => {
     expect(decodeFamily(JSON.stringify(emptyFamily()))).toEqual(emptyFamily());
     const records: PregnancyRecord[] = [
       checkup,
@@ -70,8 +70,8 @@ describe('孕期记录和原子入账', () => {
       ),
     ).toThrow();
   });
-  it('兼容旧心理自查编号并允许按日期保存多条记录', () => {
-    const legacy = {
+  it('心理自查必须完整作答并允许按日期保存多条记录', () => {
+    const firstScreening = {
       id: 'mental-screening',
       type: 'mentalScreening' as const,
       date: '2026-10-20',
@@ -81,11 +81,11 @@ describe('孕期记录和原子入账', () => {
       visibility: 'shared' as const,
       notes: '',
     };
-    const next = { ...legacy, id: 'screening-2026-10-27', date: '2026-10-27' };
+    const next = { ...firstScreening, id: 'screening-2026-10-27', date: '2026-10-27' };
     const first = applyPregnancyChange(emptyFamily(), {
       type: 'pregnancy',
       before: null,
-      value: legacy,
+      value: firstScreening,
     });
     const saved = applyPregnancyChange(first, {
       type: 'pregnancy',
@@ -93,8 +93,10 @@ describe('孕期记录和原子入账', () => {
       value: next,
     });
 
-    expect(saved.pregnancyRecords).toEqual([legacy, next]);
-    expect(decodeFamily(JSON.stringify(saved)).pregnancyRecords).toEqual([legacy, next]);
+    expect(saved.pregnancyRecords).toEqual([firstScreening, next]);
+    expect(decodeFamily(JSON.stringify(saved)).pregnancyRecords).toEqual([firstScreening, next]);
+    expect(validPregnancyRecord({ ...firstScreening, answers: undefined })).toBe(false);
+    expect(validPregnancyRecord({ ...firstScreening, visibility: undefined })).toBe(false);
   });
   it('更正分娩结局必须解除关联，含成长记录的孩子不能随结局删除', () => {
     const birth: Extract<PregnancyRecord, { type: 'outcome' }> = {
@@ -121,7 +123,10 @@ describe('孕期记录和原子入账', () => {
     };
     const data = {
       ...emptyFamily(),
-      profile: { name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: false },
+      profile: {
+        name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: false,
+        familyMode: 'single' as const, parentRole: 'single_parent' as const,
+      },
       pregnancyRecords: [birth],
       children: [child],
     };
@@ -166,7 +171,10 @@ describe('孕期记录和原子入账', () => {
     };
     const data = {
       ...emptyFamily(),
-      profile: { name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: false },
+      profile: {
+        name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: false,
+        familyMode: 'single' as const, parentRole: 'single_parent' as const,
+      },
       pregnancyRecords: [birth],
       children: [child],
     };
@@ -195,7 +203,10 @@ describe('孕期记录和原子入账', () => {
     };
     const data = {
       ...emptyFamily(),
-      profile: { name: '家', nickname: '我', dueDate: '2026-01-01', quietMode: false },
+      profile: {
+        name: '家', nickname: '我', dueDate: '2026-01-01', quietMode: false,
+        familyMode: 'single' as const, parentRole: 'single_parent' as const,
+      },
       pregnancyRecords: [birth],
     };
     const mood: PregnancyRecord = {
@@ -311,7 +322,10 @@ describe('孕期记录和原子入账', () => {
     });
     const quiet = {
       ...data,
-      profile: { name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: true },
+      profile: {
+        name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: true,
+        familyMode: 'single' as const, parentRole: 'single_parent' as const,
+      },
     };
     expect(() =>
       applyPregnancyChange(

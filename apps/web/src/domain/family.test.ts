@@ -15,9 +15,13 @@ import {
   type Expense,
 } from './family';
 
-it('旧档案可读取，新档案的家庭类型与身份须匹配', () => {
-  const profile = { name: '家', nickname: '家长', dueDate: '2027-01-26', quietMode: false };
+it('家庭档案要求显式设置家庭类型与身份', () => {
+  const profile = {
+    name: '家', nickname: '家长', dueDate: '2027-01-26', quietMode: false,
+    familyMode: 'single' as const, parentRole: 'single_parent' as const,
+  };
   expect(decodeFamily(JSON.stringify({ ...emptyFamily(), profile })).profile).toEqual(profile);
+  expect(validProfile({ ...profile, familyMode: undefined, parentRole: undefined })).toBe(false);
   expect(validProfile({ ...profile, familyMode: 'single', parentRole: 'single_parent' })).toBe(
     true,
   );
@@ -51,7 +55,7 @@ describe('日历与每日计划', () => {
     expect(dueDateFromGestation(24, 3, '2026-02-30')).toBeNull();
   });
 
-  it('按日历计算孕周，兼容闰年和预产期当天/之后', () => {
+  it('按日历计算孕周，支持闰年和预产期当天/之后', () => {
     expect(pregnancyProgress('2027-01-26', '2026-10-09')).toMatchObject({
       weeks: 24,
       days: 3,
@@ -132,7 +136,7 @@ describe('存档校验', () => {
   });
   it('拒绝损坏、未知版本及非法金额的档案', () => {
     expect(() => decodeFamily('{')).toThrow();
-    expect(() => decodeFamily(JSON.stringify({ ...emptyFamily(), version: 2 }))).toThrow();
+    expect(() => decodeFamily(JSON.stringify({ ...emptyFamily(), version: 1 }))).toThrow();
     expect(() =>
       decodeFamily(
         JSON.stringify({
@@ -151,6 +155,21 @@ describe('存档校验', () => {
         }),
       ),
     ).toThrow();
+  });
+
+  it('拒绝缺少新 schema 集合或档案身份的存档', () => {
+    const family = emptyFamily();
+
+    for (const key of ['tasks', 'expenses', 'pregnancyRecords', 'children'] as const) {
+      const incomplete: Record<string, unknown> = { ...family };
+      delete incomplete[key];
+      expect(() => decodeFamily(JSON.stringify(incomplete))).toThrow();
+    }
+
+    const profile = {
+      name: '家', nickname: '家长', dueDate: '2027-01-26', quietMode: false,
+    };
+    expect(() => decodeFamily(JSON.stringify({ ...family, profile }))).toThrow();
   });
 
   it('支持儿童档案并在格式或唯一性错误时拒绝', () => {

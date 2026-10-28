@@ -39,7 +39,7 @@ import {
 } from '@/domain/collaboration';
 import { downloadBackup, readFamilyBackup } from '@/domain/backup';
 
-export const STORAGE_KEY = '24years.family.v1';
+export const STORAGE_KEY = '24years.family.v2';
 export const BEFORE_IMPORT_KEY = `${STORAGE_KEY}.before-import`;
 
 export interface ImportTarget {
@@ -65,17 +65,11 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
       profile: source.profile ? { ...source.profile } : null,
       tasks: source.tasks.map((item) => ({ ...item, completedDates: [...item.completedDates] })),
       expenses: source.expenses.map((item) => ({ ...item })),
-      ...(source.pregnancyRecords
-        ? { pregnancyRecords: source.pregnancyRecords.map((item) => ({ ...item })) }
-        : {}),
-      ...(source.children
-        ? {
-            children: source.children.map((item) => ({
-              ...item,
-              ...(item.growthRecords ? { growthRecords: [...item.growthRecords] } : {}),
-            })),
-          }
-        : {}),
+      pregnancyRecords: source.pregnancyRecords.map((item) => ({ ...item })),
+      children: source.children.map((item) => ({
+        ...item,
+        ...(item.growthRecords ? { growthRecords: [...item.growthRecords] } : {}),
+      })),
     };
 
     if (cloud.active.value) {
@@ -129,7 +123,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     cloud.active.value ? `${cloud.state.value.user?.id}:${cloud.state.value.family?.id}` : 'local',
   );
   const privateCareStorageKey = computed(
-    () => `24years.private-care.v1:${encodeURIComponent(identity.value)}`,
+    () => `24years.private-care.v2:${encodeURIComponent(identity.value)}`,
   );
   watch(
     privateCareStorageKey,
@@ -247,9 +241,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
       cloud.active.value &&
       !cloud.state.value.family &&
       !profileLocked.value &&
-      validProfile(profile) &&
-      profile.familyMode &&
-      profile.parentRole
+      validProfile(profile)
     ) {
       return await cloud.create(
         profile.familyMode,
@@ -339,7 +331,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
         { type: 'child', value: child, before: null },
         {
           ...data.value,
-          children: [...(data.value.children ?? []), child],
+          children: [...data.value.children, child],
         },
       ))
     );
@@ -352,7 +344,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
         { type: 'child', value: child, before },
         {
           ...data.value,
-          children: (data.value.children ?? []).map((item) =>
+          children: data.value.children.map((item) =>
             item.id === child.id ? child : item,
           ),
         },
@@ -361,7 +353,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
   }
 
   async function removeChild(id: string): Promise<boolean> {
-    const current = (data.value.children ?? []).find((item) => item.id === id);
+    const current = data.value.children.find((item) => item.id === id);
 
     if (!current) {
       return false;
@@ -371,7 +363,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
       { type: 'child', value: null, before: current },
       {
         ...data.value,
-        children: (data.value.children ?? []).filter((item) => item.id !== id),
+        children: data.value.children.filter((item) => item.id !== id),
       },
     );
   }
@@ -520,7 +512,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
     addExpense,
     updateTask,
     updateExpense,
-    children: computed(() => data.value.children ?? []),
+    children: computed(() => data.value.children),
     addChild,
     updateChild,
     removeChild,

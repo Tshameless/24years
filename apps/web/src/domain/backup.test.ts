@@ -18,7 +18,7 @@ function archive(count: number) {
   return data;
 }
 
-it('restores legacy indented exports exceeding the cloud limit without losing records', () => {
+it('restores pretty-printed current-schema exports exceeding the cloud limit', () => {
   const data = archive(4500);
   const raw = JSON.stringify(data, null, 2);
   expect(familyBytes(data)).toBeLessThan(MAX_CLOUD_BYTES);

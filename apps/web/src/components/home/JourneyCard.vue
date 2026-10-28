@@ -14,12 +14,12 @@ const props = defineProps<{
   profile: FamilyProfile | null;
   today: string;
   outcome?: PregnancyOutcome | null;
-  children?: readonly Child[];
+  children: readonly Child[];
 }>();
 
 const selectedChildIndex = shallowRef(0);
 const activeChild = computed(() => {
-  const list = props.children ?? [];
+  const list = props.children;
 
   return list[selectedChildIndex.value] ?? list[0] ?? null;
 });

@@ -1,20 +1,17 @@
 import { expect, test } from '@playwright/test';
 
 for (const synced of [false, true]) {
-  test(`缺少 randomUUID 时${synced ? '同步' : '本机'}计划表单仍可新增和修改`, async ({ page }) => {
+  test(`${synced ? '同步' : '本机'}计划表单可新增和修改`, async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.addInitScript(() => {
-      Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
-    });
     await page.goto('/family');
 
     if (synced) {
       await page
         .getByLabel('同步账号', { exact: true })
-        .fill(`compat${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`);
+        .fill(`test${Date.now()}`);
       await page.getByLabel('成员称呼').fill('测试成员');
-      await page.getByLabel('账号密码').fill('compatibility-password');
+      await page.getByLabel('账号密码').fill('test-password-123');
       await page.getByRole('button', { name: '注册并开启同步' }).click();
       await expect(page.getByRole('heading', { name: '我的同步账号' })).toBeVisible();
     }

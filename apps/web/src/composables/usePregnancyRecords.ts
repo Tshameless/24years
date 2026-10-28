@@ -16,7 +16,7 @@ export function usePregnancyRecords() {
   const message = shallowRef('');
   const error = shallowRef('');
   const records = computed(() => [
-    ...(store.data.value.pregnancyRecords ?? []),
+    ...store.data.value.pregnancyRecords,
     ...store.privateCareRecords.value,
   ]);
   const outcome = computed(() => pregnancyOutcome(records.value));

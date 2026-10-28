@@ -39,7 +39,7 @@ test('胎动计数草稿刷新、纠错、编辑和零次数记录', async ({ pa
   await expect(page.locator('.record-list')).toContainText('0 次');
   await expect(page.locator('.record-list')).toContainText('观察时长：30 分钟');
   const saved = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('24years.family.v1')!).pregnancyRecords,
+    () => JSON.parse(localStorage.getItem('24years.family.v2')!).pregnancyRecords,
   );
   expect(saved).toHaveLength(1);
   expect(saved[0]).toMatchObject({
@@ -60,7 +60,7 @@ test('胎动计数草稿刷新、纠错、编辑和零次数记录', async ({ pa
   expect(errors).toEqual([]);
 });
 
-test('体征时间场景兼容旧草稿，支持刷新、编辑和清空', async ({ page }, testInfo) => {
+test('体征时间场景支持刷新、编辑和清空', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -106,7 +106,7 @@ test('体征时间场景兼容旧草稿，支持刷新、编辑和清空', async
   await page.reload();
   await expect(page.locator('.record-list')).toContainText('时间未记录');
   const saved = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('24years.family.v1')!).pregnancyRecords,
+    () => JSON.parse(localStorage.getItem('24years.family.v2')!).pregnancyRecords,
   );
   expect(saved).toHaveLength(1);
   expect(saved[0]).not.toHaveProperty('time');
@@ -142,7 +142,7 @@ test('待产分工字段与编辑草稿刷新恢复，备齐费用只入账一�
   await expect(page.getByLabel('已经备齐')).toBeChecked();
   await expect(page.getByLabel('采购金额（元，可留空）')).toHaveValue('12.34');
   await page.getByRole('button', { name: '保存待产清单' }).click();
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('24years.family.v1')!));
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('24years.family.v2')!));
   expect(saved.expenses).toHaveLength(1);
   expect(saved.expenses[0].amountCents).toBe(1234);
   expect(saved.pregnancyRecords[0]).toMatchObject({
@@ -188,9 +188,9 @@ test('恢复已冲突编辑草稿时保留内容并禁止覆盖', async ({ page 
   await page.getByRole('button', { name: '编辑 / 完成' }).click();
   await page.getByLabel('产检备注').fill('我的未提交修改');
   await page.evaluate(() => {
-    const data = JSON.parse(localStorage.getItem('24years.family.v1')!);
+    const data = JSON.parse(localStorage.getItem('24years.family.v2')!);
     data.pregnancyRecords[0].notes = '另一处已更新';
-    localStorage.setItem('24years.family.v1', JSON.stringify(data));
+    localStorage.setItem('24years.family.v2', JSON.stringify(data));
   });
   await page.reload();
   await expect(page.getByLabel('产检备注')).toHaveValue('我的未提交修改');
@@ -203,15 +203,16 @@ test('恢复已冲突编辑草稿时保留内容并禁止覆盖', async ({ page 
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-21T20:00:00+08:00'));
   await page.addInitScript(() => {
-    if (!localStorage.getItem('24years.family.v1')) {
+    if (!localStorage.getItem('24years.family.v2')) {
       localStorage.setItem(
-        '24years.family.v1',
+        '24years.family.v2',
         JSON.stringify({
-          version: 1,
+          version: 2,
           theme: 'light',
           tasks: [],
           expenses: [],
           pregnancyRecords: [],
+          children: [],
           profile: {
             name: '补齐功能测试',
             nickname: '小叶',
@@ -249,7 +250,7 @@ test('模板分工结束日期持久化、到时提醒与完成消除', async ({
   await page.getByRole('button', { name: '完成：整理下次就诊的问题', exact: true }).click();
   await expect(page.locator('.reminder-center summary')).toContainText('0 项');
   const saved = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('24years.family.v1')!).tasks[0],
+    () => JSON.parse(localStorage.getItem('24years.family.v2')!).tasks[0],
   );
   expect(saved.assignee).toBe('single_parent');
   expect(saved.completedDates).toEqual(['2026-10-21']);
@@ -274,7 +275,7 @@ test('待产模板保存、备齐原子入账、再次编辑不重复记账', as
   ).toBeVisible();
   await page.getByLabel('记录备注').fill('修改位置');
   await page.getByRole('button', { name: '保存待产清单' }).click();
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('24years.family.v1')!));
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('24years.family.v2')!));
   expect(saved.expenses).toHaveLength(1);
   expect(saved.expenses[0].amountCents).toBe(1234);
   expect(saved.expenses[0].category).toBe('待产准备');
@@ -314,7 +315,7 @@ test('通知主动授权、当前会话去重、静默模式关闭通知', async
       }
     }
     Object.defineProperty(window, 'Notification', { configurable: true, value: MockNotification });
-    const data = JSON.parse(localStorage.getItem('24years.family.v1')!);
+    const data = JSON.parse(localStorage.getItem('24years.family.v2')!);
     data.tasks = [
       {
         id: 'notify',
@@ -325,7 +326,7 @@ test('通知主动授权、当前会话去重、静默模式关闭通知', async
         completedDates: [],
       },
     ];
-    localStorage.setItem('24years.family.v1', JSON.stringify(data));
+    localStorage.setItem('24years.family.v2', JSON.stringify(data));
   });
   await page.goto('/tasks');
   const probe = () =>
@@ -362,7 +363,7 @@ test('趋势指标日期过滤、双血压曲线和窄屏布局', async ({ page 
   });
   await page.goto('/pregnancy?tab=vitals');
   await page.evaluate(() => {
-    const data = JSON.parse(localStorage.getItem('24years.family.v1')!);
+    const data = JSON.parse(localStorage.getItem('24years.family.v2')!);
     data.pregnancyRecords = [
       {
         id: 'weight',
@@ -392,7 +393,7 @@ test('趋势指标日期过滤、双血压曲线和窄屏布局', async ({ page 
         notes: '晚上',
       },
     ];
-    localStorage.setItem('24years.family.v1', JSON.stringify(data));
+    localStorage.setItem('24years.family.v2', JSON.stringify(data));
   });
   await page.reload();
   await page.getByLabel('趋势指标').selectOption('bloodPressure');

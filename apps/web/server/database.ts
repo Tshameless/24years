@@ -38,7 +38,8 @@ export function openDatabase(path: string) {
     CREATE TABLE IF NOT EXISTS members (
       user_id TEXT PRIMARY KEY REFERENCES accounts(id),
       family_id TEXT NOT NULL REFERENCES families(id),
-      role TEXT NOT NULL CHECK(role IN ('owner', 'editor', 'viewer'))
+      role TEXT NOT NULL CHECK(role IN ('owner', 'editor', 'viewer')),
+      family_role TEXT NOT NULL CHECK(family_role IN ('single_parent', 'mother', 'father'))
     );
     CREATE INDEX IF NOT EXISTS members_family ON members(family_id);
     CREATE TABLE IF NOT EXISTS invites (
@@ -68,51 +69,13 @@ export function openDatabase(path: string) {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       PRIMARY KEY(user_id, operation_id)
     );
+    CREATE INDEX IF NOT EXISTS receipts_created_at ON receipts(created_at);
     CREATE TABLE IF NOT EXISTS import_backups (
       family_id TEXT PRIMARY KEY REFERENCES families(id),
       data TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version INTEGER PRIMARY KEY,
-      applied_at TEXT NOT NULL
-    );
   `);
-
-  // The first collaboration release only stored permission roles. Keep existing
-  // databases usable while adding the family position selected during onboarding.
-  const columns = db.prepare('PRAGMA table_info(members)').all() as Array<{ name: string }>;
-
-  const accountColumns = db.prepare('PRAGMA table_info(accounts)').all() as Array<{
-    name: string;
-  }>;
-
-  const receiptColumns = db.prepare('PRAGMA table_info(receipts)').all() as Array<{
-    name: string;
-  }>;
-
-  if (!accountColumns.some((column) => column.name === 'recovery_hash')) {
-    db.exec('ALTER TABLE accounts ADD COLUMN recovery_hash TEXT');
-  }
-
-  if (!receiptColumns.some((column) => column.name === 'created_at')) {
-    db.exec('ALTER TABLE receipts ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0');
-    db.prepare('UPDATE receipts SET created_at = ? WHERE created_at = 0').run(Date.now());
-  }
-
-  db.exec('CREATE INDEX IF NOT EXISTS receipts_created_at ON receipts(created_at)');
-
-  if (!columns.some((column) => column.name === 'family_role')) {
-    db.exec(`
-      ALTER TABLE members ADD COLUMN family_role TEXT CHECK(family_role IN ('single_parent', 'mother', 'father'));
-      UPDATE members SET family_role = 'single_parent'
-      WHERE family_id IN (SELECT id FROM families WHERE mode = 'single');
-    `);
-  }
-
-  db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (1, ?)').run(
-    new Date().toISOString(),
-  );
   initRelationalSchema(db);
 
   return db;

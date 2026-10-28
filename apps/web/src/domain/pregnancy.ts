@@ -5,13 +5,13 @@ import type { FamilyTask } from './tasks.ts';
 import { childIdForOutcome, validChild, type Child } from './child.ts';
 
 export interface FamilyData {
-  version: 1;
+  version: 2;
   profile: FamilyProfile | null;
   tasks: FamilyTask[];
   expenses: Expense[];
   theme: 'light' | 'dark';
-  pregnancyRecords?: PregnancyRecord[];
-  children?: Child[];
+  pregnancyRecords: PregnancyRecord[];
+  children: Child[];
 }
 
 export type PregnancyRecord =
@@ -52,7 +52,7 @@ export type PregnancyRecord =
       date: string;
       score: number;
       selfHarm: boolean;
-      answers?: readonly number[];
+      answers: readonly number[];
       notes: string;
       visibility: 'private' | 'shared';
     }
@@ -161,8 +161,8 @@ export type PregnancyRecord =
 
 export type PregnancyOutcome = Extract<PregnancyRecord, { type: 'outcome' }>;
 
-export function pregnancyOutcome(records: readonly PregnancyRecord[] | undefined) {
-  return records?.find((record): record is PregnancyOutcome => record.type === 'outcome') ?? null;
+export function pregnancyOutcome(records: readonly PregnancyRecord[]) {
+  return records.find((record): record is PregnancyOutcome => record.type === 'outcome') ?? null;
 }
 
 export function isPostpartumCareRecord(
@@ -228,8 +228,7 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         typeof value.protein === 'boolean' &&
         typeof value.vegetables === 'boolean' &&
         typeof value.supplement === 'boolean' &&
-        note(value.notes) &&
-        (value.visibility === 'private' || value.visibility === 'shared')
+        note(value.notes)
       );
     case 'mentalScreening':
       return (
@@ -239,13 +238,11 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         value.score >= 0 &&
         value.score <= 30 &&
         typeof value.selfHarm === 'boolean' &&
-        (value.answers === undefined ||
-          (Array.isArray(value.answers) &&
-            value.answers.length === 10 &&
-            value.answers.every(
-              (answer) => Number.isInteger(answer) && answer >= 0 && answer <= 3,
-            ))) &&
-        note(value.notes)
+        Array.isArray(value.answers) &&
+        value.answers.length === 10 &&
+        value.answers.every((answer) => Number.isInteger(answer) && answer >= 0 && answer <= 3) &&
+        note(value.notes) &&
+        (value.visibility === 'private' || value.visibility === 'shared')
       );
     case 'ultrasound':
       return (
@@ -466,7 +463,7 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
   }
 
   const id = (before ?? value)!.id;
-  const records = data.pregnancyRecords ?? [];
+  const records = data.pregnancyRecords;
 
   if (!sameValue(records.find((item) => item.id === id) ?? null, before)) {
     throw new PregnancyChangeError('这条记录已变化，请重新打开最新记录，输入已保留。', 409);
@@ -487,7 +484,7 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
               : null;
     const { before: childBefore, value: childValue } = child;
     const childId = childBefore?.id ?? childValue?.id;
-    const existingChild = data.children?.find((item) => item.id === childId) ?? null;
+    const existingChild = data.children.find((item) => item.id === childId) ?? null;
     const endingBirth =
       linkedOutcome?.kind === 'birth' &&
       (!value || value.type !== 'outcome' || value.kind !== 'birth');
@@ -520,11 +517,11 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
 
     if (childValue) {
       updatedChildren = [
-        ...(data.children ?? []).filter((item) => item.id !== childId),
+        ...data.children.filter((item) => item.id !== childId),
         childValue,
       ];
     } else {
-      updatedChildren = (data.children ?? []).filter((item) => item.id !== childId);
+      updatedChildren = data.children.filter((item) => item.id !== childId);
     }
   }
 
@@ -536,7 +533,7 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
     changedOutcome &&
     (!value || (value.type === 'outcome' && value.kind !== 'birth'))
   ) {
-    const linkedChild = (data.children ?? []).find(
+    const linkedChild = data.children.find(
       (item) =>
         item.sourceOutcomeId === currentOutcome.id ||
         item.id === childIdForOutcome(currentOutcome.id),

@@ -1,7 +1,7 @@
 import { decodeFamily } from '@/domain/family';
 import type { SessionState } from '@/domain/collaboration';
 
-export const CLOUD_CACHE_KEY = '24years.cloud.cache.v1';
+export const CLOUD_CACHE_KEY = '24years.cloud.cache.v2';
 
 /** Only a read snapshot; never restores authentication or permission to write. */
 export function readCloudCache(): SessionState | null {
@@ -11,7 +11,7 @@ export function readCloudCache(): SessionState | null {
     const family = saved?.state?.family;
 
     if (
-      saved?.version !== 1 ||
+      saved?.version !== 2 ||
       !Number.isFinite(saved.savedAt) ||
       saved.savedAt > Date.now() ||
       Date.now() - saved.savedAt >= 30 * 86400000 ||
@@ -28,8 +28,7 @@ export function readCloudCache(): SessionState | null {
           member &&
           ['id', 'username', 'nickname'].every((key) => typeof member[key] === 'string') &&
           ['owner', 'editor', 'viewer'].includes(String(member.role)) &&
-          (member.familyRole === null ||
-            ['mother', 'father', 'single_parent'].includes(String(member.familyRole))),
+          ['mother', 'father', 'single_parent'].includes(String(member.familyRole)),
       ) ||
       !family.members.some((member: { id?: string }) => member?.id === user.id)
     ) {

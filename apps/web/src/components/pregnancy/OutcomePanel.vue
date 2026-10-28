@@ -19,7 +19,7 @@ const syncedChild = computed(() => {
   const currentOutcome = outcome.value;
 
   return currentOutcome?.kind === 'birth'
-    ? (familyStore.data.value.children ?? []).find(
+    ? familyStore.data.value.children.find(
         (child) =>
           child.sourceOutcomeId === currentOutcome.id ||
           child.id === childIdForOutcome(currentOutcome.id),
@@ -29,7 +29,6 @@ const syncedChild = computed(() => {
 const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
   type: 'outcome',
   initial: outcome.value,
-  optionalFields: ['birthGestationalWeeks'],
   defaults: () => ({
     kind: 'birth',
     date: localDate(),
@@ -76,7 +75,7 @@ function linkedChildFor(outcome: PregnancyOutcome | null) {
     return null;
   }
 
-  const children = familyStore.data.value.children ?? [];
+  const children = familyStore.data.value.children;
   const linked = children.find(
     (child) => child.sourceOutcomeId === outcome.id || child.id === childIdForOutcome(outcome.id),
   );
@@ -147,7 +146,7 @@ async function submit() {
   };
 
   const previousOutcome = before.value?.type === 'outcome' ? before.value : null;
-  const children = familyStore.data.value.children ?? [];
+  const children = familyStore.data.value.children;
   const linkedChild =
     linkedChildFor(previousOutcome) ??
     children.find(

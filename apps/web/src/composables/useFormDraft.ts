@@ -3,7 +3,7 @@ import { sameValue } from '@/domain/family';
 import { computed, onUnmounted, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
-const PREFIX = '24years.draft.v1:';
+const PREFIX = '24years.draft.v2:';
 
 export function clearFormDrafts() {
   try {
@@ -23,8 +23,6 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
   scope: () => string;
   name: string;
   baseline?: unknown;
-  /** Newly added string fields may use their initial defaults in older drafts. */
-  optionalFields?: readonly (keyof T)[];
 }) {
   const router = useRouter();
   const initial = JSON.stringify(options.form);
@@ -52,7 +50,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
       const fields = Object.keys(options.form);
 
       if (
-        saved?.version !== 1 ||
+        saved?.version !== 2 ||
         typeof saved.id !== 'string' ||
         !saved.id ||
         typeof saved.baseline !== 'string' ||
@@ -63,8 +61,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
         !fields.every(
           (field) =>
             (typeof saved.form[field] === typeof options.form[field] &&
-              (typeof saved.form[field] !== 'number' || Number.isFinite(saved.form[field]))) ||
-            (saved.form[field] === undefined && options.optionalFields?.includes(field)),
+              (typeof saved.form[field] !== 'number' || Number.isFinite(saved.form[field]))),
         )
       ) {
         throw new Error('Invalid draft');
@@ -97,7 +94,7 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
         // Retain the original baseline even when a restored draft is stale.
         sessionStorage.setItem(
           key,
-          JSON.stringify({ version: 1, id: id.value, baseline: draftBaseline, form: options.form }),
+          JSON.stringify({ version: 2, id: id.value, baseline: draftBaseline, form: options.form }),
         );
       } else {
         sessionStorage.removeItem(key);

@@ -273,12 +273,7 @@ export function createAccountHandlers(
             if (family.data.profile) {
               family.data.profile.nickname = remaining.nickname;
 
-              if (remaining.familyRole) {
-                family.data.profile.parentRole = remaining.familyRole;
-              } else {
-                delete family.data.profile.parentRole;
-                delete family.data.profile.familyMode;
-              }
+              family.data.profile.parentRole = remaining.familyRole;
 
               db.prepare('UPDATE families SET data = ? WHERE id = ?').run(
                 JSON.stringify(familyBlobData(family.data)),

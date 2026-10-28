@@ -12,7 +12,7 @@ const invalid = computed(() => !!from.value && !!to.value && from.value > to.val
 const baseEntries = computed(() =>
   invalid.value
     ? []
-    : selectVitals(data.value.pregnancyRecords ?? [], metric.value, from.value, to.value),
+    : selectVitals(data.value.pregnancyRecords, metric.value, from.value, to.value),
 );
 
 function matchesGlucoseContext(context: string | undefined, group: string) {

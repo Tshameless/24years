@@ -1,5 +1,4 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { decodeFamily } from '../src/domain/family.ts';
 import type {
   Account,
   FamilyDelta,
@@ -9,7 +8,7 @@ import type {
 } from '../src/domain/collaboration.ts';
 import { ApiError, createAccountHandlers, hash, requireValue, type Body } from './auth.ts';
 import { createFamilyMutations } from './family-mutations.ts';
-import { readDeltaChanges, readRelationalRecords } from './records-store.ts';
+import { decodeFamilyRecords, readDeltaChanges } from './records-store.ts';
 
 export { ApiError, hash };
 
@@ -66,22 +65,12 @@ export function createService(db: DatabaseSync) {
     const invite = db
       .prepare('SELECT expires_at FROM invites WHERE family_id = ? AND expires_at > ?')
       .get(row.id, Date.now()) as { expires_at: number } | undefined;
-    const baseData = decodeFamily(row.data);
-    const relational = readRelationalRecords(db, row.id);
+    const baseData = decodeFamilyRecords(db, row.id, row.data);
     const family: SharedFamily = {
       id: row.id,
       mode: row.mode,
       revision: row.revision,
-      data: {
-        ...baseData,
-        ...relational,
-        ...((relational.pregnancyRecords?.length ?? 0) > 0 || baseData.pregnancyRecords
-          ? { pregnancyRecords: relational.pregnancyRecords ?? [] }
-          : {}),
-        ...((relational.children?.length ?? 0) > 0 || baseData.children
-          ? { children: relational.children ?? [] }
-          : {}),
-      },
+      data: baseData,
       members: db
         .prepare(
           "SELECT a.id, a.username, a.nickname, m.role, m.family_role AS familyRole FROM members m JOIN accounts a ON a.id = m.user_id WHERE m.family_id = ? ORDER BY m.role = 'owner' DESC, a.id",

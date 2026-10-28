@@ -107,14 +107,16 @@ test('产后首页直达孩子档案，侧栏与账本图表均可用且无横�
   await page.goto('/');
   await page.evaluate(() => {
     localStorage.setItem(
-      '24years.family.v1',
+      '24years.family.v2',
       JSON.stringify({
-        version: 1,
+        version: 2,
         profile: {
           name: '小满的家',
           nickname: '家长',
           dueDate: '2027-06-01',
           quietMode: false,
+          familyMode: 'single',
+          parentRole: 'single_parent',
         },
         tasks: [],
         expenses: [
@@ -157,6 +159,7 @@ test('产后首页直达孩子档案，侧栏与账本图表均可用且无横�
             sourceOutcomeId: 'pregnancy-outcome',
           },
         ],
+        children: [],
       }),
     );
   });
@@ -185,30 +188,33 @@ test('产后首页直达孩子档案，侧栏与账本图表均可用且无横�
   await expect(page.locator('.category-chart li')).toHaveCount(2);
 });
 
-test('孕期心理自查保留旧编号，新增与编辑各自保留历史并拒绝漏答', async ({ page }) => {
+test('孕期心理自查按日期保留历史，新增与编辑独立且拒绝漏答', async ({ page }) => {
   await page.goto('/pregnancy?tab=mental');
   await page.evaluate(() => {
     localStorage.setItem(
-      '24years.family.v1',
+      '24years.family.v2',
       JSON.stringify({
-        version: 1,
+        version: 2,
         profile: {
           name: '家庭',
           nickname: '家长',
           dueDate: '2027-06-01',
           quietMode: false,
+          familyMode: 'single',
+          parentRole: 'single_parent',
         },
         tasks: [],
         expenses: [],
         theme: 'light',
         pregnancyRecords: [
           {
-            id: 'mental-screening',
+            id: 'screening-2026-10-19',
             type: 'mentalScreening',
             date: '2026-10-19',
             score: 2,
             selfHarm: false,
             answers: Array(10).fill(0),
+            visibility: 'shared',
             notes: '',
           },
           {
@@ -218,9 +224,11 @@ test('孕期心理自查保留旧编号，新增与编辑各自保留历史并�
             score: 3,
             selfHarm: false,
             answers: Array(10).fill(0),
+            visibility: 'shared',
             notes: '',
           },
         ],
+        children: [],
       }),
     );
   });

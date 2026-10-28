@@ -161,7 +161,10 @@ test('孕期协作支持幂等原子入账、冲突回滚、只读权限和备�
         minutes: 10,
         notes: '一起陪伴',
       },
-      { id: 'mood', type: 'mood', date: before.date, title: '平静', notes: '散步' },
+      {
+        id: 'mood', type: 'mood', date: before.date, title: '平静',
+        visibility: 'shared', notes: '散步',
+      },
       {
         id: 'packing',
         type: 'packing',

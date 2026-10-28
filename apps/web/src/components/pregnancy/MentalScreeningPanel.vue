@@ -49,7 +49,7 @@ const { form, before, stale, draft, reset, cancel } = usePregnancyDraft({
   }),
   fields: (item: Screening) => ({
     date: item.date,
-    answers: JSON.stringify(item.answers ?? []),
+    answers: JSON.stringify(item.answers),
     score: String(item.score),
     selfHarm: item.selfHarm,
     notes: item.notes,

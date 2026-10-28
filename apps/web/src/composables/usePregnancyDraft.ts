@@ -12,7 +12,6 @@ export function usePregnancyDraft<
   defaults: () => T;
   fields: (record: R) => T;
   initial?: R | null;
-  optionalFields?: readonly (keyof T)[];
 }) {
   const { data, identity, cloud } = useFamily();
   const form = reactive({
@@ -24,7 +23,6 @@ export function usePregnancyDraft<
     form,
     scope: () => `${identity.value}:${cloud.role.value ?? 'local'}`,
     name: `pregnancy:${options.type}`,
-    optionalFields: options.optionalFields,
   });
   const source = computed(() => {
     try {
@@ -45,7 +43,7 @@ export function usePregnancyDraft<
       return true;
     }
 
-    const records = data.value.pregnancyRecords ?? [];
+    const records = data.value.pregnancyRecords;
     const original = before.value;
     const fixedId =
       options.type === 'medical'
@@ -79,7 +77,7 @@ export function usePregnancyDraft<
         stale.value
       ) {
         reset(
-          (data.value.pregnancyRecords?.find((item) => item.type === options.type) as
+          (data.value.pregnancyRecords.find((item) => item.type === options.type) as
             | R
             | undefined) ?? null,
         );
@@ -105,7 +103,7 @@ export function usePregnancyDraft<
     const singleton = ['medical', 'birthPlan', 'outcome', 'postpartum'].includes(options.type);
     reset(
       singleton
-        ? (((data.value.pregnancyRecords ?? []).find((item) => item.type === options.type) as
+        ? ((data.value.pregnancyRecords.find((item) => item.type === options.type) as
             | R
             | undefined) ?? null)
         : null,

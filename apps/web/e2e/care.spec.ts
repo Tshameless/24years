@@ -71,11 +71,11 @@ test('胎教、心情和待产记录保存并刷新恢复', async ({ page }) => 
   await page.getByLabel('已经备齐').check();
   await page.getByRole('button', { name: '保存待产清单' }).click();
   await page.reload();
-  await expect(page.getByText('已备齐', { exact: true })).toBeVisible();
+  await expect(page.locator('.record-list').getByText('已备齐', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   await page.getByLabel('已经备齐').uncheck();
   await page.getByRole('button', { name: '保存待产清单' }).click();
-  await expect(page.getByText('待准备', { exact: true })).toBeVisible();
+  await expect(page.locator('.record-list').getByText('待准备', { exact: true })).toBeVisible();
   await page.goto('/backup');
   const downloadEvent = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出我的数据' }).click();
@@ -87,9 +87,9 @@ test('胎教、心情和待产记录保存并刷新恢复', async ({ page }) => 
   ).toEqual(['bonding', 'mood', 'packing']);
   expect(raw).not.toContain('blob:');
   await page.evaluate(() => {
-    const data = JSON.parse(localStorage.getItem('24years.family.v1')!);
+    const data = JSON.parse(localStorage.getItem('24years.family.v2')!);
     data.pregnancyRecords = [];
-    localStorage.setItem('24years.family.v1', JSON.stringify(data));
+    localStorage.setItem('24years.family.v2', JSON.stringify(data));
   });
   await page.reload();
   await page.getByText('从 JSON 备份恢复', { exact: true }).click();

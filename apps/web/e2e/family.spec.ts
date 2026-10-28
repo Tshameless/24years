@@ -37,7 +37,7 @@ test('建档先选单人或多人，多人需选择父母身份并持久保存',
   await page.getByRole('button', { name: '保存家庭档案' }).click();
   await expect(page.getByRole('status')).toHaveText('家庭档案已保存');
   const saved = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('24years.family.v1')!).profile,
+    () => JSON.parse(localStorage.getItem('24years.family.v2')!).profile,
   );
   expect(saved.familyMode).toBe('single');
   expect(saved.parentRole).toBe('single_parent');
@@ -165,7 +165,7 @@ test('怀孕时期必填且只接受支持范围内的整数孕周', async ({ pa
     await page.getByRole('button', { name: '保存家庭档案' }).click();
     await expect(weeks).toHaveValue(value);
     await expect(page.getByRole('status')).toHaveCount(0);
-    expect(await page.evaluate(() => localStorage.getItem('24years.family.v1'))).toBeNull();
+    expect(await page.evaluate(() => localStorage.getItem('24years.family.v2'))).toBeNull();
   }
 
   await weeks.fill('24');
@@ -175,16 +175,25 @@ test('怀孕时期必填且只接受支持范围内的整数孕周', async ({ pa
   await expect(page.getByRole('status')).toHaveText('家庭档案已保存');
 });
 
-test('旧档案回填孕周，跨日保存保留日期锚点并支持修改怀孕时期', async ({ page }) => {
+test('档案回填孕周，跨日保存保留日期锚点并支持修改怀孕时期', async ({ page }) => {
   await page.goto('/family');
   await page.evaluate(() => {
     localStorage.setItem(
-      '24years.family.v1',
+      '24years.family.v2',
       JSON.stringify({
-        version: 1,
-        profile: { name: '原有家庭', nickname: '小叶', dueDate: '2027-01-26', quietMode: false },
+        version: 2,
+        profile: {
+          name: '原有家庭',
+          nickname: '小叶',
+          dueDate: '2027-01-26',
+          quietMode: false,
+          familyMode: 'single',
+          parentRole: 'single_parent',
+        },
         tasks: [],
         expenses: [],
+        pregnancyRecords: [],
+        children: [],
         theme: 'light',
       }),
     );
@@ -199,7 +208,7 @@ test('旧档案回填孕周，跨日保存保留日期锚点并支持修改怀�
   await expect(page.getByRole('status')).toHaveText('家庭档案已保存');
   expect(
     await page.evaluate(
-      () => JSON.parse(localStorage.getItem('24years.family.v1')!).profile.dueDate,
+      () => JSON.parse(localStorage.getItem('24years.family.v2')!).profile.dueDate,
     ),
   ).toBe('2027-01-26');
 
@@ -216,12 +225,12 @@ test('旧档案回填孕周，跨日保存保留日期锚点并支持修改怀�
 
 test('损坏存档不会被默认档案覆盖', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => localStorage.setItem('24years.family.v1', '{broken'));
+  await page.evaluate(() => localStorage.setItem('24years.family.v2', '{broken'));
   await page.reload();
   await expect(page.getByRole('alert')).toContainText('无法读取本地存档');
   await page.getByRole('link', { name: '我的家庭', exact: true }).click();
   await expect(page.getByRole('button', { name: '保存家庭档案' })).toBeDisabled();
-  expect(await page.evaluate(() => localStorage.getItem('24years.family.v1'))).toBe('{broken');
+  expect(await page.evaluate(() => localStorage.getItem('24years.family.v2'))).toBe('{broken');
 });
 
 test('未知路由有返回入口，空白首页无虚构记录', async ({ page }) => {

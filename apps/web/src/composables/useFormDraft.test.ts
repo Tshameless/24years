@@ -12,9 +12,8 @@ const wrappers: ReturnType<typeof mount>[] = [];
 function setup(
   scope = shallowRef('local'),
   baseline?: unknown,
-  extraFields: Record<string, string> = {},
 ) {
-  const form = reactive<Record<string, string>>({ title: '', amount: '', ...extraFields });
+  const form = reactive<Record<string, string>>({ title: '', amount: '' });
   let draft!: ReturnType<typeof useFormDraft>;
   const wrapper = mount(
     defineComponent({
@@ -24,7 +23,6 @@ function setup(
           scope: () => scope.value,
           name: 'expense:new',
           baseline,
-          optionalFields: Object.keys(extraFields),
         });
 
         return () => null;
@@ -64,16 +62,22 @@ it('restores incomplete input and stable record id without submitting it', () =>
   expect(second.draft.id.value).not.toBe(id);
 });
 
-it('旧草稿可补新增可选字段，原有输入与编号保持不变', () => {
+it('缺少当前表单字段的草稿会被拒绝', () => {
   const old = setup();
-  old.form.title = '旧计划草稿';
-  const id = old.draft.id.value;
+  old.form.title = '不完整的计划草稿';
   old.wrapper.unmount();
-  const { form, draft } = setup(undefined, undefined, { weekdays: '' });
-  expect(form.title).toBe('旧计划草稿');
-  expect(form.weekdays).toBe('');
-  expect(draft.id.value).toBe(id);
-  expect(draft.storageError.value).toBe('');
+  sessionStorage.setItem(
+    '24years.draft.v2:["local","expense:new"]',
+    JSON.stringify({
+      version: 2,
+      id: 'old-draft',
+      baseline: 'null',
+      form: { title: '不完整的计划草稿' },
+    }),
+  );
+  const { form, draft } = setup();
+  expect(form.title).toBe('');
+  expect(draft.storageError.value).toContain('无法读取');
 });
 
 it('isolates identities and stops old forms writing after a scope change', () => {
@@ -156,7 +160,7 @@ it('warns on storage failure without discarding input', () => {
 
 it('rejects malformed drafts and clears only draft storage', () => {
   sessionStorage.setItem('unrelated', 'keep');
-  sessionStorage.setItem('24years.draft.v1:["local","expense:new"]', '{bad');
+  sessionStorage.setItem('24years.draft.v2:["local","expense:new"]', '{bad');
   const { draft, form } = setup();
   expect(form.title).toBe('');
   expect(draft.storageError.value).toContain('无法读取');
@@ -176,25 +180,25 @@ it('coalesces rapid edits and flushes immediately on beforeunload or accept', ()
   vi.advanceTimersByTime(150);
   expect(setItem).toHaveBeenCalledTimes(2);
   expect(
-    JSON.parse(sessionStorage.getItem('24years.draft.v1:["local","expense:new"]')!).form.title,
+    JSON.parse(sessionStorage.getItem('24years.draft.v2:["local","expense:new"]')!).form.title,
   ).toBe('abc');
 
   form.title = 'abcd';
   window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
   expect(
-    JSON.parse(sessionStorage.getItem('24years.draft.v1:["local","expense:new"]')!).form.title,
+    JSON.parse(sessionStorage.getItem('24years.draft.v2:["local","expense:new"]')!).form.title,
   ).toBe('abcd');
 
   draft.accept();
   form.title = 'first-after-accept';
   expect(
-    JSON.parse(sessionStorage.getItem('24years.draft.v1:["local","expense:new"]')!).form.title,
+    JSON.parse(sessionStorage.getItem('24years.draft.v2:["local","expense:new"]')!).form.title,
   ).toBe('first-after-accept');
 
   form.title = 'flushed-on-pagehide';
   window.dispatchEvent(new Event('pagehide'));
   expect(
-    JSON.parse(sessionStorage.getItem('24years.draft.v1:["local","expense:new"]')!).form.title,
+    JSON.parse(sessionStorage.getItem('24years.draft.v2:["local","expense:new"]')!).form.title,
   ).toBe('flushed-on-pagehide');
   vi.useRealTimers();
 });

@@ -8,12 +8,16 @@ describe('家庭云端记录配额', () => {
       withinFamilyCollectionLimits({
         tasks: [],
         expenses: Array.from({ length: 9000 }),
+        pregnancyRecords: [],
+        children: [],
       }),
     ).toBe(true);
     expect(
       withinFamilyCollectionLimits({
         tasks: Array.from({ length: 10001 }),
         expenses: [],
+        pregnancyRecords: [],
+        children: [],
       }),
     ).toBe(false);
   });
@@ -23,6 +27,7 @@ describe('家庭云端记录配额', () => {
       withinFamilyCollectionLimits({
         tasks: [],
         expenses: [],
+        pregnancyRecords: [],
         children: [
           { growthRecords: Array.from({ length: 6000 }) },
           { growthRecords: Array.from({ length: 4000 }) },
@@ -33,6 +38,7 @@ describe('家庭云端记录配额', () => {
       withinFamilyCollectionLimits({
         tasks: [],
         expenses: [],
+        pregnancyRecords: [],
         children: [
           { growthRecords: Array.from({ length: 6000 }) },
           { growthRecords: Array.from({ length: 4001 }) },

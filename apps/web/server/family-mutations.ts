@@ -5,6 +5,7 @@ import {
   applyPregnancyChange,
   canonicalJson,
   decodeFamily,
+  decodeFamilyMetadata,
   PregnancyChangeError,
   validChild,
   validExpense,
@@ -45,10 +46,6 @@ import {
 } from './records-store.ts';
 
 function familyRole(value: unknown, mode: 'single' | 'couple'): FamilyParentRole {
-  if (mode === 'single' && value === undefined) {
-    return 'single_parent';
-  }
-
   requireValue(
     value === 'single_parent' || value === 'mother' || value === 'father',
     400,
@@ -257,12 +254,8 @@ export function createFamilyMutations(options: {
         409,
         '家庭档案已被另一台设备修改。',
       );
-      const mode = value.familyMode ?? familyState.mode;
-      const currentRole = familyState.members.find((item) => item.id === userId)!.familyRole;
-      const selectedRole = familyRole(
-        value.parentRole ?? (mode === 'single' ? 'single_parent' : currentRole),
-        mode,
-      );
+      const mode = value.familyMode;
+      const selectedRole = familyRole(value.parentRole, mode);
       updateFamilyChoice(userId, familyState, mode, selectedRole);
       familyState.data.profile = { ...value, familyMode: mode, parentRole: selectedRole };
       deltaEntries.push({
@@ -466,7 +459,7 @@ export function createFamilyMutations(options: {
     const member = authorize(
       userId,
       body,
-      action === 'leave' || action === 'identity' ? 'member' : 'owner',
+      action === 'leave' ? 'member' : 'owner',
     );
     const family = snapshot(userId).family!;
     requireValue(body.revision === family.revision, 409, '家庭状态已更新，请同步后重试。');
@@ -480,21 +473,6 @@ export function createFamilyMutations(options: {
         family.data.profile = {
           ...family.data.profile,
           familyMode: body.mode,
-          parentRole: selectedRole,
-        };
-        db.prepare('UPDATE families SET data = ? WHERE id = ?').run(
-          JSON.stringify(familyBlobData(family.data)),
-          family.id,
-        );
-      }
-    } else if (action === 'identity') {
-      const selectedRole = familyRole(body.familyRole, family.mode);
-      updateFamilyChoice(userId, family, family.mode, selectedRole);
-
-      if (member.role === 'owner' && family.data.profile) {
-        family.data.profile = {
-          ...family.data.profile,
-          familyMode: family.mode,
           parentRole: selectedRole,
         };
         db.prepare('UPDATE families SET data = ? WHERE id = ?').run(
@@ -607,7 +585,7 @@ export function createFamilyMutations(options: {
       .get(familyId) as { count: number };
     const existingMember = db
       .prepare('SELECT family_role FROM members WHERE family_id = ?')
-      .get(familyId) as { family_role: string | null };
+      .get(familyId) as { family_role: FamilyParentRole };
     const selectedFamilyRole = familyRole(body.familyRole, 'couple');
     requireValue(
       selectedFamilyRole !== existingMember.family_role,
@@ -629,7 +607,7 @@ export function createFamilyMutations(options: {
       {
         recordType: 'profile',
         recordId: 'profile',
-        value: decodeFamily(family.data).profile,
+        value: decodeFamilyMetadata(family.data).profile,
       },
     ]);
   }
@@ -729,7 +707,10 @@ export function createFamilyMutations(options: {
             .get(String(body.familyId)) as { data: string } | undefined;
           requireValue(row, 404, '还没有导入前备份。');
 
-          return { ...snapshot(userId), backupData: decodeFamily(row.data) };
+          return {
+            ...snapshot(userId),
+            backupData: decodeFamily(row.data),
+          };
         }
 
         if (action === 'create') {

@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
   decodeFamily,
+  decodeFamilyMetadata,
   type Child,
   type Expense,
   type FamilyData,
@@ -81,78 +82,12 @@ export function initRelationalSchema(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS family_changes_created_at ON family_changes(created_at);
   `);
 
-  db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (2, ?)').run(
-    new Date().toISOString(),
+}
+
+export function decodeFamilyRecords(db: DatabaseSync, familyId: string, raw: string): FamilyData {
+  return decodeFamily(
+    JSON.stringify({ ...decodeFamilyMetadata(raw), ...readRelationalRecords(db, familyId) }),
   );
-  const migrated = db.prepare('SELECT 1 FROM schema_migrations WHERE version = 3').get();
-
-  if (!migrated) {
-    db.exec('BEGIN IMMEDIATE');
-
-    try {
-      const rows = db
-        .prepare('SELECT id, data, revision, updated_at FROM families')
-        .all() as Array<{
-        id: string;
-        data: string;
-        revision: number;
-        updated_at: string;
-      }>;
-      const failures: string[] = [];
-
-      for (const row of rows) {
-        try {
-          const data = decodeFamily(row.data);
-          const relational = readRelationalRecords(db, row.id);
-
-          // A compact blob is the post-migration format. Once the collection
-          // fields are absent, the relational rows are authoritative and must
-          // never be replaced with empty legacy defaults on restart.
-          const hasLegacyCollections =
-            Array.isArray((data as Partial<FamilyData>).tasks) ||
-            Array.isArray((data as Partial<FamilyData>).expenses) ||
-            Array.isArray((data as Partial<FamilyData>).pregnancyRecords) ||
-            Array.isArray((data as Partial<FamilyData>).children);
-
-          if (hasLegacyCollections) {
-            const differs =
-              JSON.stringify(relational.tasks) !== JSON.stringify(data.tasks ?? []) ||
-              JSON.stringify(relational.expenses) !== JSON.stringify(data.expenses ?? []) ||
-              JSON.stringify(relational.pregnancyRecords) !==
-                JSON.stringify(data.pregnancyRecords ?? []) ||
-              JSON.stringify(relational.children) !== JSON.stringify(data.children ?? []);
-
-            // During the compatibility window the legacy blob is the source
-            // of truth. Record a reset when it repairs a divergent relation.
-            if (differs) {
-              syncFamilyTables(db, row.id, data, row.updated_at);
-              recordResetChange(db, row.id, row.revision);
-            }
-          }
-
-          const compactData = JSON.stringify(familyBlobData(data));
-
-          if (compactData !== row.data) {
-            db.prepare('UPDATE families SET data = ? WHERE id = ?').run(compactData, row.id);
-          }
-        } catch (error) {
-          failures.push(`${row.id}: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-
-      if (failures.length > 0) {
-        throw new Error(`家庭关系数据迁移失败：${failures.join('; ')}`);
-      }
-
-      db.prepare('INSERT INTO schema_migrations(version, applied_at) VALUES (3, ?)').run(
-        new Date().toISOString(),
-      );
-      db.exec('COMMIT');
-    } catch (error) {
-      db.exec('ROLLBACK');
-      throw error;
-    }
-  }
 }
 
 export function familyBlobData(
@@ -257,7 +192,7 @@ export function syncFamilyTables(
   const insertPregnancy = db.prepare(
     'INSERT INTO family_pregnancy_records(family_id, id, position, type, date, data, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
   );
-  for (const [index, record] of (data.pregnancyRecords ?? []).entries()) {
+  for (const [index, record] of data.pregnancyRecords.entries()) {
     insertPregnancy.run(
       familyId,
       record.id,
@@ -272,7 +207,7 @@ export function syncFamilyTables(
   const insertChild = db.prepare(
     'INSERT INTO family_children(family_id, id, position, name, birth_date, data, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
   );
-  for (const [index, child] of (data.children ?? []).entries()) {
+  for (const [index, child] of data.children.entries()) {
     insertChild.run(
       familyId,
       child.id,

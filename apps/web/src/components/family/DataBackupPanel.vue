@@ -195,7 +195,7 @@ async function downloadPrevious() {
           <strong>{{ preview.data.profile?.name || '未命名档案' }}</strong>
           <p>
             {{ preview.data.tasks.length }} 条计划 · {{ preview.data.expenses.length }} 笔账目 ·
-            {{ preview.data.pregnancyRecords?.length ?? 0 }} 条孕期记录
+            {{ preview.data.pregnancyRecords.length }} 条孕期记录
           </p>
           <label class="confirm-option">
             <input

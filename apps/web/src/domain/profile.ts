@@ -9,9 +9,8 @@ export interface FamilyProfile {
   lmpDate?: string;
   prePregnancyWeightKg?: number;
   heightCm?: number;
-  /** Saved for local profiles so the first sync can use the same family choice. */
-  familyMode?: 'single' | 'couple';
-  parentRole?: 'single_parent' | 'mother' | 'father';
+  familyMode: 'single' | 'couple';
+  parentRole: 'single_parent' | 'mother' | 'father';
 }
 
 // This is a calendar estimate using the project's 40-week convention.
@@ -35,7 +34,7 @@ export function dueDateFromGestation(
   return addDays(referenceDate, 280 - (weeks * 7 + days));
 }
 
-// Display estimate only: the date anchor may come from gestational age or an older profile.
+// Display estimate only; the persisted clinical anchors remain independent profile fields.
 export function pregnancyProgress(dueDate: string, today: string) {
   if (!isDate(dueDate) || !isDate(today)) {
     return null;
@@ -59,10 +58,27 @@ export function pregnancyProgress(dueDate: string, today: string) {
 export function validProfile(value: unknown): value is FamilyProfile {
   return (
     isObject(value) &&
+    Object.keys(value).every((key) =>
+      [
+        'name',
+        'nickname',
+        'dueDate',
+        'quietMode',
+        'lmpDate',
+        'prePregnancyWeightKg',
+        'heightCm',
+        'familyMode',
+        'parentRole',
+      ].includes(key),
+    ) &&
     shortText(value.name, 30) &&
     shortText(value.nickname, 20) &&
     isDate(value.dueDate) &&
     typeof value.quietMode === 'boolean' &&
+    (value.familyMode === 'single' || value.familyMode === 'couple') &&
+    (value.parentRole === 'single_parent' ||
+      value.parentRole === 'mother' ||
+      value.parentRole === 'father') &&
     (value.lmpDate === undefined || isDate(value.lmpDate)) &&
     (value.prePregnancyWeightKg === undefined ||
       (typeof value.prePregnancyWeightKg === 'number' &&
@@ -74,16 +90,8 @@ export function validProfile(value: unknown): value is FamilyProfile {
         Number.isFinite(value.heightCm) &&
         value.heightCm >= 50 &&
         value.heightCm <= 250)) &&
-    (value.familyMode === undefined ||
-      value.familyMode === 'single' ||
-      value.familyMode === 'couple') &&
-    (value.parentRole === undefined ||
-      value.parentRole === 'single_parent' ||
-      value.parentRole === 'mother' ||
-      value.parentRole === 'father') &&
-    (value.familyMode === undefined ||
-      (value.familyMode === 'single'
-        ? value.parentRole === 'single_parent'
-        : value.parentRole === 'mother' || value.parentRole === 'father'))
+    (value.familyMode === 'single'
+      ? value.parentRole === 'single_parent'
+      : value.parentRole === 'mother' || value.parentRole === 'father')
   );
 }

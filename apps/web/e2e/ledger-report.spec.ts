@@ -6,14 +6,16 @@ import { join } from 'node:path';
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-21T10:00:00+08:00'));
   await page.addInitScript(() => {
-    if (!localStorage.getItem('24years.family.v1')) {
+    if (!localStorage.getItem('24years.family.v2')) {
       localStorage.setItem(
-        '24years.family.v1',
+        '24years.family.v2',
         JSON.stringify({
-          version: 1,
+          version: 2,
           profile: null,
           theme: 'light',
           tasks: [],
+          pregnancyRecords: [],
+          children: [],
           expenses: [
             {
               id: 'old',
@@ -70,7 +72,7 @@ test('月份分类汇总与 CSV 一致，支持负净支出，空筛选与重置
   await expect(page).toHaveURL(/\/ledger$/);
   await expect(page).toHaveTitle(/24Years/);
   await expect(page.getByRole('heading', { name: '家庭账本', exact: true })).toBeVisible();
-  const raw = await page.evaluate(() => localStorage.getItem('24years.family.v1'));
+  const raw = await page.evaluate(() => localStorage.getItem('24years.family.v2'));
   await expect(page.getByTestId('net-cost')).toHaveText('¥110.55');
   await page.getByRole('button', { name: '本月', exact: true }).click();
   await expect(page.getByLabel('账目月份')).toHaveValue('2026-10');
@@ -113,7 +115,7 @@ test('月份分类汇总与 CSV 一致，支持负净支出，空筛选与重置
   await page.getByRole('button', { name: '重置筛选' }).click();
   await expect(page.getByTestId('filtered-net')).toHaveText('¥110.55');
   await expect(page.getByTestId('net-cost')).toHaveText('¥110.55');
-  expect(await page.evaluate(() => localStorage.getItem('24years.family.v1'))).toBe(raw);
+  expect(await page.evaluate(() => localStorage.getItem('24years.family.v2'))).toBe(raw);
   expect(errors).toEqual([]);
 });
 

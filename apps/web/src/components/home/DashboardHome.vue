@@ -13,11 +13,11 @@ const { state } = cloud;
 
 const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
 const postpartum = computed(() =>
-  data.value.pregnancyRecords?.find((item) => item.type === 'postpartum'),
+  data.value.pregnancyRecords.find((item) => item.type === 'postpartum'),
 );
 const nextCheckup = computed(
   () =>
-    (data.value.pregnancyRecords ?? [])
+    data.value.pregnancyRecords
       .filter(
         (item): item is Extract<PregnancyRecord, { type: 'checkup' }> =>
           item.type === 'checkup' && !item.completed,

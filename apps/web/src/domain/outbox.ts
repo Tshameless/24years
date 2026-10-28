@@ -1,6 +1,6 @@
 import type { FamilyChange } from './collaboration';
 
-export const OUTBOX_STORAGE_PREFIX = '24years.outbox.v1:';
+export const OUTBOX_STORAGE_PREFIX = '24years.outbox.v2:';
 
 export interface OutboxEntry {
   id: string;

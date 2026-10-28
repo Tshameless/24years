@@ -108,9 +108,9 @@ test('儿童表单草稿恢复并阻止覆盖已变化的档案', async ({ page 
   await expect(modal.getByRole('button', { name: '保存修改' })).toBeEnabled();
 
   await page.evaluate(() => {
-    const family = JSON.parse(localStorage.getItem('24years.family.v1')!);
+    const family = JSON.parse(localStorage.getItem('24years.family.v2')!);
     family.children[0].notes = '另一位成员已更新';
-    localStorage.setItem('24years.family.v1', JSON.stringify(family));
+    localStorage.setItem('24years.family.v2', JSON.stringify(family));
   });
   page.once('dialog', (dialog) => dialog.accept());
   await page.reload();
@@ -188,9 +188,9 @@ test('生长记录编辑草稿恢复原记录 ID，并在档案变化后阻止�
 
   await restoredTracker.getByLabel('测量备注（就医或家庭测量）').fill('不应覆盖远端更新');
   await page.evaluate(() => {
-    const family = JSON.parse(localStorage.getItem('24years.family.v1')!);
+    const family = JSON.parse(localStorage.getItem('24years.family.v2')!);
     family.children[0].growthRecords[0].weightKg = 8.5;
-    localStorage.setItem('24years.family.v1', JSON.stringify(family));
+    localStorage.setItem('24years.family.v2', JSON.stringify(family));
   });
   page.once('dialog', (dialog) => dialog.accept());
   await page.reload();

@@ -484,6 +484,7 @@ test('backup import accepts an archive over the ordinary API body limit', async 
     );
     const family = service.mutate(registered.state.user!.id, 'create', {
       mode: 'single',
+      familyRole: 'single_parent',
       data: emptyFamily(),
     }).family!;
     const expenses = Array.from({ length: 9000 }, (_, index) => ({

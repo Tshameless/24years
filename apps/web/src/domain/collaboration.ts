@@ -23,7 +23,7 @@ export interface Account {
 
 export interface Member extends Account {
   role: MemberRole;
-  familyRole: FamilyParentRole | null;
+  familyRole: FamilyParentRole;
 }
 
 export interface SharedFamily {
@@ -111,7 +111,7 @@ export function applyPendingFamilyChange(
     return expenses ? { ...data, expenses } : null;
   }
 
-  const children = applyPendingRecord(data.children ?? [], change);
+  const children = applyPendingRecord(data.children, change);
 
   return children ? { ...data, children } : null;
 }
@@ -173,14 +173,23 @@ export function applyFamilyDelta(current: SharedFamily, delta: FamilyDelta): Sha
   let profile = current.data.profile;
   let tasks = [...current.data.tasks];
   let expenses = [...current.data.expenses];
-  let pregnancyRecords = current.data.pregnancyRecords
-    ? [...current.data.pregnancyRecords]
-    : undefined;
-  let children = current.data.children ? [...current.data.children] : undefined;
+  let pregnancyRecords = [...current.data.pregnancyRecords];
+  let children = [...current.data.children];
 
   for (const entry of delta.entries) {
     if (entry.recordType === 'profile') {
       profile = (entry.value as FamilyProfile | null) ?? null;
+
+      const owner = delta.members.find((member) => member.role === 'owner');
+
+      if (
+        profile &&
+        (profile.familyMode !== delta.mode ||
+          !owner ||
+          owner.familyRole !== profile.parentRole)
+      ) {
+        return null;
+      }
     } else if (entry.recordType === 'task') {
       tasks = replaceRecord(tasks, entry.recordId, (entry.value as FamilyTask | null) ?? null);
     } else if (entry.recordType === 'expense') {
@@ -193,15 +202,13 @@ export function applyFamilyDelta(current: SharedFamily, delta: FamilyDelta): Sha
         expenses.unshift(expense);
       }
     } else if (entry.recordType === 'pregnancy') {
-      const base = pregnancyRecords ?? [];
       pregnancyRecords = replaceRecord(
-        base,
+        pregnancyRecords,
         entry.recordId,
         (entry.value as PregnancyRecord | null) ?? null,
       );
     } else if (entry.recordType === 'child') {
-      const base = children ?? [];
-      children = replaceRecord(base, entry.recordId, (entry.value as Child | null) ?? null);
+      children = replaceRecord(children, entry.recordId, (entry.value as Child | null) ?? null);
     } else {
       return null;
     }
@@ -213,8 +220,8 @@ export function applyFamilyDelta(current: SharedFamily, delta: FamilyDelta): Sha
       profile,
       tasks,
       expenses,
-      ...(pregnancyRecords !== undefined ? { pregnancyRecords } : {}),
-      ...(children !== undefined ? { children } : {}),
+      pregnancyRecords,
+      children,
     };
     const validated = decodeFamily(JSON.stringify(candidate));
 

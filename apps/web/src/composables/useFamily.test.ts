@@ -36,6 +36,8 @@ const profile = {
   nickname: '小叶',
   dueDate: '2027-01-26',
   quietMode: false,
+  familyMode: 'single' as const,
+  parentRole: 'single_parent' as const,
 };
 
 describe('本地存档', () => {
@@ -267,10 +269,10 @@ it('离线云端家庭允许连续排队并立即显示待同步记录', async (
     updatedBy: user.id,
     inviteExpiresAt: null,
   };
-  localStorage.setItem('24years.cloud.active', 'true');
+  localStorage.setItem('24years.cloud.active.v2', 'true');
   localStorage.setItem(
     CLOUD_CACHE_KEY,
-    JSON.stringify({ version: 1, savedAt: Date.now(), state: { user, family } }),
+    JSON.stringify({ version: 2, savedAt: Date.now(), state: { user, family } }),
   );
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
   const store = setup(true);
