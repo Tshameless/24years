@@ -7,6 +7,8 @@ export interface PrenatalScheduleItem {
   offsetWeeks: number;
 }
 
+export type PrenatalScheduleState = 'upcoming' | 'due' | 'past' | 'scheduled' | 'completed';
+
 // A planning aid only. Dates and examinations must be confirmed with the care team.
 export const prenatalSchedule: readonly PrenatalScheduleItem[] = [
   {
@@ -63,9 +65,33 @@ export function scheduleDate(dueDate: string, offsetWeeks: number) {
   return addDays(dueDate, -((40 - offsetWeeks) * 7));
 }
 
-export function hasScheduledCheckup(
-  records: readonly PregnancyRecord[],
-  item: PrenatalScheduleItem,
-) {
-  return records.some((record) => record.type === 'checkup' && record.title === item.title);
+export function scheduledCheckup(records: readonly PregnancyRecord[], item: PrenatalScheduleItem) {
+  return (
+    records
+      .filter(
+        (record): record is Extract<PregnancyRecord, { type: 'checkup' }> =>
+          record.type === 'checkup' && record.title === item.title,
+      )
+      .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
+  );
+}
+
+export function prenatalScheduleState(
+  date: string,
+  today: string,
+  checkup: Extract<PregnancyRecord, { type: 'checkup' }> | null,
+): PrenatalScheduleState {
+  if (checkup?.completed) {
+    return 'completed';
+  }
+
+  if (checkup) {
+    return 'scheduled';
+  }
+
+  if (date < today) {
+    return 'past';
+  }
+
+  return date === today ? 'due' : 'upcoming';
 }

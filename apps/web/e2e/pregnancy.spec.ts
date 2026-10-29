@@ -89,7 +89,10 @@ test('孕期记录双端同步，草稿冲突保留输入，只读成员不能�
     await expect(
       partner.getByRole('button', { name: '记录一次胎动 +1', exact: true }),
     ).toBeDisabled();
-    await partner.getByLabel('孕期记录类型').getByRole('link', { name: '产检安排', exact: true }).click();
+    await partner
+      .getByLabel('孕期记录类型')
+      .getByRole('link', { name: '产检安排', exact: true })
+      .click();
     await expect(partner.getByRole('button', { name: '保存产检安排' })).toBeDisabled();
     await partner.getByRole('link', { name: '就医卡', exact: true }).click();
     await expect(partner.getByRole('button', { name: '保存就医卡' })).toBeDisabled();
@@ -98,6 +101,33 @@ test('孕期记录双端同步，草稿冲突保留输入，只读成员不能�
   } finally {
     await otherContext.close();
   }
+});
+
+test('产检参考时间轴跟踪进度并可从节点创建提醒', async ({ page }) => {
+  await createLocalProfile(page, '产检时间轴家庭');
+  await page.goto('/pregnancy?tab=checkups');
+
+  const item = page.locator('.schedule-list li').filter({ hasText: '糖耐量与血常规' });
+
+  await expect(item).toContainText('即将到期');
+  await item.getByRole('button', { name: '加入安排' }).click();
+  await expect(page.getByLabel('产检名称')).toHaveValue('糖耐量与血常规');
+  await page.getByRole('button', { name: '保存产检安排' }).click();
+  await expect(item).toContainText('已加入安排');
+
+  await item.getByRole('button', { name: '加入提醒' }).click();
+  await expect(
+    page.getByText('已加入就诊提醒，并在前一晚加入准备提醒。', { exact: true }),
+  ).toBeVisible();
+
+  await page
+    .locator('.record-list li')
+    .filter({ hasText: '糖耐量与血常规' })
+    .getByRole('button', { name: '编辑 / 完成' })
+    .click();
+  await page.getByLabel('本次产检已完成').check();
+  await page.getByRole('button', { name: '保存产检修改' }).click();
+  await expect(item).toContainText('已完成');
 });
 
 test('孕期闭环：产检原子入账、体征、计时、就医卡和备份恢复', async ({ page }) => {
@@ -128,10 +158,19 @@ test('孕期闭环：产检原子入账、体征、计时、就医卡和备份�
   await page.getByRole('link', { name: '家庭账本', exact: true }).click();
   await expect(page.getByTestId('net-cost')).toHaveText('¥80.05');
   await page.getByRole('link', { name: '孕期记录', exact: true }).click();
-  await page.getByLabel('孕期记录类型').getByRole('link', { name: '体征记录', exact: true }).click();
+  await page
+    .getByLabel('孕期记录类型')
+    .getByRole('link', { name: '体征记录', exact: true })
+    .click();
   await page.getByLabel('体重（kg）', { exact: true }).fill('62.5');
   await page.getByRole('button', { name: '保存体征', exact: true }).click();
   await expect(page.locator('.record-list').getByText('62.5', { exact: true })).toBeVisible();
+  await page.getByLabel('记录项目').selectOption('bloodPressure');
+  await page.getByLabel('收缩压（mmHg）').fill('150');
+  await page.getByLabel('舒张压（mmHg）').fill('100');
+  await page.getByRole('button', { name: '保存体征', exact: true }).click();
+  await expect(page.locator('.record-list')).toContainText('原始记录');
+  await expect(page.locator('.record-list')).not.toContainText(/警戒|偏高|标准区间/);
   await page.getByRole('link', { name: '宫缩计时', exact: true }).click();
   await page.getByRole('button', { name: '开始本次宫缩' }).click();
   await page.reload();
@@ -157,7 +196,10 @@ test('孕期闭环：产检原子入账、体征、计时、就医卡和备份�
     fullPage: true,
   });
   await page.getByRole('button', { name: '切换日间模式' }).click();
-  await page.getByLabel('孕期记录类型').getByRole('link', { name: '产检安排', exact: true }).click();
+  await page
+    .getByLabel('孕期记录类型')
+    .getByRole('link', { name: '产检安排', exact: true })
+    .click();
   await page.screenshot({
     path: join(tmpdir(), `24years-pregnancy-checkups-${test.info().project.name}.png`),
     fullPage: true,
@@ -167,7 +209,7 @@ test('孕期闭环：产检原子入账、体征、计时、就医卡和备份�
   await page.getByRole('button', { name: '导出我的数据' }).click();
   const download = await downloadEvent;
   const raw = await readFile((await download.path())!, 'utf8');
-  expect(JSON.parse(raw).pregnancyRecords).toHaveLength(4);
+  expect(JSON.parse(raw).pregnancyRecords).toHaveLength(5);
   // Replace with a valid current-schema archive with different records.
   await page.evaluate(() => {
     const data = JSON.parse(localStorage.getItem('24years.family.v2')!);
@@ -182,7 +224,7 @@ test('孕期闭环：产检原子入账、体征、计时、就医卡和备份�
     mimeType: 'application/json',
     buffer: Buffer.from(raw),
   });
-  await expect(page.getByText(/4 条孕期记录/)).toBeVisible();
+  await expect(page.getByText(/5 条孕期记录/)).toBeVisible();
   await page.getByLabel('我理解恢复会替换当前记录').check();
   await page.getByRole('button', { name: '确认恢复备份' }).click();
   await page.getByRole('link', { name: '孕期记录', exact: true }).click();

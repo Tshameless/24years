@@ -2,7 +2,6 @@
 import { computed } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import VitalTrends from './VitalTrends.vue';
-import { assessVital } from '@/domain/vitalTrends';
 import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
 
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
@@ -11,7 +10,6 @@ import FormDraftNotice from '@/components/FormDraftNotice.vue';
 type Vital = Extract<PregnancyRecord, { type: 'vital' }>;
 const {
   records,
-  outcome,
   careDisabled: disabled,
   careMinDate,
   careMaxDate,
@@ -24,12 +22,6 @@ const {
 } = usePregnancyRecords();
 const labels = { weight: '体重（kg）', bloodPressure: '血压（mmHg）', glucose: '血糖（mmol/L）' };
 const glucoseContexts = ['空腹', '餐后1小时', '餐后2小时', '随机', '其他'];
-
-function assessItem(item: Vital) {
-  return assessVital(item.metric, item.value, item.secondary, item.context, {
-    postpartum: outcome.value?.kind === 'birth' && item.date >= outcome.value.date,
-  });
-}
 
 const entries = computed(() =>
   records.value
@@ -77,9 +69,7 @@ async function submit() {
     metric: form.metric,
     value: Number(form.value),
     secondary: form.metric === 'bloodPressure' ? Number(form.secondary) : null,
-    ...(form.metric === 'bloodPressure' && form.pulse.trim()
-      ? { pulse: Number(form.pulse) }
-      : {}),
+    ...(form.metric === 'bloodPressure' && form.pulse.trim() ? { pulse: Number(form.pulse) } : {}),
     notes: form.notes.trim(),
   };
 
@@ -109,7 +99,9 @@ async function submit() {
         <h2>体征历史</h2>
         <span class="tag">{{ entries.length }} 条</span>
       </div>
-      <p class="muted">保留测量值与常规参考区间供就医时核对，不替代临床诊断。</p>
+      <p class="muted">
+        整理原始测量值与场景，供就医时核对。本页不判断正常或异常；如有个人监测方案，请按医护人员的指导记录和处理。
+      </p>
       <p
         v-if="!entries.length"
         class="empty-state"
@@ -129,23 +121,12 @@ async function submit() {
             <div class="vital-value-group">
               <span class="numbers">
                 {{ item.value }}{{ item.secondary === null ? '' : ` / ${item.secondary}` }}
-                <small v-if="item.pulse !== undefined"> · 脉搏 {{ item.pulse }}</small>
+                <small v-if="item.pulse !== undefined">· 脉搏 {{ item.pulse }}</small>
               </span>
-              <span
-                class="tag"
-                :class="`vital-badge-${assessItem(item).level}`"
-              >
-                {{ assessItem(item).badge }}
-              </span>
+              <span class="tag">原始记录</span>
             </div>
           </div>
           <p class="muted">{{ item.date }} · {{ item.time || '时间未记录' }}</p>
-          <p
-            v-if="assessItem(item).level === 'warning'"
-            class="vital-warning-tip"
-          >
-            ⚠️ {{ assessItem(item).tip }}
-          </p>
           <p
             v-if="item.context"
             class="record-notes"
@@ -339,34 +320,3 @@ async function submit() {
     </section>
   </div>
 </template>
-
-<style scoped>
-.vital-value-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.vital-badge-warning {
-  background: var(--pink-light);
-  color: var(--primary);
-  border-color: var(--primary);
-  font-weight: 600;
-}
-
-.vital-badge-attention {
-  background: var(--surface);
-  color: var(--text);
-  border-color: var(--border);
-}
-
-.vital-warning-tip {
-  margin: 6px 0 8px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--primary);
-  background: var(--pink-light);
-  padding: 6px 10px;
-  border-radius: 4px;
-}
-</style>
