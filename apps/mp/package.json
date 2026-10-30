@@ -1,0 +1,40 @@
+{
+  "name": "24years-mp",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:mp-weixin": "unh dev mp-weixin",
+    "build:mp-weixin": "unh build mp-weixin",
+    "dev:h5": "unh dev h5",
+    "build:h5": "unh build h5",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@24years/domain": "workspace:*",
+    "@dcloudio/uni-app": "3.0.0-5020620260917001",
+    "@dcloudio/uni-components": "3.0.0-5020620260917001",
+    "@dcloudio/uni-h5": "3.0.0-5020620260917001",
+    "@dcloudio/uni-mp-weixin": "3.0.0-5020620260917001",
+    "vue": "3.4.21",
+    "vue-i18n": "9.6.2",
+    "vue-router": "4.5.1"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.4.31",
+    "@dcloudio/uni-cli-shared": "3.0.0-5020620260917001",
+    "@dcloudio/uni-stacktracey": "3.0.0-5020620260917001",
+    "@dcloudio/vite-plugin-uni": "3.0.0-5020620260917001",
+    "@types/node": "^24.19.2",
+    "@uni-helper/plugin-uni": "0.1.0",
+    "@uni-helper/unh": "^0.3.2",
+    "@uni-helper/uni-types": "^1.1.0",
+    "@vue/runtime-core": "3.4.21",
+    "@vue/tsconfig": "^0.9.1",
+    "miniprogram-api-typings": "^5.2.3",
+    "sass": "1.64.2",
+    "typescript": "5.9.3",
+    "vite": "5.2.8",
+    "vue-tsc": "^3.3.11"
+  }
+}
