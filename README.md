@@ -39,6 +39,23 @@ pnpm dev --host 127.0.0.1 --port 5173 --strictPort
 
 打开 <http://127.0.0.1:5173>。开发结构、检查命令和下一步计划见 [Web 开发说明](apps/web/README.md)。下文描述的是完整产品愿景，不代表所有功能已经实现。
 
+### 小程序端（apps/mp）
+
+使用 uni-app + Vue 3 + TypeScript 编译到微信小程序，业务规则与 Web 端共用 [`packages/domain`](packages/domain) 的领域层，不重复实现：
+
+```powershell
+cd apps/mp
+pnpm build:mp-weixin   # 产物在 apps/mp/dist/build/mp-weixin
+pnpm dev:mp-weixin     # 监听模式
+pnpm type-check
+```
+
+用微信开发者工具导入 `apps/mp/dist/build/mp-weixin` 运行；真机预览与上传前需在 `apps/mp/src/manifest.json` 的 `mp-weixin.appid` 填写自己的小程序 AppID。
+
+已落地：今日陪伴（孕周、倒计时、今日打卡、账本摘要）、日常计划、家庭账本、孕期记录（产检、体征、胎动、宫缩计时、待产、症状、营养、心理自查、超声、亲子联结、就医卡）、儿童档案与生长记录、家庭档案、全周期衔接（分娩沟通计划、孕期结束、产后照护交接）、数据备份与恢复。
+
+小程序端当前为**本机存储**（`uni` 同步存储，键 `24years.family.v2`），尚未接入账号同步与双人协作；领域层已把存储与文件下载抽象为可注入适配（`packages/domain/src/storage.ts`、`backup.ts`），接入云端时无需改动业务逻辑。医学与政策相关能力同样不产出诊断结论。
+
 ---
 
 ## 🌟 项目愿景与核心特色
