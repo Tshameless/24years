@@ -319,6 +319,240 @@ function togglePacking(record: PackingRecord): void {
 function removePacking(record: PackingRecord): void {
   applyPregnancy({ type: 'pregnancy', before: record, value: null });
 }
+
+// 其他记录：症状、营养、心理自查、超声、亲子联结、就医卡
+const weekRange = Array.from({ length: 43 }, (_, index) => index);
+const dayRange = Array.from({ length: 7 }, (_, index) => index);
+const otherType = ref<'symptom' | 'nutrition' | 'mentalScreening' | 'ultrasound' | 'bonding' | 'medical'>(
+  'symptom',
+);
+const otherTypes = [
+  { value: 'symptom', label: '症状' },
+  { value: 'nutrition', label: '营养' },
+  { value: 'mentalScreening', label: '心理自查' },
+  { value: 'ultrasound', label: '超声' },
+  { value: 'bonding', label: '亲子联结' },
+  { value: 'medical', label: '就医卡' },
+] as const;
+
+const symptomPool = ['恶心呕吐', '腰酸背痛', '失眠', '水肿', '头晕', '便秘', '胃灼热', '腿抽筋'];
+const selectedSymptoms = ref<string[]>([]);
+const symptomSeverity = ref<'mild' | 'moderate' | 'severe'>('mild');
+const symptomNotes = ref('');
+
+const nutritionWater = ref(false);
+const nutritionProtein = ref(false);
+const nutritionVegetables = ref(false);
+const nutritionSupplement = ref(false);
+const nutritionNotes = ref('');
+
+const screeningAnswers = ref<number[]>(Array.from({ length: 10 }, () => 0));
+const screeningSelfHarm = ref(false);
+const screeningVisibility = ref<'private' | 'shared'>('private');
+
+const ultrasoundWeeks = ref(0);
+const ultrasoundDays = ref(0);
+const ultrasoundFhr = ref('');
+const ultrasoundEfw = ref('');
+const ultrasoundPresentation = ref('');
+const ultrasoundNotes = ref('');
+
+const bondingTitle = ref('');
+const bondingMinutes = ref('');
+const bondingNotes = ref('');
+
+const medicalHospital = ref('');
+const medicalContact = ref('');
+const medicalPhone = ref('');
+const medicalBloodType = ref('');
+const medicalObstetrician = ref('');
+const medicalObstetricPhone = ref('');
+const medicalNotes = ref('');
+
+const screeningScore = computed(() =>
+  screeningAnswers.value.reduce((sum, answer) => sum + answer, 0),
+);
+
+function toggleSymptom(item: string): void {
+  selectedSymptoms.value = selectedSymptoms.value.includes(item)
+    ? selectedSymptoms.value.filter((entry) => entry !== item)
+    : [...selectedSymptoms.value, item];
+}
+
+function onScreeningAnswer(index: number, event: any): void {
+  const next = [...screeningAnswers.value];
+
+  next[index] = Number(event.detail.value);
+  screeningAnswers.value = next;
+}
+
+function saveOther(): void {
+  const date = today;
+
+  if (otherType.value === 'symptom') {
+    if (selectedSymptoms.value.length === 0) {
+      uni.showToast({ title: '请至少选择一个症状', icon: 'none' });
+
+      return;
+    }
+
+    applyPregnancy({
+      type: 'pregnancy',
+      before: null,
+      value: {
+        id: createId(),
+        type: 'symptom',
+        date,
+        symptoms: [...selectedSymptoms.value],
+        severity: symptomSeverity.value,
+        notes: symptomNotes.value.trim(),
+      },
+    });
+    selectedSymptoms.value = [];
+    symptomNotes.value = '';
+  } else if (otherType.value === 'nutrition') {
+    applyPregnancy({
+      type: 'pregnancy',
+      before: null,
+      value: {
+        id: createId(),
+        type: 'nutrition',
+        date,
+        water: nutritionWater.value,
+        protein: nutritionProtein.value,
+        vegetables: nutritionVegetables.value,
+        supplement: nutritionSupplement.value,
+        notes: nutritionNotes.value.trim(),
+      },
+    });
+    nutritionNotes.value = '';
+  } else if (otherType.value === 'mentalScreening') {
+    applyPregnancy({
+      type: 'pregnancy',
+      before: null,
+      value: {
+        id: createId(),
+        type: 'mentalScreening',
+        date,
+        score: screeningScore.value,
+        selfHarm: screeningSelfHarm.value,
+        answers: [...screeningAnswers.value],
+        notes: '',
+        visibility: screeningVisibility.value,
+      },
+    });
+  } else if (otherType.value === 'ultrasound') {
+    applyPregnancy({
+      type: 'pregnancy',
+      before: null,
+      value: {
+        id: createId(),
+        type: 'ultrasound',
+        date,
+        gestationWeeks: ultrasoundWeeks.value,
+        gestationDays: ultrasoundDays.value,
+        fhr: ultrasoundFhr.value ? Number(ultrasoundFhr.value) : undefined,
+        efw: ultrasoundEfw.value ? Number(ultrasoundEfw.value) : undefined,
+        presentation: ultrasoundPresentation.value.trim() || undefined,
+        notes: ultrasoundNotes.value.trim(),
+      },
+    });
+    ultrasoundNotes.value = '';
+  } else if (otherType.value === 'bonding') {
+    const minutes = Number(bondingMinutes.value);
+
+    if (!bondingTitle.value.trim()) {
+      uni.showToast({ title: '请填写互动内容', icon: 'none' });
+
+      return;
+    }
+
+    if (!Number.isInteger(minutes) || minutes <= 0) {
+      uni.showToast({ title: '请填写时长（分钟）', icon: 'none' });
+
+      return;
+    }
+
+    applyPregnancy({
+      type: 'pregnancy',
+      before: null,
+      value: {
+        id: createId(),
+        type: 'bonding',
+        date,
+        title: bondingTitle.value.trim(),
+        minutes,
+        notes: bondingNotes.value.trim(),
+      },
+    });
+    bondingTitle.value = '';
+    bondingMinutes.value = '';
+    bondingNotes.value = '';
+  } else {
+    if (!medicalHospital.value.trim()) {
+      uni.showToast({ title: '请填写医院名称', icon: 'none' });
+
+      return;
+    }
+
+    applyPregnancy({
+      type: 'pregnancy',
+      before: null,
+      value: {
+        id: createId(),
+        type: 'medical',
+        hospital: medicalHospital.value.trim(),
+        contact: medicalContact.value.trim(),
+        phone: medicalPhone.value.trim(),
+        bloodType: medicalBloodType.value.trim() || undefined,
+        obstetrician: medicalObstetrician.value.trim() || undefined,
+        obstetricPhone: medicalObstetricPhone.value.trim() || undefined,
+        notes: medicalNotes.value.trim(),
+      },
+    });
+    medicalNotes.value = '';
+  }
+
+  uni.showToast({ title: '已保存', icon: 'success' });
+}
+
+function removeOther(record: PregnancyRecord): void {
+  uni.showModal({
+    title: '删除记录',
+    content: '删除后无法恢复，确定继续？',
+    success: (result) => {
+      if (result.confirm) {
+        applyPregnancy({ type: 'pregnancy', before: record, value: null });
+      }
+    },
+  });
+}
+
+function describeOther(record: PregnancyRecord): string {
+  switch (record.type) {
+    case 'symptom':
+      return `症状：${record.symptoms.join('、')}（${{ mild: '轻', moderate: '中', severe: '重' }[record.severity]}）`;
+    case 'nutrition':
+      return `营养：${[
+        record.water ? '饮水' : '',
+        record.protein ? '蛋白' : '',
+        record.vegetables ? '蔬菜' : '',
+        record.supplement ? '补剂' : '',
+      ]
+        .filter(Boolean)
+        .join('、') || '未勾选'}`;
+    case 'mentalScreening':
+      return `心理自查：${record.score} 分 · ${record.visibility === 'private' ? '仅自己' : '家庭可见'}`;
+    case 'ultrasound':
+      return `超声：孕 ${record.gestationWeeks} 周 ${record.gestationDays} 天`;
+    case 'bonding':
+      return `亲子联结：${record.title} · ${record.minutes} 分钟`;
+    case 'medical':
+      return `就医卡：${record.hospital}`;
+    default:
+      return record.type;
+  }
+}
 </script>
 
 <template>
@@ -481,12 +715,161 @@ function removePacking(record: PackingRecord): void {
     <!-- 其他 -->
     <view v-if="tab === 'other'" class="card">
       <view class="section-title">其他记录</view>
-      <view v-if="otherRecords.length === 0" class="muted">暂无心理、营养、超声、症状等其他记录。</view>
+      <view class="subtabs">
+        <text
+          v-for="item in otherTypes"
+          :key="item.value"
+          :class="['tab', { active: otherType === item.value }]"
+          @click="otherType = item.value"
+        >
+          {{ item.label }}
+        </text>
+      </view>
+
+      <view v-if="otherType === 'symptom'">
+        <view class="chips">
+          <text
+            v-for="item in symptomPool"
+            :key="item"
+            :class="['chip', { active: selectedSymptoms.includes(item) }]"
+            @click="toggleSymptom(item)"
+          >
+            {{ item }}
+          </text>
+        </view>
+        <view class="field">
+          <text>程度</text>
+          <picker
+            mode="selector"
+            :range="['轻', '中', '重']"
+            :value="['mild', 'moderate', 'severe'].indexOf(symptomSeverity)"
+            @change="(e: any) => (symptomSeverity = (['mild', 'moderate', 'severe'] as const)[e.detail.value])"
+          >
+            <text class="picker-value">
+              {{ { mild: '轻', moderate: '中', severe: '重' }[symptomSeverity] }}
+            </text>
+          </picker>
+        </view>
+        <input v-model="symptomNotes" class="input" placeholder="备注（可选）" />
+      </view>
+
+      <view v-if="otherType === 'nutrition'">
+        <view class="field">
+          <text>饮水充足</text>
+          <switch :checked="nutritionWater" color="#4caf50" @change="(e: any) => (nutritionWater = e.detail.value)" />
+        </view>
+        <view class="field">
+          <text>蛋白质摄入</text>
+          <switch :checked="nutritionProtein" color="#4caf50" @change="(e: any) => (nutritionProtein = e.detail.value)" />
+        </view>
+        <view class="field">
+          <text>蔬菜摄入</text>
+          <switch :checked="nutritionVegetables" color="#4caf50" @change="(e: any) => (nutritionVegetables = e.detail.value)" />
+        </view>
+        <view class="field">
+          <text>服用补剂</text>
+          <switch :checked="nutritionSupplement" color="#4caf50" @change="(e: any) => (nutritionSupplement = e.detail.value)" />
+        </view>
+        <input v-model="nutritionNotes" class="input" placeholder="备注（可选）" />
+      </view>
+
+      <view v-if="otherType === 'mentalScreening'">
+        <text class="muted">10 题自评，每题 0-3 分，仅供家庭记录，不构成诊断。</text>
+        <view v-for="(_, index) in screeningAnswers" :key="index" class="field">
+          <text>第 {{ index + 1 }} 题</text>
+          <picker
+            mode="selector"
+            :range="['0', '1', '2', '3']"
+            :value="screeningAnswers[index]"
+            @change="(e: any) => onScreeningAnswer(index, e)"
+          >
+            <text class="picker-value">{{ screeningAnswers[index] }}</text>
+          </picker>
+        </view>
+        <view class="field">
+          <text>总分</text>
+          <text class="picker-value">{{ screeningScore }}</text>
+        </view>
+        <view class="field">
+          <text>有自伤想法</text>
+          <switch :checked="screeningSelfHarm" color="#e0533d" @change="(e: any) => (screeningSelfHarm = e.detail.value)" />
+        </view>
+        <view class="field">
+          <text>可见范围</text>
+          <picker
+            mode="selector"
+            :range="['仅自己', '家庭可见']"
+            :value="screeningVisibility === 'private' ? 0 : 1"
+            @change="(e: any) => (screeningVisibility = e.detail.value === 0 ? 'private' : 'shared')"
+          >
+            <text class="picker-value">{{ screeningVisibility === 'private' ? '仅自己' : '家庭可见' }}</text>
+          </picker>
+        </view>
+      </view>
+
+      <view v-if="otherType === 'ultrasound'">
+        <view class="field">
+          <text>检查孕周</text>
+          <picker
+            mode="selector"
+            :range="weekRange"
+            :value="ultrasoundWeeks"
+            @change="(e: any) => (ultrasoundWeeks = Number(e.detail.value))"
+          >
+            <text class="picker-value">{{ ultrasoundWeeks }} 周</text>
+          </picker>
+        </view>
+        <view class="field">
+          <text>额外天数</text>
+          <picker
+            mode="selector"
+            :range="dayRange"
+            :value="ultrasoundDays"
+            @change="(e: any) => (ultrasoundDays = Number(e.detail.value))"
+          >
+            <text class="picker-value">{{ ultrasoundDays }} 天</text>
+          </picker>
+        </view>
+        <view class="field">
+          <text>胎心 (次/分)</text>
+          <input v-model="ultrasoundFhr" class="inline-input" type="number" placeholder="选填" />
+        </view>
+        <view class="field">
+          <text>估算体重 (g)</text>
+          <input v-model="ultrasoundEfw" class="inline-input" type="number" placeholder="选填" />
+        </view>
+        <input v-model="ultrasoundPresentation" class="input" placeholder="胎位（选填）" />
+        <input v-model="ultrasoundNotes" class="input" placeholder="备注（可选）" />
+      </view>
+
+      <view v-if="otherType === 'bonding'">
+        <input v-model="bondingTitle" class="input" placeholder="互动内容，如胎教音乐" />
+        <view class="field">
+          <text>时长（分钟）</text>
+          <input v-model="bondingMinutes" class="inline-input" type="number" placeholder="15" />
+        </view>
+        <input v-model="bondingNotes" class="input" placeholder="备注（可选）" />
+      </view>
+
+      <view v-if="otherType === 'medical'">
+        <input v-model="medicalHospital" class="input" placeholder="医院名称" />
+        <input v-model="medicalContact" class="input" placeholder="联系人（选填）" />
+        <input v-model="medicalPhone" class="input" placeholder="联系电话（选填）" />
+        <input v-model="medicalBloodType" class="input" placeholder="血型（选填）" />
+        <input v-model="medicalObstetrician" class="input" placeholder="产科医生（选填）" />
+        <input v-model="medicalObstetricPhone" class="input" placeholder="医生电话（选填）" />
+        <input v-model="medicalNotes" class="input" placeholder="备注（可选）" />
+      </view>
+
+      <button class="submit" size="mini" type="primary" @click="saveOther">保存记录</button>
+
+      <view v-if="otherRecords.length === 0" class="muted">暂无其他记录。</view>
       <view v-for="record in otherRecords" :key="record.id" class="record">
         <view class="row">
-          <text>{{ record.type }}</text>
+          <text>{{ describeOther(record) }}</text>
           <text class="muted">{{ 'date' in record ? record.date : '' }}</text>
         </view>
+        <button size="mini" type="warn" @click="removeOther(record)">删除</button>
       </view>
     </view>
   </view>
@@ -556,6 +939,33 @@ function removePacking(record: PackingRecord): void {
   display: flex;
   gap: 12rpx;
   margin-top: 10rpx;
+}
+
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  padding-bottom: 16rpx;
+}
+
+.chip {
+  padding: 8rpx 20rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 28rpx;
+  color: #6b7280;
+}
+
+.chip.active {
+  border-color: #4caf50;
+  color: #ffffff;
+  background-color: #4caf50;
 }
 
 .timer {
