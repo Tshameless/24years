@@ -7,8 +7,8 @@ import { randomUUID } from 'node:crypto';
 import { openDatabase } from './database.ts';
 import { ApiError, createService, hash } from './service.ts';
 import { createApplication } from './http.ts';
-import { emptyFamily, type FamilyTask } from '../src/domain/family.ts';
-import { applyFamilyDelta } from '../src/domain/collaboration.ts';
+import { emptyFamily, type FamilyTask } from '../../../packages/domain/src/family.ts';
+import { applyFamilyDelta } from '../../../packages/domain/src/collaboration.ts';
 
 async function fixture() {
   const db = openDatabase(':memory:');

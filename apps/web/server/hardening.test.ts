@@ -7,7 +7,7 @@ import { clientAddress, createRateLimiter } from './rate-limit.ts';
 import { openDatabase } from './database.ts';
 import { createApplication } from './http.ts';
 import { createService } from './service.ts';
-import { emptyFamily } from '../src/domain/family.ts';
+import { emptyFamily } from '../../../packages/domain/src/family.ts';
 import { pruneBackups } from './backup-retention.ts';
 import { compressionEncoding } from './compression.ts';
 import { validateDeploymentOrigin } from './deployment.ts';

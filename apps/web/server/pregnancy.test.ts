@@ -8,7 +8,7 @@ import {
   decodeFamily,
   type PregnancyChange,
   type PregnancyRecord,
-} from '../src/domain/family.ts';
+} from '../../../packages/domain/src/family.ts';
 
 test('孕期协作支持幂等原子入账、冲突回滚、只读权限和备份恢复', async () => {
   const db = openDatabase(':memory:');

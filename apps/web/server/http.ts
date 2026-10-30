@@ -6,7 +6,7 @@ import { openDatabase } from './database.ts';
 import { clientAddress, createRateLimiter } from './rate-limit.ts';
 import { compressionEncoding } from './compression.ts';
 import { serveStatic } from './static.ts';
-import { MAX_BACKUP_BYTES } from '../src/domain/capacity.ts';
+import { MAX_BACKUP_BYTES } from '../../../packages/domain/src/capacity.ts';
 
 async function readBody(
   request: IncomingMessage,

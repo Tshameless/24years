@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
-import type { Account, SessionState } from '../src/domain/collaboration.ts';
+import type { Account, SessionState } from '../../../packages/domain/src/collaboration.ts';
 import { transaction } from './database.ts';
 import { deleteFamilyTables, familyBlobData, recordDeltaEntries } from './records-store.ts';
 

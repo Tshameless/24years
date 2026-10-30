@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { copyDatabase, verifyDatabase } from './backup.ts';
 import { openDatabase } from './database.ts';
 import { createService } from './service.ts';
-import { emptyFamily } from '../src/domain/family.ts';
+import { emptyFamily } from '../../../packages/domain/src/family.ts';
 
 test('在线 WAL 数据库一致性备份、恢复可登录且不恢复旧会话或邀请', async () => {
   const directory = mkdtempSync(join(tmpdir(), '24years-backup-'));

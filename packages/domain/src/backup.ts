@@ -15,11 +15,36 @@ export function readFamilyBackup(raw: string): FamilyData {
   }
 }
 
+export interface BackupDownloadRequest {
+  raw: string;
+  filename: string;
+  type: string;
+}
+
+export type BackupDownloader = (request: BackupDownloadRequest) => void;
+
+let activeDownloader: BackupDownloader | null = null;
+
+/** 小程序等没有 DOM 的宿主注入自己的保存方式，未注入时使用浏览器下载。 */
+export function setBackupDownloader(downloader: BackupDownloader): void {
+  activeDownloader = downloader;
+}
+
+export function resetBackupDownloader(): void {
+  activeDownloader = null;
+}
+
 export function downloadBackup(
   raw: string,
   filename: string,
   type = 'application/json;charset=utf-8',
 ) {
+  if (activeDownloader) {
+    activeDownloader({ raw, filename, type });
+
+    return;
+  }
+
   const url = URL.createObjectURL(new Blob([raw], { type }));
   const link = document.createElement('a');
   link.href = url;

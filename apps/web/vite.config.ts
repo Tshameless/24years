@@ -49,6 +49,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      '@/domain': fileURLToPath(new URL('../../packages/domain/src', import.meta.url)),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },

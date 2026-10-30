@@ -15,6 +15,7 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@/domain/*": ["../../packages/domain/src/*"],
       "@/*": ["src/*"]
     },
     "types": ["node"]

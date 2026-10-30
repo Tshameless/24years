@@ -5,7 +5,7 @@ import type {
   Member,
   SessionState,
   SharedFamily,
-} from '../src/domain/collaboration.ts';
+} from '../../../packages/domain/src/collaboration.ts';
 import { ApiError, createAccountHandlers, hash, requireValue, type Body } from './auth.ts';
 import { createFamilyMutations } from './family-mutations.ts';
 import { decodeFamilyRecords, readDeltaChanges } from './records-store.ts';

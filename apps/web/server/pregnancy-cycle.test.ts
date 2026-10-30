@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { openDatabase } from './database.ts';
 import { ApiError, createService } from './service.ts';
-import { emptyFamily, type PregnancyChange, type PregnancyRecord } from '../src/domain/family.ts';
+import { emptyFamily, type PregnancyChange, type PregnancyRecord } from '../../../packages/domain/src/family.ts';
 
 test('生命周期同步、角色权限、并发、幂等与完整恢复', async () => {
   const db = openDatabase(':memory:');

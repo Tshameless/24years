@@ -7,8 +7,8 @@ import {
   type FamilyData,
   type FamilyTask,
   type PregnancyRecord,
-} from '../src/domain/family.ts';
-import type { FamilyDeltaEntry, FamilyDeltaRecordType } from '../src/domain/collaboration.ts';
+} from '../../../packages/domain/src/family.ts';
+import type { FamilyDeltaEntry, FamilyDeltaRecordType } from '../../../packages/domain/src/collaboration.ts';
 
 export function initRelationalSchema(db: DatabaseSync) {
   db.exec(`

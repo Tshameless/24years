@@ -16,7 +16,7 @@ import {
   type FamilyData,
   type FamilyTask,
   type PregnancyChange,
-} from '../src/domain/family.ts';
+} from '../../../packages/domain/src/family.ts';
 import type {
   Account,
   FamilyDeltaRecordType,
@@ -24,13 +24,13 @@ import type {
   Member,
   SessionState,
   SharedFamily,
-} from '../src/domain/collaboration.ts';
+} from '../../../packages/domain/src/collaboration.ts';
 import {
   familyBlobBytes,
   MAX_CLOUD_BYTES,
   MAX_FAMILY_COLLECTION_RECORDS,
   withinFamilyCollectionLimits,
-} from '../src/domain/capacity.ts';
+} from '../../../packages/domain/src/capacity.ts';
 import { transaction } from './database.ts';
 import { ApiError, hash, requireValue, type Body } from './auth.ts';
 import {

@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { closeSync, existsSync, mkdirSync, openSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { decodeFamilyMetadata } from '../src/domain/family.ts';
+import { decodeFamilyMetadata } from '../../../packages/domain/src/family.ts';
 import { decodeFamilyRecords } from './records-store.ts';
 
 // Runtime requires Node 24.9+. The project's Node 22 type definitions predate readOnly.

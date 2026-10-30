@@ -1,4 +1,5 @@
 import type { FamilyChange } from './collaboration';
+import { getDomainStorage } from './storage';
 
 export const OUTBOX_STORAGE_PREFIX = '24years.outbox.v2:';
 
@@ -32,7 +33,7 @@ export function outboxStorageKey(familyId: string): string {
 
 export function readOutbox(familyId: string): OutboxEntry[] {
   try {
-    const raw = localStorage.getItem(outboxStorageKey(familyId));
+    const raw = getDomainStorage().getItem(outboxStorageKey(familyId));
 
     if (!raw) {
       return [];
@@ -62,10 +63,12 @@ export function readOutbox(familyId: string): OutboxEntry[] {
 
 export function writeOutbox(familyId: string, entries: OutboxEntry[]): void {
   try {
+    const storage = getDomainStorage();
+
     if (entries.length === 0) {
-      localStorage.removeItem(outboxStorageKey(familyId));
+      storage.removeItem(outboxStorageKey(familyId));
     } else {
-      localStorage.setItem(outboxStorageKey(familyId), JSON.stringify(entries));
+      storage.setItem(outboxStorageKey(familyId), JSON.stringify(entries));
     }
   } catch {
     throw new OutboxStorageError();
@@ -104,7 +107,7 @@ export function removeOutboxEntry(familyId: string, entryIdOrOperationId: string
 
 export function clearFamilyOutbox(familyId: string): void {
   try {
-    localStorage.removeItem(outboxStorageKey(familyId));
+    getDomainStorage().removeItem(outboxStorageKey(familyId));
   } catch {
     // Ignore storage errors
   }
