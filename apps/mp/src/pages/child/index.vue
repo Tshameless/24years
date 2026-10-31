@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 
 import { createId } from '@24years/domain/id';
 import { formatGrowthAge, type ChildGrowthRecord } from '@24years/domain/growth';
+import { growthCsv } from '@24years/domain/growthReport';
 import { localDate } from '@24years/domain/primitives';
 import type { Child, ChildBloodType, ChildGender } from '@24years/domain/child';
 
@@ -163,6 +164,24 @@ function removeGrowth(child: Child, recordId: string): void {
 function toggleGrowth(childId: string): void {
   activeChildId.value = activeChildId.value === childId ? null : childId;
 }
+
+/** 导出为 CSV：小程序无法直接落盘，统一复制到剪贴板后粘贴到表格应用。 */
+function exportGrowth(child: Child): void {
+  const records = child.growthRecords ?? [];
+
+  if (!records.length) {
+    uni.showToast({ title: '暂无生长测量记录', icon: 'none' });
+
+    return;
+  }
+
+  uni.setClipboardData({
+    data: growthCsv(records),
+    success: () => {
+      uni.showToast({ title: 'CSV 已复制，可粘贴到表格应用', icon: 'none' });
+    },
+  });
+}
 </script>
 
 <template>
@@ -227,6 +246,15 @@ function toggleGrowth(childId: string): void {
           </view>
           <button size="mini" type="warn" @click="removeGrowth(child, record.id)">删除</button>
         </view>
+
+        <button
+          v-if="(child.growthRecords ?? []).length"
+          class="submit"
+          size="mini"
+          @click="exportGrowth(child)"
+        >
+          导出生长记录 CSV
+        </button>
       </view>
     </view>
 

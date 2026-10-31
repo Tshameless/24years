@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import { weekDays } from '@24years/domain/tasks';
 import { localDate } from '@24years/domain/primitives';
+import { dueReminders, taskTemplates } from '@24years/domain/taskReminders';
 
 import {
   addTask,
@@ -26,6 +27,54 @@ const endDate = ref('');
 const sortedTasks = computed(() =>
   [...familyStore.data.tasks].sort((a, b) => b.date.localeCompare(a.date)),
 );
+
+/** 到期提醒：只提示今天已到时间、未完成、且未指派他人的计划。每 30 秒刷新一次时钟。 */
+function clockText(): string {
+  const now = new Date();
+
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
+const clock = ref(clockText());
+let timer: ReturnType<typeof setInterval> | null = null;
+
+const dueNow = computed(() =>
+  dueReminders(
+    familyStore.data.tasks,
+    localDate(),
+    clock.value,
+    !!familyStore.data.profile?.quietMode,
+    familyStore.data.profile?.parentRole ?? undefined,
+  ),
+);
+
+const dueIds = computed(() => new Set(dueNow.value.map((task) => task.id)));
+
+function addFromTemplate(item: (typeof taskTemplates)[number]): void {
+  const weekday = new Date().getDay() || 7;
+
+  addTask({
+    title: item.title,
+    date: today,
+    time: item.time,
+    repeat: item.repeat,
+    weekdays: item.repeat === 'weekly' ? [weekday] : [],
+    completedDates: [],
+  });
+  uni.showToast({ title: '已添加到今日计划', icon: 'none' });
+}
+
+onMounted(() => {
+  timer = setInterval(() => {
+    clock.value = clockText();
+  }, 30000);
+});
+
+onUnmounted(() => {
+  if (timer) {
+    clearInterval(timer);
+  }
+});
 
 function resetForm(): void {
   editingId.value = null;
@@ -142,6 +191,35 @@ const repeatOptions = [
 
 <template>
   <view class="page">
+    <view v-if="dueNow.length" class="card reminder">
+      <view class="row">
+        <text class="section-title">计划提醒 · {{ dueNow.length }} 项已到时间</text>
+      </view>
+      <view v-for="task in dueNow" :key="task.id" class="row due-row">
+        <text>{{ task.time }} · {{ task.title }}</text>
+        <button size="mini" type="primary" @click="toggleTaskCompletion(task.id, today)">
+          打卡
+        </button>
+      </view>
+      <view class="muted">
+        仅显示今天到时且未完成、未指派或由你负责的计划。按设备当地时间检查；关闭页面或后台休眠时不保证提醒，不能用于紧急医疗提醒。
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">常用计划</view>
+      <view class="templates">
+        <view
+          v-for="item in taskTemplates"
+          :key="item.title"
+          class="chip"
+          @click="addFromTemplate(item)"
+        >
+          {{ item.title }}
+        </view>
+      </view>
+    </view>
+
     <view class="card">
       <view class="row">
         <text class="section-title">日常计划</text>
@@ -298,5 +376,30 @@ const repeatOptions = [
   border-color: #4caf50;
   color: #ffffff;
   background-color: #4caf50;
+}
+
+.reminder {
+  background: #fdf3f2;
+}
+
+.due-row {
+  align-items: center;
+  justify-content: space-between;
+  padding: 12rpx 0;
+  border-bottom: 1rpx solid #f6e7e5;
+  font-size: 27rpx;
+}
+
+.templates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.chip {
+  padding: 12rpx 22rpx;
+  background: #f0f1f3;
+  border-radius: 24rpx;
+  font-size: 25rpx;
 }
 </style>

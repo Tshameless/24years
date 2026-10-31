@@ -25,6 +25,18 @@
       }
     },
     {
+      "path": "pages/pregnancy/trends",
+      "style": {
+        "navigationBarTitleText": "体征趋势"
+      }
+    },
+    {
+      "path": "pages/pregnancy/schedule",
+      "style": {
+        "navigationBarTitleText": "产检排期"
+      }
+    },
+    {
       "path": "pages/mine/index",
       "style": {
         "navigationBarTitleText": "我的"

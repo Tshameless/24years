@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { createId } from '@24years/domain/id';
 import { localDate } from '@24years/domain/primitives';
 import type { PregnancyRecord } from '@24years/domain/pregnancy';
+import { analyzeContractions } from '@24years/domain/contractions';
 
 import { applyPregnancy, familyStore } from '@/store/family';
 
@@ -25,6 +26,11 @@ const tabs = [
   { value: 'packing', label: '待产' },
   { value: 'other', label: '其他' },
 ] as const;
+
+/** 跳转到体征趋势、产检排期这两个独立页面。 */
+function go(page: string): void {
+  uni.navigateTo({ url: `/pages/pregnancy/${page}` });
+}
 
 const records = computed(() => familyStore.data.pregnancyRecords);
 const checkups = computed(() =>
@@ -70,6 +76,31 @@ const contractionHistory = computed(() =>
     )
     .sort((a, b) => b.startedAt - a.startedAt)
     .slice(0, 10),
+);
+
+// 宫缩规律分析：按 ACOG 的 5-1-1（初产妇）/ 4-1-1（经产妇）参考。
+const contractionEntries = computed(() =>
+  records.value
+    .filter(
+      (record): record is Extract<PregnancyRecord, { type: 'contraction' }> =>
+        record.type === 'contraction',
+    )
+    .sort((a, b) => b.startedAt - a.startedAt),
+);
+const ruleOptions = [
+  { value: 0, label: '初产妇：5-1-1' },
+  { value: 1, label: '经产妇：4-1-1' },
+] as const;
+const ruleIndex = ref(0);
+const contractionAnalysis = computed(() =>
+  analyzeContractions(contractionEntries.value, Date.now(), {
+    multiparous: ruleIndex.value === 1,
+  }),
+);
+const analysisIntervalText = computed(() =>
+  contractionAnalysis.value.avgIntervalMinutes === null
+    ? '—'
+    : `${contractionAnalysis.value.avgIntervalMinutes.toFixed(1)} 分钟`,
 );
 
 // 产检
@@ -557,6 +588,11 @@ function describeOther(record: PregnancyRecord): string {
 
 <template>
   <view class="page">
+    <view class="quick-links">
+      <view class="quick" @click="go('trends')">体征趋势图 ›</view>
+      <view class="quick" @click="go('schedule')">产检排期 ›</view>
+    </view>
+
     <view class="tabs">
       <text
         v-for="item in tabs"
@@ -683,6 +719,48 @@ function describeOther(record: PregnancyRecord): string {
       <view v-else>
         <text class="muted">记录一次宫缩的开始与结束时间，仅作家庭记录参考。</text>
         <button class="submit" size="mini" type="primary" @click="startContraction">开始计时</button>
+      </view>
+
+      <view class="pattern-card">
+        <view class="row">
+          <text class="section-title">规律分析</text>
+          <text class="badge">{{ contractionAnalysis.badge }}</text>
+        </view>
+
+        <picker
+          mode="selector"
+          :range="ruleOptions"
+          range-key="label"
+          :value="ruleIndex"
+          @change="ruleIndex = $event.detail.value"
+        >
+          <view class="field">
+            <text class="muted">参考规则</text>
+            <text>{{ ruleOptions[ruleIndex].label }}</text>
+          </view>
+        </picker>
+
+        <view class="row pattern-row">
+          <text class="muted">已完成次数</text>
+          <text>{{ contractionAnalysis.completedCount }} 次</text>
+        </view>
+        <view class="row pattern-row">
+          <text class="muted">平均持续</text>
+          <text>{{ contractionAnalysis.avgDurationSeconds }} 秒</text>
+        </view>
+        <view class="row pattern-row">
+          <text class="muted">平均间隔</text>
+          <text>{{ analysisIntervalText }}</text>
+        </view>
+
+        <view class="advice">
+          <text class="strong">{{ contractionAnalysis.title }}</text>
+          <text class="muted">{{ contractionAnalysis.advice }}</text>
+        </view>
+
+        <view class="muted">
+          依据 {{ contractionAnalysis.rule }} 参考，按近 3 小时内的已完成记录判断，只作整理参考。出现破水、出血或规律腹痛请及时联系医院。
+        </view>
       </view>
 
       <view v-for="record in contractionHistory" :key="record.id" class="record">
@@ -980,8 +1058,59 @@ function describeOther(record: PregnancyRecord): string {
   color: #e0533d;
 }
 
+.quick-links {
+  display: flex;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.quick {
+  flex: 1;
+  padding: 20rpx 0;
+  text-align: center;
+  background: #fff;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: #4caf50;
+}
+
 .done {
   color: #9ca3af;
   text-decoration: line-through;
+}
+
+.pattern-card {
+  margin-top: 24rpx;
+  padding: 20rpx;
+  background: #f7f8fa;
+  border-radius: 12rpx;
+}
+
+.badge {
+  padding: 4rpx 16rpx;
+  background: #eef7ef;
+  border-radius: 16rpx;
+  font-size: 22rpx;
+  color: #4caf50;
+}
+
+.pattern-row {
+  justify-content: space-between;
+  padding: 10rpx 0;
+  font-size: 26rpx;
+}
+
+.advice {
+  margin: 16rpx 0;
+  padding: 16rpx;
+  background: #fff;
+  border-radius: 10rpx;
+}
+
+.strong {
+  display: block;
+  margin-bottom: 8rpx;
+  font-size: 27rpx;
+  font-weight: 600;
 }
 </style>
