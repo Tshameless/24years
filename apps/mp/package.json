@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@24years/domain": "workspace:*",
+    "@tencent-ai/workbuddy-cloud-sdk": "dev",
     "@dcloudio/uni-app": "3.0.0-5020620260917001",
     "@dcloudio/uni-components": "3.0.0-5020620260917001",
     "@dcloudio/uni-h5": "3.0.0-5020620260917001",

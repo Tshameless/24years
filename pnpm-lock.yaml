@@ -25,6 +25,9 @@ importers:
       '@dcloudio/uni-mp-weixin':
         specifier: 3.0.0-5020620260917001
         version: 3.0.0-5020620260917001(postcss@8.5.32)(rollup@4.65.1)(vue@3.4.21(typescript@5.9.3))
+      '@tencent-ai/workbuddy-cloud-sdk':
+        specifier: dev
+        version: 0.1.4-dev.ca27990.202610161713
       vue:
         specifier: 3.4.21
         version: 3.4.21(typescript@5.9.3)
@@ -1586,6 +1589,10 @@ packages:
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^9.0.0 || ^10.0.0
+
+  '@tencent-ai/workbuddy-cloud-sdk@0.1.4-dev.ca27990.202610161713':
+    resolution: {integrity: sha512-HyrXFiilbYFxDGF5pvl1MhBYvE9QnK39uJjiiefX07k7ppl2UPKfl6KWaN9yIzD1DtAGycl3fXaYOzHmvlIMpg==}
+    engines: {node: '>=18'}
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -5820,6 +5827,8 @@ snapshots:
       espree: 10.4.0
       estraverse: 5.3.0
       picomatch: 4.0.7
+
+  '@tencent-ai/workbuddy-cloud-sdk@0.1.4-dev.ca27990.202610161713': {}
 
   '@types/chai@5.2.3':
     dependencies:
