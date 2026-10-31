@@ -30,12 +30,34 @@ function clone(data: FamilyData): FamilyData {
   return JSON.parse(JSON.stringify(data)) as FamilyData;
 }
 
+type FamilyChangeListener = () => void;
+
+const changeListeners = new Set<FamilyChangeListener>();
+
+/**
+ * 订阅本地数据变更。云同步层通过它感知写入并负责上传，
+ * store 本身不反向依赖云，离线也能正常工作。
+ */
+export function onFamilyChange(listener: FamilyChangeListener): () => void {
+  changeListeners.add(listener);
+
+  return () => {
+    changeListeners.delete(listener);
+  };
+}
+
+function notifyChange(): void {
+  changeListeners.forEach((listener) => listener());
+}
+
 function persist(): void {
   try {
     uni.setStorageSync(FAMILY_STORAGE_KEY, JSON.stringify(familyStore.data));
   } catch {
     uni.showToast({ title: '本机保存失败，请检查存储空间', icon: 'none' });
   }
+
+  notifyChange();
 }
 
 export function loadFamily(): void {

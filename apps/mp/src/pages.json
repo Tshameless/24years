@@ -43,6 +43,12 @@
       }
     },
     {
+      "path": "pages/collab/index",
+      "style": {
+        "navigationBarTitleText": "家庭共享"
+      }
+    },
+    {
       "path": "pages/profile/edit",
       "style": {
         "navigationBarTitleText": "家庭档案"

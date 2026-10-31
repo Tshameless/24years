@@ -16,4 +16,11 @@ export default defineConfig({
     // https://uni-helper.js.org/plugin-uni
     Uni(),
   ],
+  build: {
+    commonjsOptions: {
+      // 云服务诊断辅助文件是原生小程序风格的 CommonJS 源文件，
+      // 默认只处理 node_modules，不加入这里会解析不出具名导出。
+      include: [/node_modules/, /src[\\/]utils[\\/]workbuddy-cloud-diagnostics\.js$/],
+    },
+  },
 });

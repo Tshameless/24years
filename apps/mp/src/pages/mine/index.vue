@@ -5,6 +5,30 @@ import { localDate } from '@24years/domain/primitives';
 import type { PregnancyRecord } from '@24years/domain/pregnancy';
 
 import { applyPregnancy, familyStore, setProfile } from '@/store/family';
+import { collabStore } from '@/store/collab';
+import { isSignedIn } from '@/store/auth';
+
+const syncSummary = computed(() => {
+  if (!isSignedIn()) {
+    return '未登录：数据保存在这台设备，登录后可两人共享。';
+  }
+
+  if (collabStore.conflict) {
+    return '存在版本冲突，请在「家庭共享与同步」中选择保留哪份数据。';
+  }
+
+  if (!collabStore.spaceId) {
+    return '已登录：尚未加入家庭，加入后数据可与家人同步。';
+  }
+
+  if (collabStore.error) {
+    return `同步异常：${collabStore.error}`;
+  }
+
+  return collabStore.lastSyncedAt
+    ? `已与「${collabStore.spaceName}」同步 · ${collabStore.lastSyncedAt}`
+    : `已加入「${collabStore.spaceName}」`;
+});
 
 const today = localDate();
 const profile = computed(() => familyStore.data.profile);
@@ -140,11 +164,12 @@ const outcomeKindOptions = [
         <text class="section-title">{{ profile?.name || '未建档' }}</text>
         <text class="muted">{{ profile?.nickname || '' }}</text>
       </view>
-      <text class="muted">本机模式：数据保存在这台设备，账号同步能力待接入。</text>
+      <text class="muted">{{ syncSummary }}</text>
     </view>
 
     <view class="card">
       <view class="section-title">档案与数据</view>
+      <button class="entry" @click="go('/pages/collab/index')">家庭共享与同步</button>
       <button class="entry" @click="go('/pages/profile/edit')">家庭档案</button>
       <button class="entry" @click="go('/pages/child/index')">儿童档案</button>
       <button class="entry" @click="go('/pages/settings/index')">数据与备份</button>
