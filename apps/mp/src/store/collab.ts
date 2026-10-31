@@ -1,6 +1,19 @@
 import { reactive } from 'vue';
 
-import { decodeFamily } from '@24years/domain/family';
+import {
+  applyPendingFamilyChange,
+  roleLabels,
+  type FamilyChange,
+  type MemberRole,
+} from '@24years/domain/collaboration';
+import { decodeFamily, type FamilyData } from '@24years/domain/family';
+import {
+  clearFamilyOutbox,
+  enqueueOutboxEntry,
+  readOutbox,
+  removeOutboxEntry,
+  type OutboxEntry,
+} from '@24years/domain/outbox';
 
 import { getCloud } from '@/utils/cloud';
 
@@ -114,6 +127,9 @@ function applyRemote(payload: unknown, version: number): void {
 
   try {
     replaceFamily(decodeFamily(JSON.stringify(payload)));
+    // 本地数据已被整体替换，队列里残留变更的 before 全部失效；
+    // 留着会在下次同步时拿旧 before 去比对新数据，结果全被打回或错配，必须清掉。
+    clearFamilyOutbox(outboxKey());
   } finally {
     suppressPush = false;
   }
@@ -290,6 +306,8 @@ export async function createSpace(name: string): Promise<boolean> {
     collabStore.conflict = false;
     collabStore.error = '';
     rememberSpaceId(row.id);
+    // 本机离线时攒下的队列已经整份写进新家庭了，不留残留。
+    clearFamilyOutbox('local');
     await loadMembers(row.id);
 
     return true;
@@ -347,18 +365,72 @@ export async function joinSpace(rawCode: string): Promise<boolean> {
   }
 }
 
+/** 当前账号在这个家庭里的角色。 */
+function myRole(): MemberRole | null {
+  const myId = authStore.account?.id;
+
+  if (!myId) {
+    return null;
+  }
+
+  const mine = collabStore.members.find((member) => member.ownerId === myId);
+
+  return mine ? (mine.role as MemberRole) : null;
+}
+
 /**
- * 本地数据发生变更时由 store/family 触发。
- * 合并短时间内的连续改动，避免每敲一次就写一次云端。
+ * viewer 只能看：本地改动不会被推上云端。
+ * 云端另有 RLS 兜底（families_update_member 已限定 owner/editor），
+ * 这里只是为了让用户在改之前就知道改了没用。
  */
-export function scheduleCloudPush(): void {
+export function canEdit(): boolean {
+  const role = myRole();
+
+  return role === 'owner' || role === 'editor';
+}
+
+/** 成员角色用领域层文案，避免两端措辞漂移。 */
+export function memberRoleLabel(role: string): string {
+  return role in roleLabels ? roleLabels[role as MemberRole] : role;
+}
+
+/** 待发队列按家庭隔离；还没接入云空间时用一个本机固定键。 */
+function outboxKey(): string {
+  return collabStore.spaceId === null ? 'local' : String(collabStore.spaceId);
+}
+
+/**
+ * 本地数据发生变更时由 store/family 触发，拿到的是**变更明细**。
+ * 先落本机队列保证离线不丢，再合并短时间内的连续输入一次性上传。
+ */
+export function scheduleCloudPush(changes: FamilyChange[]): void {
   if (suppressPush || !collabStore.spaceId || collabStore.conflict) {
     return;
   }
 
-  if (!isSignedIn()) {
+  if (!isSignedIn() || !canEdit()) {
     return;
   }
+
+  const key = outboxKey();
+  const now = Date.now();
+
+  changes.forEach((change, index) => {
+    const id = `${now}-${index}`;
+
+    try {
+      enqueueOutboxEntry(key, {
+        id,
+        familyId: key,
+        operationId: id,
+        change,
+        createdAt: now,
+        retryCount: 0,
+      });
+    } catch {
+      uni.showToast({ title: '离线待同步记录过多，请先联网同步', icon: 'none' });
+    }
+  });
 
   if (pushTimer) {
     clearTimeout(pushTimer);
@@ -390,6 +462,15 @@ async function fetchCurrentRow(): Promise<FamilyRow | null> {
   return data as FamilyRow;
 }
 
+/**
+ * 增量上传：把本机待发队列里的变更**逐条应用到云端最新数据之上**，再写回。
+ *
+ * 这是双人同时编辑不丢数据的关键。A 改账本、B 改孕期记录时，
+ * 两条变更作用在不同记录上，各自的 before 都能对上、都能应用成功，
+ * 于是两边的改动都留下；只有改了同一条记录的同一字段才会真的冲突。
+ *
+ * 旧实现直接拿本地整份快照覆盖，会让先写入的一方改动被静默吞掉。
+ */
 async function pushFamily(): Promise<void> {
   const spaceId = collabStore.spaceId;
 
@@ -397,25 +478,76 @@ async function pushFamily(): Promise<void> {
     return;
   }
 
-  if (!isSignedIn()) {
-    collabStore.error = '登录状态已失效，云同步暂停';
+  if (!isSignedIn() || !canEdit()) {
+    return;
+  }
 
+  const key = outboxKey();
+  const entries = readOutbox(key);
+
+  if (entries.length === 0) {
     return;
   }
 
   collabStore.syncing = true;
 
   try {
-    const nextVersion = collabStore.version + 1;
+    const remote = await fetchCurrentRow();
+
+    if (!remote) {
+      collabStore.error = '读不到云端档案，稍后自动重试';
+
+      return;
+    }
+
+    let base: FamilyData;
+
+    try {
+      base = decodeFamily(JSON.stringify(remote.payload));
+    } catch {
+      collabStore.error = '云端档案格式异常，已暂停同步';
+
+      return;
+    }
+
+    let merged = base;
+    const applied: string[] = [];
+    const blocked: OutboxEntry[] = [];
+
+    for (const entry of entries) {
+      const next = applyPendingFamilyChange(merged, entry.change);
+
+      if (next) {
+        merged = next;
+        applied.push(entry.id);
+      } else {
+        blocked.push(entry);
+      }
+    }
+
+    if (applied.length === 0) {
+      // 一条都没能应用：确实和家人改在了同一处，交人工裁决。
+      pendingRemote = { payload: remote.payload, version: remote.version };
+      collabStore.conflict = true;
+      uni.showToast({
+        title: '家人也改了同一处，请在「我的 · 家庭共享」选择保留哪个版本',
+        icon: 'none',
+        duration: 3000,
+      });
+
+      return;
+    }
+
+    const nextVersion = remote.version + 1;
     const { data, error } = await getCloud()
       .database.from('families')
       .update({
-        payload: familyStore.data,
+        payload: merged,
         version: nextVersion,
         updated_by: authStore.account?.id ?? null,
       })
       .eq('id', spaceId)
-      .eq('version', collabStore.version)
+      .eq('version', remote.version)
       .select('id, version');
 
     if (error) {
@@ -424,55 +556,106 @@ async function pushFamily(): Promise<void> {
       return;
     }
 
-    if (toRows<{ id: number; version: number }>(data).length === 0) {
-      // 版本号对不上：家人刚在这台设备之前写了一次，进入人工选择。
-      const remote = await fetchCurrentRow();
-
-      if (remote) {
-        pendingRemote = { payload: remote.payload, version: remote.version };
-      }
-
-      collabStore.conflict = true;
-      uni.showToast({
-        title: '家人刚更新过同一份数据，请在「我的 · 家庭共享」选择保留哪个版本',
-        icon: 'none',
-        duration: 3000,
-      });
-
+    if (toRows<{ id: number }>(data).length === 0) {
+      // 写回这一瞬间又被家人抢先了：队列原样保留，下一轮重放。
       return;
     }
 
+    // 只清掉真正上去的条目，被挡住的留着下次重试，不丢数据。
+    applied.forEach((entryId) => removeOutboxEntry(key, entryId));
+
     collabStore.version = nextVersion;
-    collabStore.conflict = false;
     collabStore.error = '';
     collabStore.lastSyncedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+
+    if (blocked.length > 0) {
+      // 部分合并成功：能合的已经合了，剩下的仍需用户裁决。
+      pendingRemote = { payload: merged, version: nextVersion };
+      collabStore.conflict = true;
+      uni.showToast({
+        title: '部分改动与他人重叠，请在「我的 · 家庭共享」确认',
+        icon: 'none',
+        duration: 3000,
+      });
+    }
   } finally {
     collabStore.syncing = false;
   }
 }
 
-/** 冲突解决：取家人那边的版本。 */
+/** 冲突解决：取家人那边的版本，本机这一轮的待发改动作废。 */
 export async function keepRemoteVersion(): Promise<void> {
   if (pendingRemote) {
     applyRemote(pendingRemote.payload, pendingRemote.version);
+    clearFamilyOutbox(outboxKey());
   }
 
   pendingRemote = null;
   collabStore.conflict = false;
 }
 
-/** 冲突解决：以这台设备的数据覆盖云端。 */
+/**
+ * 冲突解决：以这台设备为准整份覆写云端。
+ * 这是用户明确裁决后的动作，会丢掉对方在这轮冲突范围内的改动——
+ * 所以必须让用户自己点，绝不能自动替他选。
+ */
 export async function keepLocalVersion(): Promise<void> {
-  const remote = await fetchCurrentRow();
-
   pendingRemote = null;
   collabStore.conflict = false;
+  clearFamilyOutbox(outboxKey());
 
-  if (remote) {
-    collabStore.version = remote.version;
+  await forcePush();
+}
+
+/** 整份覆写，跳过增量合并：用户已明确选择以本机为准。 */
+async function forcePush(): Promise<void> {
+  const spaceId = collabStore.spaceId;
+
+  if (!spaceId || collabStore.syncing || !isSignedIn()) {
+    return;
   }
 
-  await pushFamily();
+  const remote = await fetchCurrentRow();
+
+  if (!remote) {
+    collabStore.error = '读不到云端档案，无法覆盖';
+
+    return;
+  }
+
+  collabStore.syncing = true;
+
+  try {
+    const nextVersion = remote.version + 1;
+    const { data, error } = await getCloud()
+      .database.from('families')
+      .update({
+        payload: familyStore.data,
+        version: nextVersion,
+        updated_by: authStore.account?.id ?? null,
+      })
+      .eq('id', spaceId)
+      .eq('version', remote.version)
+      .select('id, version');
+
+    if (error) {
+      collabStore.error = error.message;
+
+      return;
+    }
+
+    if (toRows<{ id: number }>(data).length === 0) {
+      collabStore.error = '覆盖时云端又被更新了，请重试';
+
+      return;
+    }
+
+    collabStore.version = nextVersion;
+    collabStore.error = '';
+    collabStore.lastSyncedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  } finally {
+    collabStore.syncing = false;
+  }
 }
 
 export function hasPendingConflict(): boolean {
@@ -484,6 +667,9 @@ export async function signOutCollaboration(): Promise<void> {
     clearTimeout(pushTimer);
     pushTimer = null;
   }
+
+  // 换账号前清干净，残留队列会串到下一个账号的写入里。
+  clearFamilyOutbox(outboxKey());
 
   pendingRemote = null;
   collabStore.conflict = false;

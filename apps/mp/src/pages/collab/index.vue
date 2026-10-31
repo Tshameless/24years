@@ -3,11 +3,13 @@ import { computed, ref } from 'vue';
 
 import { authStore, isSignedIn, signInWithWechat, signOut } from '@/store/auth';
 import {
+  canEdit,
   collabStore,
   createSpace,
   joinSpace,
   keepLocalVersion,
   keepRemoteVersion,
+  memberRoleLabel,
   pullSpace,
   signOutCollaboration,
 } from '@/store/collab';
@@ -43,13 +45,23 @@ const statusText = computed(() => {
   return `已同步 · ${collabStore.lastSyncedAt || '刚刚'}`;
 });
 
+// 角色文案统一取领域层定义，避免和 Web 端措辞漂移。
 const memberLines = computed(() =>
   collabStore.members.map((member) => {
-    const role = member.role === 'owner' ? '创建者' : '成员';
+    const mine = isSignedIn() && member.ownerId === authStore.account?.id;
 
-    return `${member.displayName || '未设置昵称'} · ${role} · ${member.joinedAt}`;
+    return `${member.displayName || '未设置昵称'}${mine ? '（我）' : ''} · ${memberRoleLabel(member.role)} · ${member.joinedAt}`;
   }),
 );
+
+/** 已加入但权限为「仅查看」时明确告知，避免用户以为改了能同步出去。 */
+const readOnlyHint = computed(() => {
+  if (!isSignedIn() || !collabStore.spaceId || canEdit()) {
+    return '';
+  }
+
+  return '你在本家庭中的权限为「仅查看」，本机改动不会同步给家人。';
+});
 
 async function login(): Promise<void> {
   const ok = await signInWithWechat();
@@ -156,6 +168,7 @@ async function refresh(): Promise<void> {
         <text class="code" @click="copyInviteCode">{{ collabStore.inviteCode }}</text>
       </view>
       <text class="muted">把邀请码告诉家人，对方在「加入家庭」里输入即可共享同一份数据。</text>
+      <text v-if="readOnlyHint" class="readonly-tip">{{ readOnlyHint }}</text>
 
       <view class="section-title gap">成员 {{ collabStore.members.length }} 人</view>
       <text v-for="line in memberLines" :key="line" class="member">{{ line }}</text>
@@ -222,5 +235,16 @@ async function refresh(): Promise<void> {
 
 .conflict {
   border: 2rpx solid #ff9800;
+}
+
+.readonly-tip {
+  display: block;
+  margin-top: 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 8rpx;
+  background-color: #fff7e6;
+  color: #b26a00;
+  font-size: 26rpx;
+  line-height: 1.6;
 }
 </style>
