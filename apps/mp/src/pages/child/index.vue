@@ -316,59 +316,71 @@ function exportGrowth(child: Child): void {
   </view>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .page {
   padding-bottom: 60rpx;
 }
 
 .gap {
-  margin-top: 12rpx;
+  margin-top: 14rpx;
 }
 
 .child-name {
   font-size: 32rpx;
   font-weight: 600;
+  color: $color-on-surface;
 }
 
 .actions {
   display: flex;
-  gap: 12rpx;
+  gap: 16rpx;
   margin-top: 16rpx;
 }
 
 .growth {
-  margin-top: 20rpx;
-  padding-top: 20rpx;
-  border-top: 2rpx solid #f0f1f3;
+  margin-top: 24rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid rgba(218, 226, 253, 0.6);
 }
 
 .input {
   width: 100%;
-  padding: 16rpx;
-  margin-bottom: 16rpx;
-  border: 2rpx solid #e5e7eb;
-  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-md;
+  background-color: $color-surface-container-low;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .inline-input {
   width: 240rpx;
   text-align: right;
+  padding: 8rpx 16rpx;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-sm;
+  background-color: $color-surface-container-low;
 }
 
 .field {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14rpx 0;
-  border-bottom: 2rpx solid #f0f1f3;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(218, 226, 253, 0.6);
+  font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .picker-value {
-  color: #4caf50;
+  color: $color-primary;
+  font-weight: 600;
 }
 
 .record {
-  padding: 16rpx 0;
-  border-top: 2rpx solid #f0f1f3;
+  padding: 20rpx 0;
+  border-top: 1rpx solid rgba(218, 226, 253, 0.6);
 }
 </style>

@@ -171,7 +171,7 @@ function onThemeChange(event: any): void {
         <text>深色主题</text>
         <switch
           :checked="familyStore.data.theme === 'dark'"
-          color="#4caf50"
+          color="#b90538"
           @change="onThemeChange"
         />
       </view>
@@ -180,7 +180,7 @@ function onThemeChange(event: any): void {
   </view>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .page {
   padding-bottom: 60rpx;
 }
@@ -193,17 +193,19 @@ function onThemeChange(event: any): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14rpx 0;
-  border-bottom: 2rpx solid #f0f1f3;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(218, 226, 253, 0.6);
+  font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .actions {
   display: flex;
-  gap: 12rpx;
+  gap: 16rpx;
   margin-top: 16rpx;
 }
 
 .warning .section-title {
-  color: #e0533d;
+  color: $color-tertiary;
 }
 </style>

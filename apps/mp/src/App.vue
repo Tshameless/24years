@@ -10,31 +10,53 @@ onLaunch(() => {
   <slot />
 </template>
 
-<style>
+<style lang="scss">
 page {
-  background-color: #f5f6f8;
-  color: #1f2328;
+  background-color: $color-background;
+  color: $color-on-surface;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 28rpx;
-  line-height: 1.6;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* 核心卡片容器：温润悬浮与圆角 */
 .card {
-  margin: 24rpx;
-  padding: 28rpx;
-  border-radius: 20rpx;
-  background-color: #ffffff;
-  box-shadow: 0 2rpx 12rpx rgba(31, 35, 40, 0.06);
+  position: relative;
+  margin: 20rpx 24rpx;
+  padding: 30rpx 28rpx;
+  border-radius: $radius-lg;
+  background-color: $color-surface-lowest;
+  box-shadow: $shadow-card;
+  border: 1rpx solid rgba(218, 226, 253, 0.5);
+  box-sizing: border-box;
 }
 
+/* 标题规范 */
 .section-title {
   margin-bottom: 16rpx;
   font-size: 32rpx;
   font-weight: 600;
+  color: $color-on-surface;
+  letter-spacing: -0.01em;
 }
 
+.section-subtitle {
+  font-size: 24rpx;
+  color: $color-on-surface-variant;
+  margin-top: -8rpx;
+  margin-bottom: 20rpx;
+}
+
+/* 辅助文字与状态 */
 .muted {
-  color: #6b7280;
+  color: $color-on-surface-variant;
   font-size: 26rpx;
+}
+
+.hint {
+  color: $color-outline;
+  font-size: 22rpx;
 }
 
 .row {
@@ -45,5 +67,91 @@ page {
 
 .gap {
   margin-top: 16rpx;
+}
+
+/* Stitch 胶囊标签 (Pills / Badges) */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 6rpx 18rpx;
+  border-radius: $radius-full;
+  font-size: 22rpx;
+  font-weight: 500;
+  line-height: 1.2;
+
+  &.pill-primary {
+    background-color: $color-primary-fixed;
+    color: $color-on-primary-fixed-variant;
+  }
+
+  &.pill-secondary {
+    background-color: $color-secondary-fixed;
+    color: $color-on-secondary-fixed;
+  }
+
+  &.pill-secondary-dim {
+    background-color: $color-secondary-container;
+    color: $color-on-secondary-container;
+  }
+
+  &.pill-surface {
+    background-color: $color-surface-container-high;
+    color: $color-on-surface-variant;
+  }
+
+  &.pill-alert {
+    background-color: $color-tertiary-fixed;
+    color: $color-on-tertiary-fixed;
+  }
+}
+
+/* 脉冲协同绿点 */
+.pulse-dot {
+  display: inline-block;
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background-color: $color-secondary;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+/* 按钮通用提升 */
+button[type='primary'] {
+  background-color: $color-primary !important;
+  color: $color-on-primary !important;
+  border-radius: $radius-lg !important;
+  font-weight: 500 !important;
+  box-shadow: 0 4rpx 14rpx rgba(185, 5, 56, 0.25);
+  border: none !important;
+
+  &:active {
+    opacity: 0.88;
+  }
+}
+
+button[type='default'] {
+  background-color: $color-surface-container !important;
+  color: $color-on-surface !important;
+  border-radius: $radius-lg !important;
+  border: 1rpx solid rgba(218, 226, 253, 0.8) !important;
+}
+
+button.btn-secondary {
+  background-color: $color-secondary !important;
+  color: #ffffff !important;
+  border-radius: $radius-lg !important;
+  box-shadow: 0 4rpx 14rpx rgba(0, 108, 73, 0.25);
 }
 </style>

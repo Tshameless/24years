@@ -316,46 +316,57 @@ const repeatOptions = [
   </view>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .page {
-  padding-bottom: 40rpx;
+  padding-bottom: 60rpx;
 }
 
 .task-item {
-  padding: 20rpx 0;
-  border-top: 2rpx solid #f0f1f3;
+  padding: 22rpx 0;
+  border-top: 1rpx solid rgba(218, 226, 253, 0.6);
 }
 
-.task-title.done {
-  color: #9ca3af;
-  text-decoration: line-through;
+.task-title {
+  font-weight: 500;
+  color: $color-on-surface;
+
+  &.done {
+    color: $color-outline;
+    text-decoration: line-through;
+  }
 }
 
 .actions {
   display: flex;
-  gap: 12rpx;
-  margin-top: 12rpx;
+  gap: 16rpx;
+  margin-top: 14rpx;
 }
 
 .input {
   width: 100%;
-  padding: 16rpx;
-  margin-bottom: 16rpx;
-  border: 2rpx solid #e5e7eb;
-  border-radius: 12rpx;
-  background-color: #ffffff;
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-md;
+  background-color: $color-surface-container-low;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .field {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14rpx 0;
-  border-bottom: 2rpx solid #f0f1f3;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(218, 226, 253, 0.6);
+  font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .picker-value {
-  color: #4caf50;
+  color: $color-primary;
+  font-weight: 600;
 }
 
 .weekdays {
@@ -366,27 +377,34 @@ const repeatOptions = [
 }
 
 .weekday {
-  padding: 8rpx 20rpx;
-  border: 2rpx solid #e5e7eb;
-  border-radius: 28rpx;
-  color: #6b7280;
-}
+  padding: 10rpx 24rpx;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-full;
+  color: $color-on-surface-variant;
+  background-color: $color-surface-container-low;
+  font-size: 26rpx;
+  transition: all 0.2s ease;
 
-.weekday.active {
-  border-color: #4caf50;
-  color: #ffffff;
-  background-color: #4caf50;
+  &.active {
+    border-color: $color-primary;
+    color: #ffffff;
+    background-color: $color-primary;
+    font-weight: 600;
+    box-shadow: 0 4rpx 12rpx rgba(185, 5, 56, 0.25);
+  }
 }
 
 .reminder {
-  background: #fdf3f2;
+  background: $color-tertiary-fixed;
+  border: 1rpx solid rgba(187, 1, 18, 0.2);
 }
 
 .due-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12rpx 0;
-  border-bottom: 1rpx solid #f6e7e5;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid rgba(187, 1, 18, 0.15);
   font-size: 27rpx;
 }
 
@@ -397,9 +415,16 @@ const repeatOptions = [
 }
 
 .chip {
-  padding: 12rpx 22rpx;
-  background: #f0f1f3;
-  border-radius: 24rpx;
+  padding: 12rpx 24rpx;
+  background: $color-surface-container-high;
+  border-radius: $radius-full;
   font-size: 25rpx;
+  color: $color-on-surface;
+  font-weight: 500;
+  transition: all 0.2s ease;
+
+  &:active {
+    background: $color-surface-container-highest;
+  }
 }
 </style>

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_blank" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#faf8ff;}body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline-variant": "#e3bdbf", "primary-fixed-dim": "#ffb2b7", "error": "#ba1a1a", "on-primary-fixed": "#40000d", "surface-container-low": "#f2f3ff", "secondary": "#006c49", "surface-container-high": "#e2e7ff", "on-tertiary-container": "#fffbff", "on-secondary": "#ffffff", "on-secondary-container": "#00714d", "surface": "#faf8ff", "on-primary-container": "#fffbff", "on-error-container": "#93000a", "surface-tint": "#bc0b3b", "inverse-surface": "#283044", "error-container": "#ffdad6", "on-tertiary-fixed-variant": "#93000b", "on-primary-fixed-variant": "#92002a", "primary-fixed": "#ffdadb", "on-primary": "#ffffff", "inverse-primary": "#ffb2b7", "secondary-container": "#6cf8bb", "tertiary-fixed-dim": "#ffb4ab", "on-error": "#ffffff", "on-tertiary": "#ffffff", "surface-container-highest": "#dae2fd", "inverse-on-surface": "#eef0ff", "tertiary-fixed": "#ffdad6", "tertiary": "#bb0112", "on-secondary-fixed": "#002113", "surface-container-lowest": "#ffffff", "surface-dim": "#d2d9f4", "surface-bright": "#faf8ff", "surface-container": "#eaedff", "background": "#faf8ff", "on-background": "#131b2e", "outline": "#8f6f71", "on-surface": "#131b2e", "on-secondary-fixed-variant": "#005236", "on-surface-variant": "#5b4041", "on-tertiary-fixed": "#410002", "secondary-fixed-dim": "#4edea3", "primary": "#b90538", "tertiary-container": "#e02928", "secondary-fixed": "#6ffbbe", "primary-container": "#dc2c4f", "surface-variant": "#dae2fd" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "margin": "2rem", "space-xl": "2.5rem", "space-xs": "0.25rem", "space-md": "1rem", "gutter-dense": "0.75rem", "space-sm": "0.5rem", "gutter": "1.25rem", "space-lg": "1.5rem" }, "fontFamily": { "headline-sm": ["Manrope"], "headline-lg": ["Manrope"], "body-sm": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "headline-md": ["Manrope"], "mono-metric-lg": ["JetBrains Mono"], "body-md": ["Inter"], "display-hero": ["Manrope"], "body-lg": ["Inter"], "mono-code-sm": ["JetBrains Mono"], "mono-metric-md": ["JetBrains Mono"] }, "fontSize": { "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }], "label-sm": ["11px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }], "label-md": ["13px", { "lineHeight": "18px", "fontWeight": "500" }], "headline-md": ["22px", { "lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "mono-metric-lg": ["24px", { "lineHeight": "28px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "display-hero": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "mono-code-sm": ["11px", { "lineHeight": "16px", "fontWeight": "400" }], "mono-metric-md": ["14px", { "lineHeight": "18px", "letterSpacing": "-0.01em", "fontWeight": "500" }] } } } }</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface text-on-surface font-body-md text-body-md pt-safe pb-safe min-h-screen flex flex-col"><main class="flex-1 flex flex-col relative w-full bg-surface"><div class="flex flex-col w-full px-4 pb-12 pt-2">
+<!-- Warm Top Hero Welcome -->
+<header class="relative rounded-2xl p-6 bg-gradient-to-br from-surface-container via-surface-container-low to-surface-container-high overflow-hidden shadow-sm">
+<div class="absolute -right-8 -bottom-8 w-36 h-36 rounded-full bg-primary-fixed/30 blur-2xl pointer-events-none"></div>
+<div class="absolute -left-6 -top-6 w-28 h-28 rounded-full bg-secondary-fixed/40 blur-xl pointer-events-none"></div>
+<div class="relative z-10 flex flex-col gap-2">
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary text-on-primary shadow-sm">
+<span class="material-symbols-outlined text-[18px]">family_restroom</span>
+</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-primary font-semibold">24Years · 循证家庭档案</span>
+</div>
+<h1 class="font-headline-md text-headline-md text-on-surface tracking-tight">开启 24 年家庭养育长卷</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+        基于循证儿科学（EBM）与家庭生命周期理论。为每一个���庭成员建立长达 24 岁的动态成长健康档案，消除养育焦虑。
+      </p>
+</div>
+</header>
+<!-- Wizard Main Form Container -->
+<div class="flex flex-col gap-5 mt-4">
+<!-- Step 1: 家庭形态与身份 -->
+<section class="rounded-2xl p-5 bg-surface-container-lowest shadow-sm flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-primary-fixed text-on-primary-fixed font-mono-code-sm text-mono-code-sm flex items-center justify-center font-bold">1</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">家庭形态与身份确认</h2>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-medium px-2 py-0.5 rounded-full bg-secondary-fixed/30">双角色协同</span>
+</div>
+<!-- Mode Selector -->
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">协作模式</label>
+<div class="grid grid-cols-2 gap-2" id="family-mode-group">
+<button class="mode-btn active flex items-start gap-2.5 p-3 rounded-xl bg-surface-container text-left transition-all" data-val="dual" onclick="selectFamilyMode('dual')" type="button">
+<span class="material-symbols-outlined text-primary text-[20px] mt-0.5">handshake</span>
+<div class="min-w-0">
+<p class="font-label-md text-label-md font-semibold text-on-surface">双人协作模式</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">父母共同记账、喂养双签</p>
+</div>
+</button>
+<button class="mode-btn flex items-start gap-2.5 p-3 rounded-xl bg-surface-container-low text-left transition-all" data-val="single" onclick="selectFamilyMode('single')" type="button">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px] mt-0.5">person</span>
+<div class="min-w-0">
+<p class="font-label-md text-label-md font-semibold text-on-surface">独立抚养模式</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">专属一人主理健康档案</p>
+</div>
+</button>
+</div>
+</div>
+<!-- Role Selector -->
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">我的主角色</label>
+<div class="grid grid-cols-3 gap-2" id="user-role-group">
+<button class="role-btn active flex flex-col items-center justify-center p-3 rounded-xl bg-primary-fixed text-on-primary-fixed gap-1 text-center transition-all" onclick="selectUserRole('mom')" type="button">
+<span class="material-symbols-outlined text-[22px]">face_3</span>
+<span class="font-label-md text-label-md font-medium">准妈妈 / 妈妈</span>
+<span class="font-mono-code-sm text-mono-code-sm opacity-80">Mom #F43F5E</span>
+</button>
+<button class="role-btn flex flex-col items-center justify-center p-3 rounded-xl bg-surface-container-low text-on-surface gap-1 text-center transition-all" onclick="selectUserRole('dad')" type="button">
+<span class="material-symbols-outlined text-[22px] text-secondary">face_6</span>
+<span class="font-label-md text-label-md font-medium">准爸爸 / 爸爸</span>
+<span class="font-mono-code-sm text-mono-code-sm opacity-80">Partner #0284C7</span>
+</button>
+<button class="role-btn flex flex-col items-center justify-center p-3 rounded-xl bg-surface-container-low text-on-surface gap-1 text-center transition-all" onclick="selectUserRole('caregiver')" type="button">
+<span class="material-symbols-outlined text-[22px] text-outline">volunteer_activism</span>
+<span class="font-label-md text-label-md font-medium">独立长辈/监护</span>
+<span class="font-mono-code-sm text-mono-code-sm opacity-80">Guardian</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Step 2: 精准生命周期节点 (Core) -->
+<section class="rounded-2xl p-5 bg-surface-container-lowest shadow-sm flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-primary-fixed text-on-primary-fixed font-mono-code-sm text-mono-code-sm flex items-center justify-center font-bold">2</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">生��周期精准阶段</h2>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono-code-sm">Stage Mapping</span>
+</div>
+<!-- Stage Selector Tabs -->
+<div class="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-surface-container">
+<button class="stage-tab-btn py-2.5 px-1 rounded-lg text-center font-label-md text-label-md font-medium transition-all text-on-surface-variant" id="tab-btn-prep" onclick="switchStage('prep')" type="button">
+          备孕调理期
+        </button>
+<button class="stage-tab-btn py-2.5 px-1 rounded-lg text-center font-label-md text-label-md font-medium transition-all text-on-surface-variant" id="tab-btn-preg" onclick="switchStage('preg')" type="button">
+          幸福孕期 (40w)
+        </button>
+<button class="stage-tab-btn py-2.5 px-1 rounded-lg text-center font-label-md text-label-md font-semibold bg-surface-container-lowest text-primary shadow-sm transition-all" id="tab-btn-born" onclick="switchStage('born')" type="button">
+          宝贝已出生
+        </button>
+</div>
+<!-- Stage A Panel: 备孕 -->
+<div class="stage-content hidden flex-col gap-3 pt-1" id="panel-prep">
+<div class="p-3 rounded-xl bg-surface-container-low flex items-start gap-2.5">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">water_drop</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            基于排卵周期与医学指南（叶酸补充、基础体温、男士活力指标监测），定制孕前 3~12 个月科学备孕清单。
+          </p>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface">末次月经第一天 (LMP)</label>
+<input class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container" type="date" value="2024-04-10"/>
+<span class="font-label-sm text-label-sm text-on-surface-variant">系统将自动推算排卵窗口及优孕黄金期</span>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface">计划备孕时长期望</label>
+<div class="grid grid-cols-3 gap-2">
+<button class="py-2 px-1 rounded-lg bg-surface-container font-label-md text-label-md text-on-surface text-center" type="button">3个月内</button>
+<button class="py-2 px-1 rounded-lg bg-primary-fixed text-on-primary-fixed font-label-md text-label-md text-center font-medium" type="button">3~6个月</button>
+<button class="py-2 px-1 rounded-lg bg-surface-container font-label-md text-label-md text-on-surface text-center" type="button">顺其自然</button>
+</div>
+</div>
+</div>
+<!-- Stage B Panel: 孕期 -->
+<div class="stage-content hidden flex-col gap-3 pt-1" id="panel-preg">
+<div class="p-3 rounded-xl bg-surface-container-low flex items-start gap-2.5">
+<span class="material-symbols-outlined text-tertiary text-[20px] shrink-0 mt-0.5">pregnant_woman</span>
+<div class="min-w-0">
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              支持「5-1-1 宫缩临床预警」、「孕周产检倒计时」及胎儿发育 3D 图谱。
+            </p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface">预估预产期 (EDC)</label>
+<input class="w-full px-3 py-2.5 rounded-xl bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container" id="input-edc" onchange="calcPregWeek()" type="date" value="2024-11-20"/>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface">当前孕周 (周+天)</label>
+<input class="w-full px-3 py-2.5 rounded-xl bg-surface-container text-on-surface font-mono-metric-md text-mono-metric-md text-center" id="input-preg-week" readonly="" type="text" value="孕 24 周 + 3 天"/>
+</div>
+</div>
+<div class="p-2.5 rounded-xl bg-error-container/30 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-[18px]">crisis_alert</span>
+<span class="font-label-sm text-label-sm text-on-surface">预置 5-1-1 临床临产分娩急救路由</span>
+</div>
+<span class="font-label-sm text-label-sm text-tertiary font-semibold">待命启动</span>
+</div>
+</div>
+<!-- Stage C Panel: 已出生 0-24 岁 (Default Active) -->
+<div class="stage-content flex flex-col gap-3.5 pt-1" id="panel-born">
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md text-on-surface">孩子出生日期 (公历)</label>
+<span class="font-label-sm text-label-sm text-secondary font-medium">支持 0~24 岁全阶段覆盖</span>
+</div>
+<input class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container" id="child-birthday-input" onchange="calculateChildLifeStage(this.value)" type="date" value="2022-09-18"/>
+</div>
+<!-- Dynamic Milestone Real-Time Computation Card -->
+<div class="rounded-xl p-3.5 bg-gradient-to-br from-surface-container-low to-surface-container flex flex-col gap-2.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">badge</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">系统推算当前生长坐标</span>
+</div>
+<span class="font-mono-metric-md text-mono-metric-md text-primary font-bold px-2 py-0.5 rounded-full bg-primary-fixed/60" id="child-age-pill">
+              1 岁 8 个月
+            </span>
+</div>
+<div class="p-2.5 rounded-lg bg-surface-container-lowest flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface font-semibold" id="child-substage-title">幼儿期 (Toddler Sprint 1~3岁)</span>
+<span class="font-label-sm text-label-sm text-secondary font-medium">WHO 50分位发育参考</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant" id="child-substage-desc">
+              重点监测：语言爆发期词汇量、睡眠作息自律、麻腮风等二类疫苗补种、精细大运动发展曲线。
+            </p>
+</div>
+<!-- Age Presets Quick Tester -->
+<div class="flex flex-wrap gap-1.5 pt-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant self-center mr-1">快捷体验不同跨度:</span>
+<button class="px-2 py-1 rounded bg-surface-container-lowest text-on-surface font-mono-code-sm text-mono-code-sm hover:bg-surface-container-high transition-colors" onclick="setAgePreset('2023-11-01')" type="button">6月龄(疫苗)</button>
+<button class="px-2 py-1 rounded bg-surface-container-lowest text-on-surface font-mono-code-sm text-mono-code-sm hover:bg-surface-container-high transition-colors" onclick="setAgePreset('2017-04-12')" type="button">7岁(视力建档)</button>
+<button class="px-2 py-1 rounded bg-surface-container-lowest text-on-surface font-mono-code-sm text-mono-code-sm hover:bg-surface-container-high transition-colors" onclick="setAgePreset('2006-08-20')" type="button">18岁(大学基金)</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Step 3: 孩子性别 (用于生理生长曲率与青春期科学路由) -->
+<section class="rounded-2xl p-5 bg-surface-container-lowest shadow-sm flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-primary-fixed text-on-primary-fixed font-mono-code-sm text-mono-code-sm flex items-center justify-center font-bold">3</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">孩子性别及循证基准</h2>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">WHO分位算法校准</span>
+</div>
+<div class="grid grid-cols-3 gap-2" id="gender-group">
+<button class="gender-btn flex flex-col items-center justify-center p-3 rounded-xl bg-surface-container text-on-surface gap-1 transition-all" onclick="selectGender('boy')" type="button">
+<span class="material-symbols-outlined text-secondary text-[24px]">boy</span>
+<span class="font-label-md text-label-md font-semibold">男宝</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">男童生长曲线</span>
+</button>
+<button class="gender-btn active flex flex-col items-center justify-center p-3 rounded-xl bg-primary-fixed text-on-primary-fixed gap-1 transition-all" onclick="selectGender('girl')" type="button">
+<span class="material-symbols-outlined text-[24px]">girl</span>
+<span class="font-label-md text-label-md font-semibold">女宝</span>
+<span class="font-label-sm text-label-sm opacity-80">女童生长曲线</span>
+</button>
+<button class="gender-btn flex flex-col items-center justify-center p-3 rounded-xl bg-surface-container text-on-surface gap-1 transition-all" onclick="selectGender('surprise')" type="button">
+<span class="material-symbols-outlined text-outline text-[24px]">card_giftcard</span>
+<span class="font-label-md text-label-md font-semibold">待惊喜揭晓</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">中性标准基线</span>
+</button>
+</div>
+<div class="flex items-center gap-1.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[15px] text-outline">verified_user</span>
+<span class="font-body-sm text-body-sm">不同性别将在 10~16 岁青春期自动匹配专属生理健康提示与同性沟通锦囊。</span>
+</div>
+</section>
+<!-- Dynamic Computed Preview Card (Moments of Delight) -->
+<section class="rounded-2xl p-5 bg-gradient-to-br from-surface-container to-surface-container-high shadow-sm flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">preview</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">系统智能建档预览</h3>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-mono-code-sm">Ready to Deploy</span>
+</div>
+<div class="grid grid-cols-1 gap-2.5" id="feature-modules-list">
+<!-- Feature Item 1 -->
+<div class="flex items-center justify-between p-3 rounded-xl bg-surface-container-lowest shadow-sm">
+<div class="flex items-center gap-3">
+<span class="w-8 h-8 rounded-lg bg-secondary-fixed/50 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[18px]">vaccines</span>
+</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold" id="feat-1-title">WHO 疫苗与喂养精准双签</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant" id="feat-1-desc">按月龄预警一类/二类接种计划</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary text-[18px]">check_circle</span>
+</div>
+<!-- Feature Item 2 -->
+<div class="flex items-center justify-between p-3 rounded-xl bg-surface-container-lowest shadow-sm">
+<div class="flex items-center gap-3">
+<span class="w-8 h-8 rounded-lg bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">timeline</span>
+</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold" id="feat-2-title">身高体重头围 P10-P90 通道</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant" id="feat-2-desc">自动规避焦虑，异常偏离自动提示</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary text-[18px]">check_circle</span>
+</div>
+<!-- Feature Item 3 -->
+<div class="flex items-center justify-between p-3 rounded-xl bg-surface-container-lowest shadow-sm">
+<div class="flex items-center gap-3">
+<span class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[18px]">account_balance_wallet</span>
+</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold" id="feat-3-title">24年家庭抚养净成本台账</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant" id="feat-3-desc">医疗、营养与早教开销智能透视</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary text-[18px]">check_circle</span>
+</div>
+</div>
+<!-- Continuity Guarantee Banner -->
+<div class="p-3 rounded-xl bg-surface-container-lowest/80 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-[18px] shrink-0">history_toggle_off</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+          24 年全生命周期随时平滑切换，跨阶段历史数据永久安全加密留存。
+        </p>
+</div>
+</section>
+<!-- Baby Name / Nickname Input -->
+<section class="rounded-2xl p-4 bg-surface-container-lowest shadow-sm flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-fixed/50 flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[20px]">favorite</span>
+</div>
+<div class="flex-1 flex flex-col gap-0.5 min-w-0">
+<label class="font-label-sm text-label-sm text-on-surface-variant">宝贝小名或代称 (可选)</label>
+<input class="w-full bg-transparent text-on-surface font-label-md text-label-md font-semibold focus:outline-none placeholder:text-outline-variant" placeholder="例：小柚子 / 晨晨" type="text" value="小柚子"/>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant px-2 py-1 rounded bg-surface-container">已就绪</span>
+</section>
+<!-- Bottom Actions -->
+<div class="flex flex-col gap-3 mt-2">
+<button class="w-full py-4 px-6 rounded-2xl bg-primary text-on-primary font-headline-sm text-headline-sm font-semibold shadow-lg shadow-primary/20 hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2" onclick="completeOnboarding()" type="button">
+<span>完成建档，开启专属陪伴之旅</span>
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+<div class="flex items-center justify-center gap-1.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px] text-secondary">verified</span>
+<span class="font-label-sm text-label-sm">遵循国家卫生健康委儿童健康评估规程 · 数据全端同步</span>
+</div>
+</div>
+</div>
+<!-- Interactive Feedback Toast (Hidden by default) -->
+<div class="fixed bottom-6 left-4 right-4 z-50 p-4 rounded-xl bg-inverse-surface text-inverse-on-surface shadow-xl flex items-center gap-3 opacity-0 pointer-events-none transition-all duration-300 transform translate-y-3" id="toast">
+<span class="material-symbols-outlined text-secondary-fixed text-[24px]">task_alt</span>
+<div class="min-w-0 flex-1">
+<p class="font-label-md text-label-md font-semibold text-inverse-on-surface">家庭健康档案初始化成功！</p>
+<p class="font-body-sm text-body-sm opacity-80" id="toast-msg">已为您加载 1岁8个月 幼儿阶段专属临床看板。</p>
+</div>
+</div>
+</div>
+<script>
+  let currentStage = 'born';
+  let currentRole = 'mom';
+  let currentMode = 'dual';
+  let currentGender = 'girl';
+
+  function selectFamilyMode(mode) {
+    currentMode = mode;
+    const btns = document.querySelectorAll('#family-mode-group .mode-btn');
+    btns.forEach(btn => {
+      const isSelected = btn.dataset.val === mode;
+      btn.className = `mode-btn flex items-start gap-2.5 p-3 rounded-xl text-left transition-all ${isSelected ? 'bg-surface-container font-semibold' : 'bg-surface-container-low'}`;
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon) {
+        icon.className = `material-symbols-outlined text-[20px] mt-0.5 ${isSelected ? 'text-primary' : 'text-on-surface-variant'}`;
+      }
+    });
+  }
+
+  function selectUserRole(role) {
+    currentRole = role;
+    const btns = document.querySelectorAll('#user-role-group .role-btn');
+    btns.forEach((btn, index) => {
+      const match = (index === 0 && role === 'mom') || (index === 1 && role === 'dad') || (index === 2 && role === 'caregiver');
+      if (match) {
+        btn.className = 'role-btn flex flex-col items-center justify-center p-3 rounded-xl bg-primary-fixed text-on-primary-fixed gap-1 text-center transition-all font-medium';
+      } else {
+        btn.className = 'role-btn flex flex-col items-center justify-center p-3 rounded-xl bg-surface-container-low text-on-surface gap-1 text-center transition-all';
+      }
+    });
+  }
+
+  function selectGender(gender) {
+    currentGender = gender;
+    const btns = document.querySelectorAll('#gender-group .gender-btn');
+    btns.forEach((btn, index) => {
+      const match = (index === 0 && gender === 'boy') || (index === 1 && gender === 'girl') || (index === 2 && gender === 'surprise');
+      if (match) {
+        btn.className = 'gender-btn flex flex-col items-center justify-center p-3 rounded-xl bg-primary-fixed text-on-primary-fixed gap-1 transition-all';
+      } else {
+        btn.className = 'gender-btn flex flex-col items-center justify-center p-3 rounded-xl bg-surface-container text-on-surface gap-1 transition-all';
+      }
+    });
+  }
+
+  function switchStage(stage) {
+    currentStage = stage;
+    const tabPrep = document.getElementById('tab-btn-prep');
+    const tabPreg = document.getElementById('tab-btn-preg');
+    const tabBorn = document.getElementById('tab-btn-born');
+
+    const panelPrep = document.getElementById('panel-prep');
+    const panelPreg = document.getElementById('panel-preg');
+    const panelBorn = document.getElementById('panel-born');
+
+    [tabPrep, tabPreg, tabBorn].forEach(t => {
+      t.className = 'stage-tab-btn py-2.5 px-1 rounded-lg text-center font-label-md text-label-md font-medium text-on-surface-variant transition-all';
+    });
+
+    [panelPrep, panelPreg, panelBorn].forEach(p => {
+      p.classList.add('hidden');
+      p.classList.remove('flex');
+    });
+
+    if (stage === 'prep') {
+      tabPrep.className = 'stage-tab-btn py-2.5 px-1 rounded-lg text-center font-label-md text-label-md font-semibold bg-surface-container-lowest text-primary shadow-sm transition-all';
+      panelPrep.classList.remove('hidden');
+      panelPrep.classList.add('flex');
+      updatePreviewForPrep();
+    } else if (stage === 'preg') {
+      tabPreg.className = 'stage-tab-btn py-2.5 px-1 rounded-lg text-center font-label-md text-label-md font-semibold bg-surface-container-lowest text-primary shadow-sm transition-all';
+      panelPreg.classList.remove('hidden');
+      panelPreg.classList.add('flex');
+      updatePreviewForPreg();
+    } else {
+      tabBorn.className = 'stage-tab-btn py-2.5 px-1 rounded-lg text-center font-label-md text-label-md font-semibold bg-surface-container-lowest text-primary shadow-sm transition-all';
+      panelBorn.classList.remove('hidden');
+      panelBorn.classList.add('flex');
+      const birthVal = document.getElementById('child-birthday-input').value;
+      calculateChildLifeStage(birthVal);
+    }
+  }
+
+  function updatePreviewForPrep() {
+    document.getElementById('feat-1-title').textContent = '生殖内分泌与排卵周期追踪';
+    document.getElementById('feat-1-desc').textContent = '黄体期基础体温曲线与优孕窗口';
+    document.getElementById('feat-2-title').textContent = '双人协同孕前营养补充台账';
+    document.getElementById('feat-2-desc').textContent = '活性叶酸 + 精子活力与母体血红蛋白储备';
+    document.getElementById('feat-3-title').textContent = '孕前 20 项专科检查清单';
+    document.getElementById('feat-3-desc').textContent = 'TORCH 优生与遗传咨询指引';
+  }
+
+  function updatePreviewForPreg() {
+    document.getElementById('feat-1-title').textContent = '40 周产检与唐筛/大排畸智能日程';
+    document.getElementById('feat-1-desc').textContent = '精准推算每一次专科产检窗口与准备';
+    document.getElementById('feat-2-title').textContent = '5-1-1 宫缩计时与临床临产告警';
+    document.getElementById('feat-2-desc').textContent = '一键拨打建卡医院分娩急救直连电话';
+    document.getElementById('feat-3-title').textContent = '待产包双人清单与母婴室准备';
+    document.getElementById('feat-3-desc').textContent = '父亲/母亲责任分工与开销透视';
+  }
+
+  function calcPregWeek() {
+    const edcVal = document.getElementById('input-edc').value;
+    if (!edcVal) return;
+    const edcDate = new Date(edcVal);
+    const today = new Date();
+    const diffDays = Math.round((edcDate - today) / (1000 * 60 * 60 * 24));
+    const passedDays = 280 - diffDays;
+    if (passedDays > 0 && passedDays <= 294) {
+      const weeks = Math.floor(passedDays / 7);
+      const days = passedDays % 7;
+      document.getElementById('input-preg-week').value = `孕 ${weeks} 周 + ${days} 天`;
+    }
+  }
+
+  function setAgePreset(dateStr) {
+    document.getElementById('child-birthday-input').value = dateStr;
+    calculateChildLifeStage(dateStr);
+  }
+
+  function calculateChildLifeStage(birthDateStr) {
+    if (!birthDateStr) return;
+    const birth = new Date(birthDateStr);
+    const now = new Date();
+    
+    let years = now.getFullYear() - birth.getFullYear();
+    let months = now.getMonth() - birth.getMonth();
+    let days = now.getDate() - birth.getDate();
+
+    if (days < 0) {
+      months--;
+    }
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    const pill = document.getElementById('child-age-pill');
+    const title = document.getElementById('child-substage-title');
+    const desc = document.getElementById('child-substage-desc');
+
+    const f1T = document.getElementById('feat-1-title');
+    const f1D = document.getElementById('feat-1-desc');
+    const f2T = document.getElementById('feat-2-title');
+    const f2D = document.getElementById('feat-2-desc');
+    const f3T = document.getElementById('feat-3-title');
+    const f3D = document.getElementById('feat-3-desc');
+
+    if (years === 0 && months < 12) {
+      pill.textContent = `${months} 个月`;
+      title.textContent = '婴儿期 (Infant Sprint 0~1岁)';
+      desc.textContent = '重点监测：母乳/配方奶摄入量、睡眠节律、抬头翻身坐爬大运动、疫苗接种日程。';
+      f1T.textContent = '0-12月龄接种与辅食过敏源追踪';
+      f1D.textContent = 'WHO疫苗标准与第一口辅食添加排查';
+      f2T.textContent = '24小时睡眠与排便双签日志';
+      f2D.textContent = '避免信息差，父母轮班夜醒智能同步';
+      f3T.textContent = '婴儿期医疗与装备支出分析';
+      f3D.textContent = '婴儿车、奶粉与体检费用分类沉淀';
+    } else if (years < 3) {
+      pill.textContent = `${years} 岁 ${months} 个月`;
+      title.textContent = '幼儿期 (Toddler Sprint 1~3岁)';
+      desc.textContent = '重点监测：语言爆发期词汇量、睡眠作息自律、麻腮风等二类疫苗补种、精细大运动发展曲线。';
+      f1T.textContent = 'WHO 疫苗与喂养精准双签';
+      f1D.textContent = '按月龄预警一类/二类接种计划';
+      f2T.textContent = '身高体重头围 P10-P90 通道';
+      f2D.textContent = '自动规避焦虑，异常偏离自动提示';
+      f3T.textContent = '幼儿期早教与抚养净成本台账';
+      f3D.textContent = '医疗、营养与早教开销智能透视';
+    } else if (years < 6) {
+      pill.textContent = `${years} 岁 ${months} 个月`;
+      title.textContent = '学龄前期 (Preschool 3~6岁)';
+      desc.textContent = '重点监���：社交合作习惯建立、乳牙龋齿预防、户外活动时间、视力远视储备监控。';
+      f1T.textContent = '远视储备与户外 2 小时活动打卡';
+      f1D.textContent = '儿童眼轴与角膜曲率屈光发育档案';
+      f2T.textContent = '社交情感与幼儿园适应期评估';
+      f2D.textContent = '循证儿童心理量表与行为引导指南';
+      f3T.textContent = '学前兴趣班与营养开销跟踪';
+      f3D.textContent = '教育投入回报与家庭资金池管理';
+    } else if (years < 12) {
+      const grade = years === 6 ? '小学一年级' : years === 7 ? '小学二年级' : years === 8 ? '小学三年级' : `${years - 5} 年级`;
+      pill.textContent = `${years} 岁 (${grade})`;
+      title.textContent = `学龄期 (School Age 6~12岁 - ${grade})`;
+      desc.textContent = '重点监测：脊柱侧弯筛查、近视防控进展、学习专注力训练、同伴关系建立。';
+      f1T.textContent = '青少年近视防控与眼健康台账';
+      f1D.textContent = '每季度视力检查与散瞳医学指引';
+      f2T.textContent = '骨龄生长突增与脊柱侧弯监测';
+      f2D.textContent = '预防不良坐姿，运动体质健康体测';
+      f3T.textContent = '学龄期课外开销与成长账户';
+      f3D.textContent = '双亲共管家庭教��储蓄金';
+    } else if (years < 18) {
+      pill.textContent = `${years} 岁 (中学阶段)`;
+      title.textContent = '青春期 (Adolescence 12~18岁)';
+      desc.textContent = '重点监测：第二性征发育评估、心理情绪韧性、同性/异性沟通指引、中高考睡眠保障。';
+      f1T.textContent = '第二性征与生理发育科学向导';
+      f1D.textContent = '定向同性父母沟通与去病理化释疑';
+      f2T.textContent = '心理健康评估与压力情绪宣泄';
+      f2D.textContent = '家庭沟通边界协议与尊重契约';
+      f3T.textContent = '升学预算与国际化教育基金';
+      f3D.textContent = '高中至大学阶段学费与生活储备';
+    } else {
+      pill.textContent = `${years} 岁 (成人自立)`;
+      title.textContent = '青年自立期 (Adulthood 18~24岁)';
+      desc.textContent = '重点监测：大学生涯规划、第一笔独立财务账户交接、成年健康体检长图转赠。';
+      f1T.textContent = '24 年家庭医疗历史档案一键交付';
+      f1D.textContent = '儿童期疫苗、病历与过敏史完整转赠孩子';
+      f2T.textContent = '大学教育金与青年自立理财账户';
+      f2D.textContent = '由父母协同向子女独立记账平滑移交';
+      f3T.textContent = '家庭养育 24 年终身回��长卷';
+      f3D.textContent = '生成家庭成长纪念白皮书与勋章';
+    }
+  }
+
+  function completeOnboarding() {
+    const toast = document.getElementById('toast');
+    const msg = document.getElementById('toast-msg');
+    
+    let stageTxt = '已完成生命周期节点校准';
+    if (currentStage === 'prep') {
+      stageTxt = '已为您装载备孕期排卵与营养准备专属模块。';
+    } else if (currentStage === 'preg') {
+      stageTxt = '已为您开启 40 周孕期协同与 5-1-1 临产准备。';
+    } else {
+      const agePill = document.getElementById('child-age-pill').textContent.trim();
+      stageTxt = `已为您加载 ${agePill} 专属循证儿科成长档案与预算。`;
+    }
+    msg.textContent = stageTxt;
+
+    toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-3');
+    toast.classList.add('opacity-100', 'translate-y-0');
+
+    setTimeout(() => {
+      toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-3');
+      toast.classList.remove('opacity-100', 'translate-y-0');
+    }, 3200);
+  }
+
+  // Initialize
+  document.addEventListener('DOMContentLoaded', () => {
+    calculateChildLifeStage('2022-09-18');
+  });
+</script></main></body></html>

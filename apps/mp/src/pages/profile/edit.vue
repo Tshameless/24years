@@ -206,7 +206,7 @@ function clearProfile(): void {
       </view>
       <view class="field">
         <text>静默关怀</text>
-        <switch :checked="quietMode" color="#4caf50" @change="(e: any) => (quietMode = e.detail.value)" />
+        <switch :checked="quietMode" color="#b90538" @change="(e: any) => (quietMode = e.detail.value)" />
       </view>
       <text class="muted">开启后首页不再显示孕周、倒计时与计划，历史记录仍保留。</text>
     </view>
@@ -216,34 +216,45 @@ function clearProfile(): void {
   </view>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .page {
   padding-bottom: 60rpx;
 }
 
 .input {
   width: 100%;
-  padding: 16rpx;
-  margin-bottom: 16rpx;
-  border: 2rpx solid #e5e7eb;
-  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-md;
+  background-color: $color-surface-container-low;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .inline-input {
   width: 240rpx;
   text-align: right;
+  padding: 8rpx 16rpx;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-sm;
+  background-color: $color-surface-container-low;
 }
 
 .field {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14rpx 0;
-  border-bottom: 2rpx solid #f0f1f3;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(218, 226, 253, 0.6);
+  font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .picker-value {
-  color: #4caf50;
+  color: $color-primary;
+  font-weight: 600;
 }
 
 .primary-button {
@@ -252,6 +263,9 @@ function clearProfile(): void {
 
 .danger-button {
   margin: 20rpx 24rpx 0;
-  color: #e0533d;
+  color: $color-tertiary;
+  border: 1rpx solid rgba(187, 1, 18, 0.2);
+  border-radius: $radius-lg;
+  background-color: transparent;
 }
 </style>

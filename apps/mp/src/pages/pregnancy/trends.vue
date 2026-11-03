@@ -370,76 +370,86 @@ watch([metric, glucoseContext, from, to], () => renderChart());
   </view>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .page {
-  padding-bottom: 40rpx;
+  padding-bottom: 60rpx;
 }
 
 .card {
-  margin: 24rpx;
-  padding: 28rpx;
-  background: #fff;
-  border-radius: 16rpx;
+  margin: 20rpx 24rpx;
+  padding: 30rpx 28rpx;
+  background: #ffffff;
+  border-radius: $radius-lg;
+  border: 1rpx solid rgba(218, 226, 253, 0.6);
+  box-shadow: $shadow-card;
 }
 
 .section-title {
   margin-bottom: 20rpx;
-  font-size: 30rpx;
+  font-size: 32rpx;
   font-weight: 600;
+  color: $color-on-surface;
 }
 
 .segment {
   display: flex;
   margin-bottom: 24rpx;
-  background: #f0f1f3;
-  border-radius: 12rpx;
-  overflow: hidden;
+  background: $color-surface-container-high;
+  border-radius: $radius-full;
+  padding: 6rpx;
 }
 
 .seg-item {
   flex: 1;
-  padding: 18rpx 0;
+  padding: 14rpx 0;
   text-align: center;
-  font-size: 27rpx;
-  color: #6b7280;
-}
+  font-size: 26rpx;
+  border-radius: $radius-full;
+  color: $color-on-surface-variant;
+  font-weight: 500;
+  transition: all 0.2s ease;
 
-.seg-item.active {
-  background: #4caf50;
-  color: #fff;
-  font-weight: 600;
+  &.active {
+    background: $color-primary;
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 4rpx 12rpx rgba(185, 5, 56, 0.25);
+  }
 }
 
 .row {
   display: flex;
   gap: 20rpx;
-}
 
-.row.between {
-  align-items: center;
-  justify-content: space-between;
-}
+  &.between {
+    align-items: center;
+    justify-content: space-between;
 
-.row.between .section-title {
-  margin-bottom: 0;
+    .section-title {
+      margin-bottom: 0;
+    }
+  }
 }
 
 .field {
   flex: 1;
   padding: 20rpx;
-  background: #f7f8fa;
-  border-radius: 12rpx;
+  background: $color-surface-container-low;
+  border-radius: $radius-md;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
 }
 
 .field-label {
   display: block;
   margin-bottom: 8rpx;
   font-size: 24rpx;
-  color: #6b7280;
+  color: $color-on-surface-variant;
 }
 
 .field-value {
   font-size: 28rpx;
+  color: $color-on-surface;
+  font-weight: 500;
 }
 
 .chart {
@@ -451,13 +461,14 @@ watch([metric, glucoseContext, from, to], () => renderChart());
 .summary-row {
   display: flex;
   justify-content: space-between;
-  padding: 12rpx 0;
+  padding: 14rpx 0;
   font-size: 27rpx;
+  border-bottom: 1rpx dashed rgba(218, 226, 253, 0.6);
 }
 
 .table-row {
   padding: 18rpx 0;
-  border-bottom: 1rpx solid #f0f1f3;
+  border-bottom: 1rpx solid rgba(218, 226, 253, 0.6);
 }
 
 .table-head {
@@ -467,32 +478,33 @@ watch([metric, glucoseContext, from, to], () => renderChart());
 }
 
 .strong {
-  font-weight: 600;
-  color: #4caf50;
+  font-weight: 700;
+  color: $color-secondary;
 }
 
 .muted {
   margin: 8rpx 0;
   font-size: 24rpx;
-  color: #6b7280;
+  color: $color-on-surface-variant;
   line-height: 1.6;
 }
 
 .link {
   margin-top: 16rpx;
   font-size: 26rpx;
-  color: #4caf50;
+  color: $color-primary;
+  font-weight: 500;
 }
 
 .error {
   margin-top: 16rpx;
   font-size: 26rpx;
-  color: #e0533d;
+  color: $color-tertiary;
 }
 
 .alert-caption {
   font-size: 22rpx;
-  color: #e0533d;
+  color: $color-tertiary;
   line-height: 1.6;
 }
 
@@ -500,12 +512,14 @@ watch([metric, glucoseContext, from, to], () => renderChart());
   margin-top: 24rpx;
   padding: 22rpx 0;
   text-align: center;
-  border-radius: 12rpx;
+  border-radius: $radius-lg;
   font-size: 28rpx;
-}
+  font-weight: 500;
 
-.btn.primary {
-  background: #4caf50;
-  color: #fff;
+  &.primary {
+    background: $color-primary;
+    color: #ffffff;
+    box-shadow: 0 4rpx 14rpx rgba(185, 5, 56, 0.25);
+  }
 }
 </style>

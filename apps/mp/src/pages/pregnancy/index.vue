@@ -953,70 +953,112 @@ function describeOther(record: PregnancyRecord): string {
   </view>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .page {
   padding-bottom: 60rpx;
 }
 
-.tabs {
+.quick-links {
   display: flex;
-  padding: 20rpx 24rpx;
-  gap: 12rpx;
-  overflow-x: auto;
+  gap: 20rpx;
+  margin: 16rpx 24rpx;
 }
 
-.tab {
-  padding: 10rpx 24rpx;
-  border: 2rpx solid #e5e7eb;
-  border-radius: 28rpx;
-  color: #6b7280;
+.quick {
+  flex: 1;
+  padding: 20rpx 0;
+  text-align: center;
+  background: #ffffff;
+  border-radius: $radius-lg;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: $color-primary;
+  border: 1rpx solid rgba(218, 226, 253, 0.7);
+  box-shadow: $shadow-card;
+  transition: all 0.2s ease;
+
+  &:active {
+    background-color: $color-surface-container-low;
+  }
+}
+
+.tabs {
+  display: flex;
+  padding: 16rpx 24rpx;
+  gap: 12rpx;
+  overflow-x: auto;
   white-space: nowrap;
 }
 
-.tab.active {
-  border-color: #4caf50;
-  color: #ffffff;
-  background-color: #4caf50;
+.tab {
+  padding: 12rpx 28rpx;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-full;
+  color: $color-on-surface-variant;
+  background-color: $color-surface-container-low;
+  font-size: 26rpx;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+
+  &.active {
+    border-color: $color-primary;
+    color: #ffffff;
+    background-color: $color-primary;
+    font-weight: 600;
+    box-shadow: 0 4rpx 12rpx rgba(185, 5, 56, 0.25);
+  }
 }
 
 .input {
   width: 100%;
-  padding: 16rpx;
-  margin-bottom: 16rpx;
-  border: 2rpx solid #e5e7eb;
-  border-radius: 12rpx;
+  padding: 18rpx 20rpx;
+  margin-bottom: 20rpx;
+  background-color: $color-surface-container-low;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-md;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .inline-input {
   width: 240rpx;
   text-align: right;
+  padding: 8rpx 16rpx;
+  background-color: $color-surface-container-low;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-sm;
 }
 
 .field {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14rpx 0;
-  border-bottom: 2rpx solid #f0f1f3;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(218, 226, 253, 0.6);
+  font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .picker-value {
-  color: #4caf50;
+  color: $color-primary;
+  font-weight: 600;
 }
 
 .submit {
-  margin: 20rpx 0;
+  margin: 24rpx 0 12rpx;
 }
 
 .record {
-  padding: 18rpx 0;
-  border-top: 2rpx solid #f0f1f3;
+  padding: 22rpx 0;
+  border-top: 1rpx solid rgba(218, 226, 253, 0.6);
 }
 
 .actions {
   display: flex;
-  gap: 12rpx;
-  margin-top: 10rpx;
+  gap: 16rpx;
+  margin-top: 14rpx;
 }
 
 .subtabs {
@@ -1029,88 +1071,85 @@ function describeOther(record: PregnancyRecord): string {
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 12rpx;
-  padding-bottom: 16rpx;
+  gap: 14rpx;
+  padding-bottom: 20rpx;
 }
 
 .chip {
-  padding: 8rpx 20rpx;
-  border: 2rpx solid #e5e7eb;
-  border-radius: 28rpx;
-  color: #6b7280;
-}
+  padding: 10rpx 24rpx;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-full;
+  color: $color-on-surface-variant;
+  background-color: $color-surface-container-low;
+  font-size: 26rpx;
+  transition: all 0.2s ease;
 
-.chip.active {
-  border-color: #4caf50;
-  color: #ffffff;
-  background-color: #4caf50;
+  &.active {
+    border-color: $color-primary;
+    color: #ffffff;
+    background-color: $color-primary;
+    font-weight: 500;
+    box-shadow: 0 4rpx 12rpx rgba(185, 5, 56, 0.2);
+  }
 }
 
 .timer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 24rpx 0;
 }
 
 .timer-value {
-  font-size: 44rpx;
-  font-weight: 600;
-  color: #e0533d;
-}
-
-.quick-links {
-  display: flex;
-  gap: 20rpx;
-  margin-bottom: 20rpx;
-}
-
-.quick {
-  flex: 1;
-  padding: 20rpx 0;
-  text-align: center;
-  background: #fff;
-  border-radius: 12rpx;
-  font-size: 26rpx;
-  color: #4caf50;
+  font-size: 52rpx;
+  font-weight: 800;
+  color: $color-primary;
+  font-family: -apple-system, monospace;
 }
 
 .done {
-  color: #9ca3af;
+  color: $color-outline;
   text-decoration: line-through;
 }
 
 .pattern-card {
   margin-top: 24rpx;
-  padding: 20rpx;
-  background: #f7f8fa;
-  border-radius: 12rpx;
+  padding: 24rpx;
+  background: $color-surface-container-low;
+  border-radius: $radius-lg;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
 }
 
 .badge {
-  padding: 4rpx 16rpx;
-  background: #eef7ef;
-  border-radius: 16rpx;
+  padding: 6rpx 18rpx;
+  background: $color-secondary-container;
+  border-radius: $radius-full;
   font-size: 22rpx;
-  color: #4caf50;
+  font-weight: 600;
+  color: $color-on-secondary-container;
 }
 
 .pattern-row {
+  display: flex;
   justify-content: space-between;
-  padding: 10rpx 0;
+  padding: 12rpx 0;
   font-size: 26rpx;
 }
 
 .advice {
-  margin: 16rpx 0;
-  padding: 16rpx;
-  background: #fff;
-  border-radius: 10rpx;
+  margin: 20rpx 0;
+  padding: 20rpx;
+  background: #ffffff;
+  border-radius: $radius-md;
+  border-left: 6rpx solid $color-primary;
+  box-shadow: $shadow-sm;
 }
 
 .strong {
   display: block;
   margin-bottom: 8rpx;
-  font-size: 27rpx;
-  font-weight: 600;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: $color-on-surface;
 }
 </style>

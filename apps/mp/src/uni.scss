@@ -1,76 +1,112 @@
 /**
  * 这里是uni-app内置的常用样式变量
  *
- * uni-app 官方扩展插件及插件市场（https://ext.dcloud.net.cn）上很多三方插件均使用了这些样式变量
- * 如果你是插件开发者，建议你使用scss预处理，并在插件代码中直接使用这些变量（无需 import 这个文件），方便用户通过搭积木的方式开发整体风格一致的App
- *
+ * 结合 Google Stitch 项目 "Clinical Nurture" (循证呵护) 设计系统
  */
 
-/**
- * 如果你是App开发者（插件使用者），你可以通过修改这些变量来定制自己的插件主题，实现自定义主题功能
- *
- * 如果你的项目同样使用了scss预处理，你也可以直接在你的 scss 代码中使用如下变量，同时无需 import 这个文件
- */
+/* ==========================================================================
+   Stitch "Clinical Nurture" Design Tokens
+   ========================================================================== */
 
-/* 颜色变量 */
+/* 主色调 (Primary: 玫瑰红/树莓浆果色，传递关爱、温度与核心动作) */
+$color-primary: #b90538;
+$color-primary-container: #dc2c4f;
+$color-on-primary: #ffffff;
+$color-on-primary-container: #fffbff;
+$color-primary-fixed: #ffdadb;
+$color-primary-fixed-dim: #ffb2b7;
+$color-on-primary-fixed: #40000d;
+$color-on-primary-fixed-variant: #92002a;
+$color-inverse-primary: #ffb2b7;
 
-/* 行为相关颜色 */
-$uni-color-primary: #007aff;
-$uni-color-success: #4cd964;
-$uni-color-warning: #f0ad4e;
-$uni-color-error: #dd524d;
+/* 次色调 (Secondary: 循证翡翠绿/薄荷绿，代表生命体征健康、双人同频) */
+$color-secondary: #006c49;
+$color-secondary-container: #6cf8bb;
+$color-on-secondary: #ffffff;
+$color-on-secondary-container: #00714d;
+$color-secondary-fixed: #6ffbbe;
+$color-secondary-fixed-dim: #4edea3;
+$color-on-secondary-fixed: #002113;
+$color-on-secondary-fixed-variant: #005236;
 
-/* 文字基本颜色 */
-$uni-text-color: #333; // 基本色
-$uni-text-color-inverse: #fff; // 反色
-$uni-text-color-grey: #999; // 辅助灰色，如加载更多的提示信息
-$uni-text-color-placeholder: #808080;
+/* 警示与强调色 (Tertiary: 临产/异常预警) */
+$color-tertiary: #bb0112;
+$color-tertiary-container: #e02928;
+$color-on-tertiary-container: #fffbff;
+$color-tertiary-fixed: #ffdad6;
+$color-tertiary-fixed-dim: #ffb4ab;
+$color-on-tertiary-fixed: #410002;
+$color-on-tertiary-fixed-variant: #93000b;
+
+/* 背景与表面色 (Surface: 临床温润暖白/低饱和柔光背景) */
+$color-background: #faf8ff;
+$color-surface: #faf8ff;
+$color-surface-bright: #faf8ff;
+$color-surface-dim: #d2d9f4;
+$color-surface-lowest: #ffffff;
+$color-surface-low: #f2f3ff;
+$color-surface-container-lowest: #ffffff;
+$color-surface-container-low: #f2f3ff;
+$color-surface-container: #eaedff;
+$color-surface-container-high: #e2e7ff;
+$color-surface-container-highest: #dae2fd;
+$color-surface-high: #e2e7ff;
+$color-surface-highest: #dae2fd;
+$color-surface-variant: #dae2fd;
+
+/* 文字与轮廓色 */
+$color-on-surface: #131b2e;
+$color-on-surface-variant: #5b4041;
+$color-outline: #8f6f71;
+$color-outline-variant: #e3bdbf;
+
+/* 圆角规范 */
+$radius-sm: 8rpx;
+$radius-md: 16rpx;
+$radius-lg: 24rpx;
+$radius-xl: 32rpx;
+$radius-full: 9999rpx;
+
+/* 阴影规范 */
+$shadow-sm: 0 2rpx 8rpx rgba(19, 27, 46, 0.04);
+$shadow-card: 0 4rpx 20rpx rgba(19, 27, 46, 0.05);
+$shadow-glow-secondary: 0 8rpx 24rpx rgba(0, 108, 73, 0.12);
+$shadow-glow-primary: 0 8rpx 24rpx rgba(185, 5, 56, 0.12);
+
+/* ==========================================================================
+   uni-app 内置变量适配
+   ========================================================================== */
+$uni-color-primary: $color-primary;
+$uni-color-success: $color-secondary;
+$uni-color-warning: #f59e0b;
+$uni-color-error: $color-tertiary;
+
+$uni-text-color: $color-on-surface;
+$uni-text-color-inverse: #ffffff;
+$uni-text-color-grey: $color-on-surface-variant;
+$uni-text-color-placeholder: $color-outline;
 $uni-text-color-disable: #c0c0c0;
 
-/* 背景颜色 */
-$uni-bg-color: #fff;
-$uni-bg-color-grey: #f8f8f8;
-$uni-bg-color-hover: #f1f1f1; // 点击状态颜色
-$uni-bg-color-mask: rgba(0, 0, 0, 0.4); // 遮罩颜色
+$uni-bg-color: $color-surface-lowest;
+$uni-bg-color-grey: $color-surface-low;
+$uni-bg-color-hover: $color-surface-container;
+$uni-bg-color-mask: rgba(19, 27, 46, 0.45);
 
-/* 边框颜色 */
-$uni-border-color: #c8c7cc;
+$uni-border-color: rgba(218, 226, 253, 0.6);
 
-/* 尺寸变量 */
-
-/* 文字尺寸 */
 $uni-font-size-sm: 12px;
 $uni-font-size-base: 14px;
 $uni-font-size-lg: 16px;
 
-/* 图片尺寸 */
-$uni-img-size-sm: 20px;
-$uni-img-size-base: 26px;
-$uni-img-size-lg: 40px;
-
-/* Border Radius */
-$uni-border-radius-sm: 2px;
-$uni-border-radius-base: 3px;
-$uni-border-radius-lg: 6px;
+$uni-border-radius-sm: 4px;
+$uni-border-radius-base: 8px;
+$uni-border-radius-lg: 12px;
 $uni-border-radius-circle: 50%;
 
-/* 水平间距 */
-$uni-spacing-row-sm: 5px;
-$uni-spacing-row-base: 10px;
-$uni-spacing-row-lg: 15px;
+$uni-spacing-row-sm: 6px;
+$uni-spacing-row-base: 12px;
+$uni-spacing-row-lg: 16px;
 
-/* 垂直间距 */
 $uni-spacing-col-sm: 4px;
 $uni-spacing-col-base: 8px;
 $uni-spacing-col-lg: 12px;
-
-/* 透明度 */
-$uni-opacity-disabled: 0.3; // 组件禁用态的透明度
-
-/* 文章场景相关 */
-$uni-color-title: #2c405a; // 文章标题颜色
-$uni-font-size-title: 20px;
-$uni-color-subtitle: #555; // 二级标题颜色
-$uni-font-size-subtitle: 18px;
-$uni-color-paragraph: #3f536e; // 文章段落颜色
-$uni-font-size-paragraph: 15px;

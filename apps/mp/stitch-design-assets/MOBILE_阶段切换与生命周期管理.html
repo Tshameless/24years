@@ -1,0 +1,493 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_stack" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#faf8ff;}body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline-variant": "#e3bdbf", "primary-fixed-dim": "#ffb2b7", "error": "#ba1a1a", "on-primary-fixed": "#40000d", "surface-container-low": "#f2f3ff", "secondary": "#006c49", "surface-container-high": "#e2e7ff", "on-tertiary-container": "#fffbff", "on-secondary": "#ffffff", "on-secondary-container": "#00714d", "surface": "#faf8ff", "on-primary-container": "#fffbff", "on-error-container": "#93000a", "surface-tint": "#bc0b3b", "inverse-surface": "#283044", "error-container": "#ffdad6", "on-tertiary-fixed-variant": "#93000b", "on-primary-fixed-variant": "#92002a", "primary-fixed": "#ffdadb", "on-primary": "#ffffff", "inverse-primary": "#ffb2b7", "secondary-container": "#6cf8bb", "tertiary-fixed-dim": "#ffb4ab", "on-error": "#ffffff", "on-tertiary": "#ffffff", "surface-container-highest": "#dae2fd", "inverse-on-surface": "#eef0ff", "tertiary-fixed": "#ffdad6", "tertiary": "#bb0112", "on-secondary-fixed": "#002113", "surface-container-lowest": "#ffffff", "surface-dim": "#d2d9f4", "surface-bright": "#faf8ff", "surface-container": "#eaedff", "background": "#faf8ff", "on-background": "#131b2e", "outline": "#8f6f71", "on-surface": "#131b2e", "on-secondary-fixed-variant": "#005236", "on-surface-variant": "#5b4041", "on-tertiary-fixed": "#410002", "secondary-fixed-dim": "#4edea3", "primary": "#b90538", "tertiary-container": "#e02928", "secondary-fixed": "#6ffbbe", "primary-container": "#dc2c4f", "surface-variant": "#dae2fd" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "margin": "2rem", "space-xl": "2.5rem", "space-xs": "0.25rem", "space-md": "1rem", "gutter-dense": "0.75rem", "space-sm": "0.5rem", "gutter": "1.25rem", "space-lg": "1.5rem" }, "fontFamily": { "headline-sm": ["Manrope"], "headline-lg": ["Manrope"], "body-sm": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "headline-md": ["Manrope"], "mono-metric-lg": ["JetBrains Mono"], "body-md": ["Inter"], "display-hero": ["Manrope"], "body-lg": ["Inter"], "mono-code-sm": ["JetBrains Mono"], "mono-metric-md": ["JetBrains Mono"] }, "fontSize": { "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }], "label-sm": ["11px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }], "label-md": ["13px", { "lineHeight": "18px", "fontWeight": "500" }], "headline-md": ["22px", { "lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "mono-metric-lg": ["24px", { "lineHeight": "28px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "display-hero": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "mono-code-sm": ["11px", { "lineHeight": "16px", "fontWeight": "400" }], "mono-metric-md": ["14px", { "lineHeight": "18px", "letterSpacing": "-0.01em", "fontWeight": "500" }] } } } }</script></head><body class="bg-surface text-on-surface font-body-md text-body-md flex flex-col min-h-screen"><header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(19,27,46,0.04)] pt-safe"><div class="h-16 px-gutter flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-xs"><button aria-label="返回" class="w-11 h-11 -ml-2 rounded-full flex items-center justify-center text-on-surface active:bg-surface-container-high/60 transition-colors" onclick="history.back()" type="button"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg></button><h1 class="font-headline-sm text-headline-sm text-on-surface truncate">阶段切换与生命周期管理</h1></div><div class="flex items-center gap-space-sm shrink-0"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-[0_2px_6px_rgba(185,5,56,0.25)]"><svg class="w-4 h-4 text-on-primary" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 bg-surface pb-safe"><div class="flex flex-col w-full px-gutter pb-space-xl space-y-space-lg">
+<!-- 1. 当前家庭状态卡片 (Dual-Actor Clinical Telemetry) -->
+<div class="relative w-full rounded-xl bg-surface-container-lowest p-space-md shadow-sm overflow-hidden">
+<!-- Ambient Gradient Ribbon -->
+<div class="absolute -top-12 -right-12 w-36 h-36 rounded-full bg-primary-fixed/30 blur-2xl pointer-events-none"></div>
+<div class="absolute -bottom-10 -left-10 w-28 h-28 rounded-full bg-secondary-container/20 blur-xl pointer-events-none"></div>
+<div class="relative z-10 flex flex-col space-y-space-md">
+<!-- Stage & Status Badges -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-on-primary font-label-md text-label-md shadow-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-surface-bright animate-ping"></span>
+            当前主阶段
+          </span>
+<span class="font-label-md text-label-md text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-lg">
+            周期序列 02 / 08
+          </span>
+</div>
+<div class="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-full">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-label-sm text-label-sm text-secondary font-medium">EBM 循证引擎同步中</span>
+</div>
+</div>
+<!-- Main Pregnancy Stat Header -->
+<div class="flex flex-col">
+<div class="flex items-baseline gap-2">
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">孕 28周<span class="font-headline-sm text-headline-sm font-normal text-on-surface-variant ml-1">+ 4天</span></h2>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+          全周期第 200 天 · 距离预计分娩日还剩 <span class="font-mono-metric-md text-mono-metric-md font-semibold text-primary">80</span> 天
+        </p>
+</div>
+<!-- 40W Progress Bar Strip -->
+<div class="space-y-1.5">
+<div class="flex justify-between items-center font-label-sm text-label-sm text-on-surface-variant">
+<span class="">孕早期 (1-12W)</span>
+<span class="text-primary font-medium">孕晚期进行中 (28W)</span>
+<span class="">临产冲刺 (40W)</span>
+</div>
+<div class="w-full h-2 rounded-full bg-surface-container-high overflow-hidden relative">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container rounded-full" style="width: 71.4%"></div>
+<div class="absolute top-0 bottom-0 left-[71.4%] w-1 bg-surface-container-lowest shadow-sm -ml-0.5"></div>
+</div>
+</div>
+<!-- Dual-Actor Parental Attribution Strip -->
+<div class="pt-space-xs grid grid-cols-2 gap-space-sm">
+<!-- Mom Node -->
+<div class="flex items-center gap-2 p-2 rounded-lg bg-surface-container-low">
+<div class="relative w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-base" style="font-variation-settings: 'FILL' 1;">pregnant_woman</span>
+<span class="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-secondary ring-2 ring-surface-container-lowest"></span>
+</div>
+<div class="min-w-0 flex-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface font-medium truncate">母亲 (林舒)</span>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">在线</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">胎动记录 42分前</p>
+</div>
+</div>
+<!-- Partner Node -->
+<div class="flex items-center gap-2 p-2 rounded-lg bg-surface-container-low">
+<div class="relative w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant text-base" style="font-variation-settings: 'FILL' 1;">shield_person</span>
+<span class="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-secondary ring-2 ring-surface-container-lowest"></span>
+</div>
+<div class="min-w-0 flex-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface font-medium truncate">伴侣 (周远)</span>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">已核签</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">待产箱补货完成</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 2. 全生命周期 24年状态机切换面板 -->
+<div class="flex flex-col space-y-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-lg" style="font-variation-settings: 'FILL' 1;">conversion_path</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">24年生命周期状态机</h3>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full">
+        8个完整演进态
+      </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+      点击任意阶段可发起视图切换。切换后历史健康底账将自动封存，UI模块即时重组。
+    </p>
+<!-- Lifecycle Cards Stream -->
+<div class="space-y-space-sm pt-1" id="stageList">
+<!-- 阶段 0: 备孕期 -->
+<div class="stage-item cursor-pointer transition-all duration-200 rounded-xl bg-surface-container-lowest p-space-md shadow-sm active:scale-[0.99]" data-stage="0">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">favorite</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant">阶段 0</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">备孕与体质储备</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">调养周期 · 排卵监测 · 精卵储备 · 叶酸与微量元素</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded-md shrink-0">已归档</span>
+</div>
+</div>
+<!-- 阶段 1: 孕期 40周 (当前阶段) -->
+<div class="stage-item relative rounded-xl bg-surface-container-lowest p-space-md shadow-md ring-2 ring-primary overflow-hidden" data-stage="1">
+<div class="absolute top-0 right-0 bg-primary text-on-primary font-label-sm text-label-sm px-3 py-0.5 rounded-bl-lg">
+          正在生效
+        </div>
+<div class="flex items-start gap-space-sm mt-1">
+<div class="w-10 h-10 rounded-lg bg-primary-fixed flex items-center justify-center shrink-0 text-primary">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">ecg_heart</span>
+</div>
+<div class="flex-1 min-w-0 pr-12">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm font-semibold text-primary">阶段 1</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">孕期 40周护理</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">高精产检路径 · 母体体征追踪 · 待产包核算 · 分娩计划书</p>
+<!-- Quick Feature Tags -->
+<div class="flex flex-wrap gap-1.5 mt-2.5">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-on-surface">三维胎动记数</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-on-surface">WHO 宫高腹围拟合</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-on-surface">5-1-1 宫缩临产预警</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 阶段 2: 婴幼儿 0-3岁 -->
+<div class="stage-item cursor-pointer transition-all duration-200 rounded-xl bg-surface-container-lowest p-space-md shadow-sm active:scale-[0.99]" data-stage="2">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">child_care</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant">阶段 2</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">婴幼儿 0-3岁</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">科学喂养节律 · 睡眠训练 · 疫苗接种档案 · CDC生长曲线</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-container/40 px-2 py-1 rounded-md shrink-0">可即时切入</span>
+</div>
+</div>
+<!-- 阶段 3: 学前 3-6岁 -->
+<div class="stage-item cursor-pointer transition-all duration-200 rounded-xl bg-surface-container-lowest p-space-md shadow-sm active:scale-[0.99]" data-stage="3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">toys</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant">阶段 3</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">学前 3-6岁</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">远视储备追踪 · 幼小心理衔接 · 习惯建立 · 独立生活自理</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/50 text-xl">chevron_right</span>
+</div>
+</div>
+<!-- 阶段 4: 小学 6-12岁 -->
+<div class="stage-item cursor-pointer transition-all duration-200 rounded-xl bg-surface-container-lowest p-space-md shadow-sm active:scale-[0.99]" data-stage="4">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">menu_book</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant">阶段 4</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">小学 6-12岁</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">学习节律 · 脊柱发育筛查 · 财商零花钱账本 · 双亲轮值陪伴</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/50 text-xl">chevron_right</span>
+</div>
+</div>
+<!-- 阶段 5: 青春期 12-18岁 -->
+<div class="stage-item cursor-pointer transition-all duration-200 rounded-xl bg-surface-container-lowest p-space-md shadow-sm active:scale-[0.99]" data-stage="5">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">psychology</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant">阶段 5</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">青春期 12-18岁</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">定向生理引导 · 情绪暗角支持 · 升学心理屏障 · 边界感沟通</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/50 text-xl">chevron_right</span>
+</div>
+</div>
+<!-- 阶段 6: 大学独立 18-22岁 -->
+<div class="stage-item cursor-pointer transition-all duration-200 rounded-xl bg-surface-container-lowest p-space-md shadow-sm active:scale-[0.99]" data-stage="6">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">school</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant">阶段 6</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">大学独立 18-22岁</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">成长基金结算 · 异地生活透视 · 独立人格构建 · 远距家庭共联</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/50 text-xl">chevron_right</span>
+</div>
+</div>
+<!-- 阶段 7: 步入职场 23-24岁 -->
+<div class="stage-item cursor-pointer transition-all duration-200 rounded-xl bg-surface-container-lowest p-space-md shadow-sm active:scale-[0.99]" data-stage="7">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">work</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant">阶段 7</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">步入职场 23-24岁</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">首薪纪念归档 · 24年养育总成本报告 · 生命时光胶囊完全解封</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/50 text-xl">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. 动态特性模块管理 (Dynamic Feature Modules & Storage) -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm space-y-space-md"><!-- Header with Title & Storage Bar -->
+<div class="space-y-2.5">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+          <rect height="5" rx="2" width="20" x="2" y="3"></rect>
+          <rect height="5" rx="2" width="20" x="2" y="11"></rect>
+          <rect height="5" rx="2" width="20" x="2" y="19"></rect>
+          <circle cx="6" cy="5.5" r="1" fill="currentColor"></circle>
+          <circle cx="6" cy="13.5" r="1" fill="currentColor"></circle>
+          <circle cx="6" cy="21.5" r="1" fill="currentColor"></circle>
+        </svg>
+      </div>
+      <h3 class="font-headline-sm text-headline-sm text-on-surface">动态模块与离线存储</h3>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <span class="font-mono-metric-md text-mono-metric-md text-primary font-semibold">68.2</span>
+      <span class="font-label-sm text-label-sm text-on-surface-variant">/ 500 MB</span>
+    </div>
+  </div>
+
+  <!-- Storage Allocation Progress Bar -->
+  <div class="space-y-1">
+    <div class="w-full h-1.5 rounded-full bg-surface-container-high overflow-hidden flex">
+      <div class="h-full bg-primary rounded-l-full" style="width: 14%"></div>
+      <div class="h-full bg-secondary-fixed-dim" style="width: 7%"></div>
+    </div>
+    <div class="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant pt-0.5">
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-primary"></span> 当前生效 (28.4MB)
+        </span>
+        <span class="inline-flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-secondary-fixed-dim"></span> 预载缓冲 (34.1MB)
+        </span>
+      </div>
+      <span class="">可用 431.8 MB</span>
+    </div>
+  </div>
+</div>
+
+<!-- Modules List -->
+<div class="space-y-2.5">
+  <!-- Module 1: Currently Active -->
+  <div class="p-space-sm rounded-xl bg-surface-container-low border border-primary/20 flex items-center justify-between gap-space-sm">
+    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+      <div class="w-9 h-9 rounded-lg bg-primary-fixed/40 flex items-center justify-center text-primary shrink-0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+        </svg>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="font-label-md text-label-md text-on-surface font-semibold truncate">孕期 40周核心包</span>
+          <span class="font-label-sm text-label-sm text-primary bg-primary-fixed/40 px-1.5 py-0.2 rounded font-medium shrink-0">运行中</span>
+        </div>
+        <p class="font-label-sm text-label-sm text-on-surface-variant truncate mt-0.5">包含母体指标库 · 40周产检时序 · 5-1-1算法</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="font-mono-metric-md text-mono-metric-md text-on-surface font-medium">28.4 MB</span>
+      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-secondary-container/40 text-secondary font-label-sm text-label-sm font-semibold">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24">
+          <path d="M20 6 9 17l-5-5"></path>
+        </svg>
+        已就绪
+      </span>
+    </div>
+  </div>
+
+  <!-- Module 2: Preloaded -->
+  <div class="p-space-sm rounded-xl bg-surface-container-lowest border border-surface-container-high flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors">
+    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+      <div class="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 2a5 5 0 0 1 5 5v3a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5z"></path>
+          <path d="M5 13a7 7 0 0 0 14 0"></path>
+          <path d="M12 20v2"></path>
+        </svg>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="font-label-md text-label-md text-on-surface font-semibold truncate">0-3岁 幼童成长发育包</span>
+          <span class="font-label-sm text-label-sm text-secondary bg-secondary-container/20 px-1.5 py-0.2 rounded font-medium shrink-0">已预载</span>
+        </div>
+        <p class="font-label-sm text-label-sm text-on-surface-variant truncate mt-0.5">WHO生长曲线 · 辅食添加算法 · 疫苗时序库</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button class="px-2.5 py-1.5 rounded-lg border border-secondary/30 text-secondary bg-surface-bright active:bg-secondary-container/30 text-label-sm font-label-sm font-medium flex items-center gap-1 transition-all" type="button">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M20 6 9 17l-5-5"></path>
+        </svg>
+        <span class="">34.1 MB</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Module 3: Not Loaded / On Cloud -->
+  <div class="p-space-sm rounded-xl bg-surface-container-lowest border border-surface-container-high flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors">
+    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+      <div class="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+        </svg>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="font-label-md text-label-md text-on-surface font-semibold truncate">3-6岁 学前与视力储备包</span>
+          <span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-1.5 py-0.2 rounded shrink-0">云端就绪</span>
+        </div>
+        <p class="font-label-sm text-label-sm text-on-surface-variant truncate mt-0.5">眼轴储备监测 · 幼小衔接自理能力评估量表</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button class="px-2.5 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high active:scale-[0.98] text-on-surface font-label-sm text-label-sm transition-all flex items-center gap-1" type="button">
+        <svg class="w-3.5 h-3.5 text-on-surface-variant" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" x2="12" y1="15" y2="3"></line>
+        </svg>
+        <span class="">下载 (19.8M)</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Data Security Guarantee Box with Medical-Grade Trust Design -->
+<div class="p-space-sm rounded-xl bg-surface-container-low border border-secondary/20 flex items-start gap-2.5 shadow-sm">
+  <div class="w-7 h-7 rounded-lg bg-secondary-container/40 flex items-center justify-center text-secondary shrink-0 mt-0.5">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+      <path d="m9 12 2 2 4-4"></path>
+    </svg>
+  </div>
+  <div class="flex-1">
+    <div class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1.5">
+      <span class="">全生命周期数据永存机制</span>
+      <span class="font-mono-code-sm text-label-sm text-secondary bg-surface-container-lowest px-1.5 py-0.2 rounded">AES-256 + SQLite</span>
+    </div>
+    <p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed mt-0.5">
+      无论阶段如何切换或模块如何卸载，所有历史体征、超声影像与双人记账均永久留存于本地离线数据库与家庭私有加密云，绝不丢失。
+    </p>
+  </div>
+</div></div>
+<!-- 4. 特殊生命周期���径与静默关怀 (06 临床静默模式) -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm space-y-space-md">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-full bg-error-container flex items-center justify-center text-on-error-container">
+<span class="material-symbols-outlined text-base">spa</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">特殊路径与静默关怀</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant">尊重每个生命的不可抗力，提供临床级的温度</p>
+</div>
+</div>
+<!-- Silent Care Switch Card -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-start justify-between gap-space-sm">
+<div class="flex-1 space-y-1">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface">妊娠异常 / 终止静默关怀</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.2 rounded bg-surface-container-highest text-on-surface">自愿开��</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+          若遇生化、胎停或医学终止，开启后将立即<strong class="text-on-surface">无痛静默阻断所有母婴推荐与敏感推送</strong>，界面平滑过渡至“小月子身心康复·激素回归·双人关怀”专业循证支持。
+        </p>
+</div>
+<!-- Custom Toggle -->
+<label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+<input class="sr-only peer" id="silentModeToggle" type="checkbox">
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface-container-lowest after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+<!-- 5. 底部主操作条 (Fixed or Sticky Grounding) -->
+<div class="pt-space-sm flex flex-col space-y-space-sm">
+<button class="w-full h-12 rounded-xl bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center gap-2 shadow-md active:opacity-90 transition-opacity" id="confirmStageBtn" type="button">
+<span class="material-symbols-outlined text-xl">done_all</span>
+<span class="">保存生命周期阶段配置</span>
+</button>
+<div class="flex items-center justify-center gap-space-md pt-1">
+<button class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-base">switch_account</span>
+<span class="">切换其他家庭档案 (二胎 / 归档)</span>
+</button>
+<span class="text-surface-container-highest">|</span>
+<button class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-base">history</span>
+<span class="">阶段变更留痕审计</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Inline Micro-interactions -->
+<script>
+  (function() {
+    // 阶段切换交互体验
+    const stageItems = document.querySelectorAll('.stage-item');
+    stageItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const stageId = item.getAttribute('data-stage');
+        if (stageId === '1') return; // 已是当前活跃阶段
+        
+        const stageName = item.querySelector('.font-headline-sm').innerText;
+        const confirmSwitch = confirm(`准备切换至「${stageName}」？\n\n系统将自动保全历史数据，并重组界面模块。`);
+        if (confirmSwitch) {
+          // Visual feedback
+          stageItems.forEach(si => {
+            si.classList.remove('ring-2', 'ring-primary', 'shadow-md');
+            si.classList.add('shadow-sm');
+          });
+          item.classList.add('ring-2', 'ring-primary', 'shadow-md');
+        }
+      });
+    });
+
+    // 静默模式微交互
+    const silentToggle = document.getElementById('silentModeToggle');
+    if (silentToggle) {
+      silentToggle.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          alert('静默关怀模式已就绪：已停止常态孕产算法提醒，已置顶小月子身��康复专栏。给您与伴侣最温柔的修整空间。');
+        }
+      });
+    }
+
+    // 保存主按钮
+    const confirmBtn = document.getElementById('confirmStageBtn');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', () => {
+        const originalText = confirmBtn.innerHTML;
+        confirmBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-xl">refresh</span> 状态机配置同步中...';
+        setTimeout(() => {
+          confirmBtn.innerHTML = '<span class="material-symbols-outlined text-xl">check</span> 生命周期配置已生效';
+          setTimeout(() => {
+            confirmBtn.innerHTML = originalText;
+          }, 1800);
+        }, 600);
+      });
+    }
+  })();
+</script></main>
+
+</body></html>

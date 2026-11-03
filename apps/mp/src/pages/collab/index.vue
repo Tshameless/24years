@@ -19,7 +19,7 @@ const inviteInput = ref('');
 
 const statusText = computed(() => {
   if (!isSignedIn()) {
-    return '未登录 · 数据只存在本机';
+    return '未登录 · 本机离线';
   }
 
   if (!collabStore.ready || collabStore.loading) {
@@ -45,12 +45,19 @@ const statusText = computed(() => {
   return `已同步 · ${collabStore.lastSyncedAt || '刚刚'}`;
 });
 
+const isConnected = computed(() => isSignedIn() && !!collabStore.spaceId && !collabStore.error);
+
 // 角色文案统一取领域层定义，避免和 Web 端措辞漂移。
 const memberLines = computed(() =>
   collabStore.members.map((member) => {
     const mine = isSignedIn() && member.ownerId === authStore.account?.id;
 
-    return `${member.displayName || '未设置昵称'}${mine ? '（我）' : ''} · ${memberRoleLabel(member.role)} · ${member.joinedAt}`;
+    return {
+      name: `${member.displayName || '微信家人'}${mine ? ' (我)' : ''}`,
+      role: memberRoleLabel(member.role),
+      date: member.joinedAt,
+      isOwner: member.role === 'owner',
+    };
   }),
 );
 
@@ -108,143 +115,371 @@ async function refresh(): Promise<void> {
     uni.showToast({ title: '已拉取最新数据', icon: 'success' });
   }
 }
-
 </script>
 
 <template>
   <view class="page">
-    <view class="card">
-      <view class="row">
-        <text class="section-title">家庭共享</text>
-        <text class="status">{{ statusText }}</text>
+    <!-- 品牌与协同状态顶卡 (Brand Badge & Hearth Aesthetics) -->
+    <view class="card brand-card">
+      <view class="brand-badge-wrap">
+        <text class="brand-icon">🤝</text>
       </view>
-      <text class="muted gap">登录并加入同一家庭后，双方在本机的改动会互相同步。</text>
+      <view class="brand-title">24Years · 双人家庭协同</view>
+      <text class="brand-tagline">双向同频 · 循证产检 · 家庭共享账本</text>
+
+      <view class="row status-bar">
+        <view class="status-left">
+          <view :class="['pulse-dot', { offline: !isConnected }]" />
+          <text class="status-text">{{ statusText }}</text>
+        </view>
+        <view class="pill pill-surface">
+          <text>端到端加密</text>
+        </view>
+      </view>
     </view>
 
-    <view v-if="!isSignedIn()" class="card">
-      <view class="section-title">登录</view>
-      <text class="muted">使用微信身份登录，把本机数据升级为可在两人之间同步的家庭数据。</text>
+    <!-- 登录模块 -->
+    <view v-if="!isSignedIn()" class="card login-card">
+      <view class="section-title">微信一键接入</view>
+      <text class="muted desc">使用微信快速登录，将当前设备的孕期与账本数据升级为双人实时同步状态。</text>
       <button class="primary" type="primary" :loading="authStore.loading" @click="login">
-        微信一键登录
+        微信一键安全登录
       </button>
       <text v-if="authStore.error" class="error">{{ authStore.error }}</text>
     </view>
 
-    <view v-else class="card">
+    <!-- 已登录账号卡片 -->
+    <view v-else class="card account-card">
       <view class="row">
-        <text>{{ authStore.account?.name || '微信用户' }}</text>
-        <button size="mini" @click="logout">退出登录</button>
+        <view class="user-info">
+          <view class="avatar-circle">👤</view>
+          <view class="user-text">
+            <text class="user-name">{{ authStore.account?.name || '微信用户' }}</text>
+            <text class="hint">ID: {{ authStore.account?.id }}</text>
+          </view>
+        </view>
+        <button class="logout-btn" size="mini" @click="logout">退出</button>
       </view>
-      <text class="muted gap">账号 ID：{{ authStore.account?.id }}</text>
     </view>
 
-    <view v-if="collabStore.conflict" class="card conflict">
-      <view class="section-title">版本冲突</view>
-      <text class="muted">家人在这台设备离线期间更新了同一份家庭数据，请选择保留哪一份。</text>
-      <button class="primary" type="primary" @click="keepRemoteVersion">用家人的版本</button>
-      <button class="primary" @click="keepLocalVersion">用我这台的版本覆盖</button>
+    <!-- 冲突解决卡片 -->
+    <view v-if="collabStore.conflict" class="card conflict-card">
+      <view class="section-title text-alert">⚠️ 数据版本冲突</view>
+      <text class="muted desc">家人在你离线期间更新了同一份家庭档案，请选择保留哪一份：</text>
+      <view class="conflict-actions">
+        <button class="conflict-btn primary" type="primary" @click="keepRemoteVersion">
+          使用家人的最新版本
+        </button>
+        <button class="conflict-btn secondary" @click="keepLocalVersion">
+          用我当前的版本覆盖
+        </button>
+      </view>
     </view>
 
-    <view v-if="isSignedIn() && !collabStore.spaceId" class="card">
-      <view class="section-title">创建家庭</view>
-      <input v-model="spaceName" class="input" placeholder="家庭名称，如：小团圆" />
-      <button class="primary" type="primary" :loading="collabStore.loading" @click="create">
-        创建并把本机数据上传
-      </button>
+    <!-- 未创建/未加入家庭 -->
+    <view v-if="isSignedIn() && !collabStore.spaceId" class="card action-card">
+      <view class="form-section">
+        <view class="section-title">创建专属家庭空间</view>
+        <input v-model="spaceName" class="input" placeholder="输入家庭名称，如：温馨小家" />
+        <button class="primary" type="primary" :loading="collabStore.loading" @click="create">
+          创建家庭并同步数据
+        </button>
+      </view>
 
-      <view class="section-title gap">加入家人的家庭</view>
-      <input v-model="inviteInput" class="input" placeholder="输入 8 位邀请码" />
-      <button class="primary" :loading="collabStore.loading" @click="join">加入</button>
+      <view class="section-divider">
+        <text class="divider-text">或者</text>
+      </view>
+
+      <view class="form-section">
+        <view class="section-title">加入家人的家庭</view>
+        <input v-model="inviteInput" class="input" placeholder="输入 8 位家庭邀请码" />
+        <button class="btn-join" :loading="collabStore.loading" @click="join">
+          验证并加入
+        </button>
+      </view>
       <text v-if="collabStore.error" class="error">{{ collabStore.error }}</text>
     </view>
 
-    <view v-if="isSignedIn() && collabStore.spaceId" class="card">
-      <view class="row">
-        <text class="section-title">{{ collabStore.spaceName }}</text>
-        <button size="mini" :loading="collabStore.loading" @click="refresh">刷新</button>
+    <!-- 已加入家庭空间 -->
+    <view v-if="isSignedIn() && collabStore.spaceId" class="card space-card">
+      <view class="row space-header">
+        <view>
+          <view class="section-title">{{ collabStore.spaceName }}</view>
+          <view class="section-subtitle">双人同频已生效</view>
+        </view>
+        <button size="mini" :loading="collabStore.loading" @click="refresh">拉取同步</button>
       </view>
-      <view class="field">
-        <text>邀请码</text>
-        <text class="code" @click="copyInviteCode">{{ collabStore.inviteCode }}</text>
+
+      <!-- 邀请码高亮卡片 -->
+      <view class="invite-highlight-box" @click="copyInviteCode">
+        <text class="invite-label">家庭邀请码 (点击复制)</text>
+        <text class="code-number">{{ collabStore.inviteCode }}</text>
+        <text class="invite-tip">将此码发送给伴侣，即可在另一台设备共享数据</text>
       </view>
-      <text class="muted">把邀请码告诉家人，对方在「加入家庭」里输入即可共享同一份数据。</text>
+
       <text v-if="readOnlyHint" class="readonly-tip">{{ readOnlyHint }}</text>
 
-      <view class="section-title gap">成员 {{ collabStore.members.length }} 人</view>
-      <text v-for="line in memberLines" :key="line" class="member">{{ line }}</text>
+      <!-- 成员列表 -->
+      <view class="members-section">
+        <view class="section-title">家庭成员 ({{ collabStore.members.length }}人)</view>
+        <view v-for="m in memberLines" :key="m.name" class="member-row">
+          <view class="member-left">
+            <text class="member-name">{{ m.name }}</text>
+            <text class="hint">{{ m.date }} 加入</text>
+          </view>
+          <view :class="['pill', m.isOwner ? 'pill-primary' : 'pill-secondary']">
+            <text>{{ m.role }}</text>
+          </view>
+        </view>
+      </view>
     </view>
   </view>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .page {
   padding-bottom: 60rpx;
 }
 
-.status {
-  font-size: 24rpx;
-  color: #6b7280;
+/* 顶卡 */
+.brand-card {
+  text-align: center;
+  background: linear-gradient(180deg, #ffffff 0%, $color-surface-container-low 100%);
+  border: 1rpx solid rgba(218, 226, 253, 0.7);
+
+  .brand-badge-wrap {
+    width: 96rpx;
+    height: 96rpx;
+    border-radius: 50%;
+    background-color: $color-primary-fixed;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16rpx;
+
+    .brand-icon {
+      font-size: 48rpx;
+    }
+  }
+
+  .brand-title {
+    font-size: 34rpx;
+    font-weight: 700;
+    color: $color-on-surface;
+    letter-spacing: -0.01em;
+  }
+
+  .brand-tagline {
+    font-size: 24rpx;
+    color: $color-on-surface-variant;
+    margin-top: 6rpx;
+    display: block;
+  }
+
+  .status-bar {
+    margin-top: 28rpx;
+    padding-top: 20rpx;
+    border-top: 1rpx solid rgba(218, 226, 253, 0.8);
+
+    .status-left {
+      display: flex;
+      align-items: center;
+      gap: 12rpx;
+
+      .status-text {
+        font-size: 24rpx;
+        color: $color-on-surface;
+        font-weight: 500;
+      }
+
+      .pulse-dot.offline {
+        background-color: $color-outline;
+        animation: none;
+      }
+    }
+  }
 }
 
-.gap {
-  margin-top: 12rpx;
-}
-
-.muted {
-  color: #6b7280;
-  font-size: 26rpx;
+.desc {
+  line-height: 1.6;
+  margin-bottom: 24rpx;
+  display: block;
 }
 
 .error {
   display: block;
-  margin-top: 12rpx;
-  color: #e0533d;
+  margin-top: 14rpx;
+  color: $color-tertiary;
   font-size: 26rpx;
 }
 
 .primary {
   margin-top: 16rpx;
+  width: 100%;
 }
 
 .input {
-  padding: 16rpx;
-  margin-top: 12rpx;
-  border: 2rpx solid #e5e7eb;
-  border-radius: 12rpx;
+  width: 100%;
+  padding: 20rpx 24rpx;
+  margin: 16rpx 0 20rpx;
+  background-color: $color-surface-container-low;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-md;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: $color-on-surface;
 }
 
-.field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14rpx 0;
+.account-card {
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+
+    .avatar-circle {
+      width: 72rpx;
+      height: 72rpx;
+      border-radius: 50%;
+      background-color: $color-surface-container-high;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36rpx;
+    }
+
+    .user-text {
+      display: flex;
+      flex-direction: column;
+
+      .user-name {
+        font-size: 28rpx;
+        font-weight: 600;
+        color: $color-on-surface;
+      }
+    }
+  }
+
+  .logout-btn {
+    margin: 0 !important;
+    border-radius: $radius-full !important;
+  }
 }
 
-.code {
-  font-size: 36rpx;
-  font-weight: 600;
-  letter-spacing: 4rpx;
-  color: #4caf50;
+.conflict-card {
+  border: 2rpx solid $color-tertiary-container;
+  background-color: #fff9f9;
+
+  .text-alert {
+    color: $color-tertiary;
+  }
+
+  .conflict-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+  }
 }
 
-.member {
-  display: block;
-  padding: 8rpx 0;
-  color: #374151;
+.section-divider {
+  text-align: center;
+  margin: 28rpx 0;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1rpx;
+    background-color: rgba(218, 226, 253, 0.8);
+  }
+
+  .divider-text {
+    position: relative;
+    background-color: #ffffff;
+    padding: 0 20rpx;
+    font-size: 22rpx;
+    color: $color-outline;
+  }
 }
 
-.conflict {
-  border: 2rpx solid #ff9800;
+.btn-join {
+  width: 100%;
+  border-radius: $radius-lg !important;
+  background-color: $color-surface-container !important;
+  color: $color-on-surface !important;
+  font-weight: 500 !important;
 }
 
-.readonly-tip {
-  display: block;
-  margin-top: 16rpx;
-  padding: 16rpx 20rpx;
-  border-radius: 8rpx;
-  background-color: #fff7e6;
-  color: #b26a00;
-  font-size: 26rpx;
-  line-height: 1.6;
+.space-card {
+  .space-header {
+    margin-bottom: 24rpx;
+  }
+
+  .invite-highlight-box {
+    padding: 30rpx;
+    background: linear-gradient(135deg, $color-surface-container-low 0%, $color-surface-container 100%);
+    border-radius: $radius-lg;
+    border: 1rpx dashed $color-primary;
+    text-align: center;
+    margin-bottom: 24rpx;
+
+    .invite-label {
+      font-size: 24rpx;
+      color: $color-on-surface-variant;
+      display: block;
+      margin-bottom: 8rpx;
+    }
+
+    .code-number {
+      font-size: 52rpx;
+      font-weight: 800;
+      letter-spacing: 6rpx;
+      color: $color-primary;
+      font-family: -apple-system, monospace;
+      display: block;
+      margin: 10rpx 0;
+    }
+
+    .invite-tip {
+      font-size: 22rpx;
+      color: $color-outline;
+    }
+  }
+
+  .members-section {
+    margin-top: 24rpx;
+
+    .member-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18rpx 0;
+      border-top: 1rpx solid rgba(218, 226, 253, 0.6);
+
+      .member-left {
+        display: flex;
+        flex-direction: column;
+
+        .member-name {
+          font-size: 28rpx;
+          font-weight: 500;
+          color: $color-on-surface;
+        }
+      }
+    }
+  }
+
+  .readonly-tip {
+    display: block;
+    margin-bottom: 20rpx;
+    padding: 16rpx 20rpx;
+    border-radius: $radius-md;
+    background-color: $color-tertiary-fixed;
+    color: $color-on-tertiary-fixed;
+    font-size: 24rpx;
+    line-height: 1.5;
+  }
 }
 </style>

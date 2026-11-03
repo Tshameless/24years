@@ -247,16 +247,18 @@ function submit(): void {
   </view>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .page {
-  padding-bottom: 40rpx;
+  padding-bottom: 60rpx;
 }
 
 .card {
-  margin: 24rpx;
-  padding: 28rpx;
-  background: #fff;
-  border-radius: 16rpx;
+  margin: 20rpx 24rpx;
+  padding: 30rpx 28rpx;
+  background: #ffffff;
+  border-radius: $radius-lg;
+  border: 1rpx solid rgba(218, 226, 253, 0.6);
+  box-shadow: $shadow-card;
 }
 
 .head {
@@ -267,8 +269,9 @@ function submit(): void {
 }
 
 .section-title {
-  font-size: 30rpx;
+  font-size: 32rpx;
   font-weight: 600;
+  color: $color-on-surface;
 }
 
 .row.between {
@@ -279,25 +282,26 @@ function submit(): void {
 
 .tag {
   flex-shrink: 0;
-  padding: 6rpx 16rpx;
-  background: #eef7ef;
-  border-radius: 20rpx;
+  padding: 6rpx 18rpx;
+  background: $color-secondary-container;
+  border-radius: $radius-full;
   font-size: 22rpx;
-  color: #4caf50;
-}
+  font-weight: 600;
+  color: $color-on-secondary-container;
 
-.tag.warn {
-  background: #fdecea;
-  color: #e0533d;
+  &.warn {
+    background: $color-tertiary-fixed;
+    color: $color-on-tertiary-fixed;
+  }
 }
 
 .notice {
   margin-top: 20rpx;
-  padding: 18rpx;
-  background: #fdf3f2;
-  border-radius: 12rpx;
+  padding: 20rpx;
+  background: $color-tertiary-fixed;
+  border-radius: $radius-md;
   font-size: 24rpx;
-  color: #e0533d;
+  color: $color-on-tertiary-fixed;
   line-height: 1.6;
 }
 
@@ -305,7 +309,7 @@ function submit(): void {
   display: flex;
   margin-top: 24rpx;
   padding-top: 24rpx;
-  border-top: 1rpx solid #f0f1f3;
+  border-top: 1rpx solid rgba(218, 226, 253, 0.8);
 }
 
 .summary-item {
@@ -315,40 +319,44 @@ function submit(): void {
 
 .num {
   display: block;
-  font-size: 36rpx;
-  font-weight: 600;
-}
+  font-size: 38rpx;
+  font-weight: 700;
+  color: $color-on-surface;
 
-.num.ok {
-  color: #4caf50;
-}
+  &.ok {
+    color: $color-secondary;
+  }
 
-.num.current {
-  color: #2196f3;
-}
+  &.current {
+    color: $color-primary;
+  }
 
-.num.past {
-  color: #9ca3af;
+  &.past {
+    color: $color-outline;
+  }
 }
 
 .item {
   padding: 24rpx;
-  margin-bottom: 16rpx;
-  background: #f7f8fa;
-  border-left: 6rpx solid #e5e7eb;
-  border-radius: 12rpx;
-}
+  margin-bottom: 20rpx;
+  background: $color-surface-container-low;
+  border-left: 8rpx solid $color-surface-container-highest;
+  border-radius: $radius-md;
+  transition: all 0.2s ease;
 
-.item.state-due {
-  border-left-color: #2196f3;
-}
+  &.state-due {
+    border-left-color: $color-primary;
+    background: #ffffff;
+    box-shadow: $shadow-card;
+  }
 
-.item.state-completed {
-  border-left-color: #4caf50;
-}
+  &.state-completed {
+    border-left-color: $color-secondary;
+  }
 
-.item.state-scheduled {
-  border-left-color: #f2994a;
+  &.state-scheduled {
+    border-left-color: $color-primary-container;
+  }
 }
 
 .item-head {
@@ -362,42 +370,45 @@ function submit(): void {
   flex: 1;
   font-size: 28rpx;
   font-weight: 600;
+  color: $color-on-surface;
 }
 
 .state-tag {
   flex-shrink: 0;
-  padding: 4rpx 14rpx;
-  border-radius: 16rpx;
-  font-size: 20rpx;
-  background: #eef0f2;
-  color: #6b7280;
-}
+  padding: 6rpx 16rpx;
+  border-radius: $radius-full;
+  font-size: 22rpx;
+  font-weight: 500;
+  background: $color-surface-container-high;
+  color: $color-on-surface-variant;
 
-.tag-completed {
-  background: #e8f5e9;
-  color: #4caf50;
-}
+  &.tag-completed {
+    background: $color-secondary-container;
+    color: $color-on-secondary-container;
+  }
 
-.tag-due {
-  background: #e3f2fd;
-  color: #2196f3;
-}
+  &.tag-due {
+    background: $color-primary-fixed;
+    color: $color-on-primary-fixed-variant;
+  }
 
-.tag-scheduled {
-  background: #fff3e0;
-  color: #f2994a;
+  &.tag-scheduled {
+    background: $color-surface-variant;
+    color: $color-primary;
+  }
 }
 
 .guidance {
-  margin: 12rpx 0;
+  margin: 14rpx 0;
   font-size: 25rpx;
   line-height: 1.6;
+  color: $color-on-surface-variant;
 }
 
 .actions {
   display: flex;
   gap: 16rpx;
-  margin-top: 8rpx;
+  margin-top: 12rpx;
 }
 
 .form {
@@ -412,21 +423,25 @@ function submit(): void {
   display: block;
   margin-bottom: 10rpx;
   font-size: 24rpx;
-  color: #6b7280;
+  color: $color-on-surface-variant;
 }
 
 .value {
   padding: 20rpx;
-  background: #f7f8fa;
-  border-radius: 12rpx;
+  background: $color-surface-container-low;
+  border-radius: $radius-md;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
   font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .input {
   padding: 20rpx;
-  background: #f7f8fa;
-  border-radius: 12rpx;
+  background: $color-surface-container-low;
+  border-radius: $radius-md;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
   font-size: 28rpx;
+  color: $color-on-surface;
 }
 
 .area {
@@ -437,35 +452,40 @@ function submit(): void {
 .btn {
   padding: 20rpx 0;
   text-align: center;
-  border: 1rpx solid #e5e7eb;
-  border-radius: 12rpx;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  border-radius: $radius-lg;
   font-size: 27rpx;
-}
+  font-weight: 500;
+  transition: all 0.2s ease;
 
-.btn.small {
-  flex: 1;
-  padding: 14rpx 0;
-  font-size: 24rpx;
-}
+  &.small {
+    flex: 1;
+    padding: 14rpx 0;
+    font-size: 24rpx;
+  }
 
-.btn.primary {
-  background: #4caf50;
-  border-color: #4caf50;
-  color: #fff;
-}
+  &.primary {
+    background: $color-primary;
+    border-color: $color-primary;
+    color: #ffffff;
+    box-shadow: 0 4rpx 14rpx rgba(185, 5, 56, 0.25);
+  }
 
-.btn.danger {
-  color: #e0533d;
+  &.danger {
+    color: $color-tertiary;
+    border-color: rgba(187, 1, 18, 0.3);
+  }
 }
 
 .link {
   font-size: 26rpx;
-  color: #4caf50;
+  color: $color-primary;
+  font-weight: 500;
 }
 
 .muted {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $color-on-surface-variant;
   line-height: 1.6;
 }
 </style>
