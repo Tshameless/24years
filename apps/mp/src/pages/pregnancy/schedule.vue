@@ -436,17 +436,25 @@ function submit(): void {
 }
 
 .input {
-  padding: 20rpx;
+  width: 100%;
+  height: 80rpx;
+  min-height: 80rpx;
+  line-height: 80rpx;
+  padding: 0 24rpx;
   background: $color-surface-container-low;
   border-radius: $radius-md;
   border: 1rpx solid rgba(218, 226, 253, 0.8);
   font-size: 28rpx;
   color: $color-on-surface;
+  box-sizing: border-box;
 }
 
 .area {
   width: 100%;
+  height: auto;
   min-height: 120rpx;
+  line-height: 1.5;
+  padding: 16rpx 20rpx;
 }
 
 .btn {

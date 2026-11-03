@@ -344,7 +344,10 @@ const repeatOptions = [
 
 .input {
   width: 100%;
-  padding: 20rpx 24rpx;
+  height: 80rpx;
+  min-height: 80rpx;
+  line-height: 80rpx;
+  padding: 0 24rpx;
   margin-bottom: 20rpx;
   border: 1rpx solid rgba(218, 226, 253, 0.8);
   border-radius: $radius-md;

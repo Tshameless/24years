@@ -69,6 +69,35 @@ page {
   margin-top: 16rpx;
 }
 
+/* 微信小程序原生 input 高度与防压扁规范 */
+input {
+  box-sizing: border-box;
+}
+
+.input {
+  width: 100%;
+  height: 80rpx;
+  min-height: 80rpx;
+  line-height: 80rpx;
+  padding: 0 24rpx;
+  border-radius: $radius-md;
+  background-color: $color-surface-container-low;
+  border: 1rpx solid rgba(218, 226, 253, 0.8);
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: $color-on-surface;
+}
+
+.inline-input {
+  height: 64rpx;
+  min-height: 64rpx;
+  line-height: 64rpx;
+  padding: 0 16rpx;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: $color-on-surface;
+}
+
 /* Stitch 胶囊标签 (Pills / Badges) */
 .pill {
   display: inline-flex;

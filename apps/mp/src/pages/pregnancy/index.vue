@@ -1012,7 +1012,10 @@ function describeOther(record: PregnancyRecord): string {
 
 .input {
   width: 100%;
-  padding: 18rpx 20rpx;
+  height: 80rpx;
+  min-height: 80rpx;
+  line-height: 80rpx;
+  padding: 0 24rpx;
   margin-bottom: 20rpx;
   background-color: $color-surface-container-low;
   border: 1rpx solid rgba(218, 226, 253, 0.8);
@@ -1024,11 +1027,15 @@ function describeOther(record: PregnancyRecord): string {
 
 .inline-input {
   width: 240rpx;
+  height: 64rpx;
+  min-height: 64rpx;
+  line-height: 64rpx;
   text-align: right;
-  padding: 8rpx 16rpx;
+  padding: 0 16rpx;
   background-color: $color-surface-container-low;
   border: 1rpx solid rgba(218, 226, 253, 0.8);
   border-radius: $radius-sm;
+  box-sizing: border-box;
 }
 
 .field {
