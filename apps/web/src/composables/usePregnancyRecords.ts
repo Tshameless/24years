@@ -15,10 +15,14 @@ export function usePregnancyRecords() {
   const busy = shallowRef(false);
   const message = shallowRef('');
   const error = shallowRef('');
-  const records = computed(() => [
-    ...store.data.value.pregnancyRecords,
-    ...store.privateCareRecords.value,
-  ]);
+  const records = computed(() => {
+    const sharedIds = new Set(store.data.value.pregnancyRecords.map((item) => item.id));
+
+    return [
+      ...store.data.value.pregnancyRecords,
+      ...store.privateCareRecords.value.filter((item) => !sharedIds.has(item.id)),
+    ];
+  });
   const outcome = computed(() => pregnancyOutcome(records.value));
   const outcomeDisabled = computed(() => store.recordLocked.value || busy.value);
   const disabled = computed(() => outcomeDisabled.value || !!outcome.value);
@@ -74,7 +78,9 @@ export function usePregnancyRecords() {
       if (beforePrivate && valuePrivate) {
         const saved = store.savePrivateCareRecord(change.value, change.before);
         message.value = saved ? '私密记录已保存在本机，不会同步到家庭云。' : '';
-        error.value = saved ? '' : store.privateCareError.value || '本机私密记录已变化，请重新载入。';
+        error.value = saved
+          ? ''
+          : store.privateCareError.value || '本机私密记录已变化，请重新载入。';
 
         return saved;
       }

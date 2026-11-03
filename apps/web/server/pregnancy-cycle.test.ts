@@ -25,8 +25,12 @@ test('生命周期同步、角色权限、并发、幂等与完整恢复', async
       data: {
         ...emptyFamily(),
         profile: {
-          name: '家', nickname: '我', dueDate: '2026-01-10', quietMode: false,
-          familyMode: 'couple', parentRole: 'mother',
+          name: '家',
+          nickname: '我',
+          dueDate: '2026-01-10',
+          quietMode: false,
+          familyMode: 'couple',
+          parentRole: 'mother',
         },
       },
     }).family!;

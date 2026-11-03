@@ -367,34 +367,37 @@ async function addReminder() {
         <label class="field">
           体重（kg）
           <input
-            v-model="form.weightKg"
+            :value="form.weightKg"
             type="number"
             step="0.01"
             min="0.5"
             max="40"
             placeholder="例如：6.40"
+            @input="form.weightKg = ($event.target as HTMLInputElement).value"
           />
         </label>
         <label class="field">
           身长（cm）
           <input
-            v-model="form.heightCm"
+            :value="form.heightCm"
             type="number"
             step="0.1"
             min="20"
             max="140"
             placeholder="例如：61.5"
+            @input="form.heightCm = ($event.target as HTMLInputElement).value"
           />
         </label>
         <label class="field">
           头围（cm）
           <input
-            v-model="form.headCircumferenceCm"
+            :value="form.headCircumferenceCm"
             type="number"
             step="0.1"
             min="20"
             max="60"
             placeholder="例如：40.5"
+            @input="form.headCircumferenceCm = ($event.target as HTMLInputElement).value"
           />
         </label>
       </div>

@@ -61,6 +61,13 @@ const card = computed(() =>
         拨打 120
       </a>
       <a
+        v-if="card?.obstetricPhone"
+        class="button button-secondary"
+        :href="`tel:${card.obstetricPhone.replace(/[^+\d]/g, '')}`"
+      >
+        联系产科急诊
+      </a>
+      <a
         v-if="card?.phone"
         class="button button-secondary"
         :href="`tel:${card.phone.replace(/[^+\d]/g, '')}`"

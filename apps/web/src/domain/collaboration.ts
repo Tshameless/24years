@@ -184,9 +184,7 @@ export function applyFamilyDelta(current: SharedFamily, delta: FamilyDelta): Sha
 
       if (
         profile &&
-        (profile.familyMode !== delta.mode ||
-          !owner ||
-          owner.familyRole !== profile.parentRole)
+        (profile.familyMode !== delta.mode || !owner || owner.familyRole !== profile.parentRole)
       ) {
         return null;
       }

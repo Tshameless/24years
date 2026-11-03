@@ -102,6 +102,8 @@ export function analyzeContractions(
   const isSustained = spanMinutes >= 40 || pool.length >= 6;
 
   if (isInterval511 && isDuration511 && isSustained) {
+    const targetMinutes = options.multiparous ? 4 : 5;
+
     return {
       completedCount: completed.length,
       avgDurationSeconds: avgDuration,
@@ -109,10 +111,9 @@ export function analyzeContractions(
       matches511: true,
       rule,
       status: 'active_labor_511',
-      badge: '5-1-1 规律临产',
-      title: '已符合 5-1-1 规律临产标准',
-      advice:
-        '宫缩间隔已达到约 5 分钟或更短、持续约 1 分钟并保持规律。这通常是真正产程启动的信号，建议联系产检医院或带齐待产包与就医证件前往急诊。',
+      badge: `${rule} 规律临产`,
+      title: `已符合 ${rule} 规律临产标准`,
+      advice: `宫缩间隔已达到约 ${targetMinutes} 分钟或更短、持续约 1 分钟并保持规律。这通常是真正产程启动的信号，建议联系产检医院或带齐待产包与就医证件前往急诊。`,
     };
   }
 

@@ -69,7 +69,9 @@ async function submit() {
     metric: form.metric,
     value: Number(form.value),
     secondary: form.metric === 'bloodPressure' ? Number(form.secondary) : null,
-    ...(form.metric === 'bloodPressure' && form.pulse.trim() ? { pulse: Number(form.pulse) } : {}),
+    ...(form.metric === 'bloodPressure' && String(form.pulse).trim()
+      ? { pulse: Number(form.pulse) }
+      : {}),
     notes: form.notes.trim(),
   };
 
@@ -268,11 +270,12 @@ async function submit() {
           >
             脉搏/心率（次/分，可选）
             <input
-              v-model="form.pulse"
+              :value="form.pulse"
               type="number"
               min="1"
               max="300"
               step="1"
+              @input="form.pulse = ($event.target as HTMLInputElement).value"
             />
           </label>
           <label class="field">

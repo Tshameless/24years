@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
+import { addDays, localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
+import FoodSafetyGuide from './FoodSafetyGuide.vue';
 
 type Nutrition = Extract<PregnancyRecord, { type: 'nutrition' }>;
 const {
@@ -23,6 +24,11 @@ const entries = computed(() =>
     .filter((item): item is Nutrition => item.type === 'nutrition')
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
+const recentSevenDaysCount = computed(() => {
+  const cutoff = addDays(localDate(), -6);
+
+  return new Set(entries.value.filter((item) => item.date >= cutoff).map((item) => item.date)).size;
+});
 const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
   type: 'nutrition',
   defaults: () => ({
@@ -69,11 +75,12 @@ async function submit() {
 </script>
 
 <template>
+  <FoodSafetyGuide />
   <div class="pregnancy-columns">
     <section class="panel">
       <div class="panel-heading">
         <h2>营养与补剂记录</h2>
-        <span class="tag">{{ entries.length }} 天</span>
+        <span class="tag">{{ entries.length }} 天 · 近 7 天 {{ recentSevenDaysCount }} 天</span>
       </div>
       <p class="muted">
         记录饮水、优质蛋白、蔬菜和遵医嘱补剂。这里不替代个体化营养方案；分娩后可继续记录至 24 个月。
@@ -193,6 +200,22 @@ async function submit() {
           </label>
           <button class="button button-primary">保存营养记录</button>
         </fieldset>
+        <p
+          v-if="stale"
+          class="form-error"
+          role="alert"
+        >
+          记录已变化，输入仍保留，请取消后重新编辑最新记录。
+        </p>
+        <button
+          v-if="before"
+          type="button"
+          class="button button-secondary"
+          :disabled="disabled"
+          @click="cancel"
+        >
+          取消编辑
+        </button>
       </form>
       <p
         v-if="error"

@@ -173,12 +173,15 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
       localStorage.setItem(privateCareStorageKey.value, JSON.stringify(next));
       privateCareRecords.value = next;
       privateCareError.value = '';
+
       return true;
     } catch {
       privateCareError.value = '私密记录未能保存在本机，请检查浏览器存储空间。';
+
       return false;
     }
   }
+
   const today = shallowRef(localDate());
 
   let lastSaved: string | null = null;
@@ -344,9 +347,7 @@ export function createFamilyStore(options: { connect?: boolean } = {}) {
         { type: 'child', value: child, before },
         {
           ...data.value,
-          children: data.value.children.map((item) =>
-            item.id === child.id ? child : item,
-          ),
+          children: data.value.children.map((item) => (item.id === child.id ? child : item)),
         },
       ))
     );

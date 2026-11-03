@@ -415,3 +415,85 @@ test('趋势指标日期过滤、双血压曲线和窄屏布局', async ({ page 
   await expect(panel.getByRole('alert')).toContainText('不得早于');
   expect(errors).toEqual([]);
 });
+
+test('分孕周指南、循证饮食速查、待产套组导入、起名寄语与私密心情编辑闭环', async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (['error', 'warning'].includes(message.type())) {
+      errors.push(message.text());
+    }
+  });
+  page.on('dialog', (dialog) => dialog.accept());
+
+  // 1. 分孕周科学指南并加入日常计划
+  await page.goto('/pregnancy?tab=overview');
+  const weeklyGuide = page.getByRole('region', { name: '分孕周科学指南' });
+  await expect(weeklyGuide).toBeVisible();
+  await weeklyGuide.getByRole('button', { name: '加入日常计划' }).first().click();
+  await expect(weeklyGuide.getByRole('status')).toContainText('加入日常计划');
+
+  // 2. 私密心情记录编辑不误报冲突
+  await page.goto('/pregnancy?tab=mood');
+  await page.getByLabel('可见范围').selectOption('private');
+  await page.getByLabel('记录备注').fill('仅自己可见的初始心情');
+  await page.getByRole('button', { name: '保存心情日记' }).click();
+  await expect(page.locator('.record-list')).toContainText('仅自己可见');
+  await page.locator('.record-list').getByRole('button', { name: '编辑', exact: true }).click();
+  await expect(page.getByRole('button', { name: '保存心情日记' })).toBeEnabled();
+  await page.getByLabel('记录备注').fill('修改后的私密心情');
+  await page.getByRole('button', { name: '保存心情日记' }).click();
+  await expect(page.locator('.record-list')).toContainText('修改后的私密心情');
+
+  // 3. 超声数字输入草稿刷新不损坏
+  await page.goto('/pregnancy?tab=ultrasound');
+  await page.getByLabel('BPD（mm）').fill('61.2');
+  await page.reload();
+  await expect(page.getByLabel('BPD（mm）')).toHaveValue('61.2');
+  await expect(page.getByText(/无法读取标签页草稿/)).toHaveCount(0);
+  await page.getByRole('button', { name: '保存超声指标' }).click();
+  await expect(page.locator('.trend-table')).toContainText('61.2');
+
+  // 4. 循证饮食安全速查与错峰补剂提醒
+  await page.goto('/pregnancy?tab=nutrition');
+  const foodGuide = page.getByRole('region', { name: '孕期循证饮食速查与补剂错峰助手' });
+  await foodGuide.getByLabel('搜索食物或饮品').fill('螃蟹');
+  await expect(foodGuide).toContainText('彻底煮熟的螃蟹与虾贝');
+  await expect(foodGuide).toContainText('放心享用');
+  await foodGuide.locator('.supplement-clock summary').click();
+  await foodGuide.getByRole('button', { name: '设为每日提醒' }).first().click();
+  await expect(foodGuide.getByRole('status')).toContainText('补剂错峰提醒');
+
+  // 5. 医院场景待产套组一键补齐
+  await page.goto('/pregnancy?tab=packing');
+  const importer = page.getByRole('region', { name: '医院场景待产套组快速补齐' });
+  await importer
+    .getByRole('button', { name: /一键补齐本组/ })
+    .first()
+    .click();
+  await expect(importer.getByRole('status')).toContainText('已向待产清单补齐');
+  await expect(importer.getByRole('button', { name: '本组已全部在清单中' }).first()).toBeDisabled();
+
+  // 6. 起名灵感与寄语保存及刷新恢复
+  await page.goto('/pregnancy?tab=names');
+  await page.getByLabel('候选名字或小名').fill('知夏');
+  await page.getByLabel('拼音或读音备注（可选）').fill('zhī xià');
+  await page.getByLabel('寓意与出处（可选）').fill('晴方觉夏深');
+  await page.getByRole('button', { name: '保存名字灵感' }).click();
+  await expect(page.locator('.record-list')).toContainText('知夏');
+  await page.locator('.record-list').getByRole('button', { name: '☆ 标为心仪' }).click();
+  await expect(page.locator('.record-list')).toContainText('心仪候选');
+  await page.reload();
+  await expect(page.locator('.record-list')).toContainText('知夏');
+
+  await page.screenshot({
+    path: join(tmpdir(), `24years-pregnancy-enhanced-${testInfo.project.name}.png`),
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  expect(errors).toEqual([]);
+});

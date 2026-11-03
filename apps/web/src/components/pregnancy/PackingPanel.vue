@@ -11,6 +11,7 @@ import { packingTemplates } from '@/domain/preparationTemplates';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
+import PackingBundleImporter from './PackingBundleImporter.vue';
 
 type Packing = Extract<PregnancyRecord, { type: 'packing' }>;
 const { records, disabled, save, remove, error, reportError, message, hasExpense } =
@@ -27,7 +28,8 @@ const visibleEntries = computed(() =>
   entries.value.filter(
     (item) =>
       (categoryFilter.value === 'all' || (item.category ?? '未分类') === categoryFilter.value) &&
-      (assigneeFilter.value === 'all' || (item.assignee ?? 'unassigned') === assigneeFilter.value) &&
+      (assigneeFilter.value === 'all' ||
+        (item.assignee ?? 'unassigned') === assigneeFilter.value) &&
       (statusFilter.value === 'all' ||
         (statusFilter.value === 'completed' ? item.completed : !item.completed)),
   ),
@@ -63,10 +65,7 @@ const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
 const template = shallowRef('');
 const linkedExpense = computed(() => !!before.value && hasExpense('packing-' + before.value.id));
 const canRecordExpense = computed(
-  () =>
-    form.completed &&
-    !linkedExpense.value &&
-    (!before.value || !before.value.completed),
+  () => form.completed && !linkedExpense.value && (!before.value || !before.value.completed),
 );
 
 function applyTemplate() {
@@ -80,7 +79,16 @@ function applyTemplate() {
     return;
   }
 
-  Object.assign(form, selected);
+  form.title = selected.title;
+  form.notes = selected.notes;
+
+  if (!form.category.trim()) {
+    form.category = selected.category;
+  }
+
+  if (!String(form.quantity).trim()) {
+    form.quantity = String(selected.quantity);
+  }
 }
 
 async function toggleCompleted(item: Packing) {
@@ -152,6 +160,7 @@ async function submit() {
 </script>
 
 <template>
+  <PackingBundleImporter />
   <div class="pregnancy-columns">
     <section class="panel">
       <div class="panel-heading">
@@ -173,7 +182,11 @@ async function submit() {
           分类
           <select v-model="categoryFilter">
             <option value="all">全部分类</option>
-            <option v-for="category in categories" :key="category" :value="category">
+            <option
+              v-for="category in categories"
+              :key="category"
+              :value="category"
+            >
               {{ category }}
             </option>
           </select>
@@ -426,3 +439,37 @@ async function submit() {
     </section>
   </div>
 </template>
+
+<style scoped>
+.packing-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.packing-progress progress {
+  flex: 1;
+  height: 8px;
+  accent-color: var(--green);
+}
+
+.packing-progress small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.packing-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 600px) {
+  .packing-filters {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

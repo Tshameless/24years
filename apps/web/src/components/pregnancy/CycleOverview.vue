@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useFamily } from '@/composables/useFamily';
 import { pregnancyOutcome, pregnancyProgress } from '@/domain/family';
+import WeeklyGuideCard from './WeeklyGuideCard.vue';
 
 const { data, today } = useFamily();
 const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
@@ -71,6 +72,7 @@ const stages = [
       { label: '胎动记录', to: '/pregnancy?tab=movements' },
       { label: '心情日记', to: '/pregnancy?tab=mood' },
       { label: '胎教陪伴', to: '/pregnancy?tab=bonding' },
+      { label: '起名与寄语', to: '/pregnancy?tab=names' },
     ],
   },
   {
@@ -110,7 +112,11 @@ const stages = [
     <p class="muted">
       这里串联本次孕期的记录和交接，不设必须完成的打卡，也不自动生成医疗检查或治疗方案。
     </p>
-    <section class="companion-card">
+    <WeeklyGuideCard v-if="data.profile && !data.profile.quietMode && !outcome" />
+    <section
+      v-if="data.profile && !data.profile.quietMode && !outcome"
+      class="companion-card"
+    >
       <div class="panel-heading">
         <h3>{{ companionCard.title }}</h3>
         <span class="tag">陪伴建议</span>

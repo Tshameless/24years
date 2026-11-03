@@ -18,18 +18,17 @@ const original: Packing = {
   completed: false,
 };
 const records = shallowRef<PregnancyRecord[]>([]);
+const privateCareRecords = shallowRef<PregnancyRecord[]>([]);
 const identity = shallowRef('a');
 
-function setup() {
-  let editor!: ReturnType<typeof usePregnancyDraft<Packing, { title: string; completed: boolean }>>;
+function setupWith<R extends PregnancyRecord, T extends Record<string, string | number | boolean>>(
+  options: Parameters<typeof usePregnancyDraft<R, T>>[0],
+) {
+  let editor!: ReturnType<typeof usePregnancyDraft<R, T>>;
   const wrapper = mount(
     defineComponent({
       setup() {
-        editor = usePregnancyDraft({
-          type: 'packing',
-          defaults: () => ({ title: '', completed: false }),
-          fields: (record: Packing) => ({ title: record.title, completed: record.completed }),
-        });
+        editor = usePregnancyDraft(options);
 
         return () => null;
       },
@@ -40,9 +39,18 @@ function setup() {
   return { editor, wrapper };
 }
 
+function setup() {
+  return setupWith<Packing, { title: string; completed: boolean }>({
+    type: 'packing',
+    defaults: () => ({ title: '', completed: false }),
+    fields: (record: Packing) => ({ title: record.title, completed: record.completed }),
+  });
+}
+
 beforeEach(() => {
   sessionStorage.clear();
   records.value = [original];
+  privateCareRecords.value = [];
   identity.value = 'a';
   state.store = {
     data: {
@@ -50,6 +58,7 @@ beforeEach(() => {
         return { pregnancyRecords: records.value };
       },
     },
+    privateCareRecords,
     identity,
     cloud: { role: shallowRef('editor') },
   };
@@ -124,4 +133,30 @@ it('treats identical records with different property ordering as fresh', () => {
   ];
   const second = setup();
   expect(second.editor.stale.value).toBe(false);
+});
+
+it('keeps private care records fresh during editing and marks stale only when modified', () => {
+  type Mood = Extract<PregnancyRecord, { type: 'mood' }>;
+  const privateMood: Mood = {
+    id: 'private-mood-1',
+    type: 'mood',
+    date: '2026-10-21',
+    title: '平静',
+    notes: '仅保存在本机',
+    visibility: 'private',
+  };
+  records.value = [];
+  privateCareRecords.value = [privateMood];
+
+  const { editor: moodEditor } = setupWith<Mood, { notes: string }>({
+    type: 'mood',
+    defaults: () => ({ notes: '' }),
+    fields: (record: Mood) => ({ notes: record.notes }),
+  });
+
+  moodEditor.edit(privateMood);
+  expect(moodEditor.stale.value).toBe(false);
+
+  privateCareRecords.value = [{ ...privateMood, notes: '已在另一标签页更新' }];
+  expect(moodEditor.stale.value).toBe(true);
 });

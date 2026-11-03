@@ -6,9 +6,13 @@
   --green-light: #ebf6ef;
   --canvas: #f8faf9;
   --surface: #fff;
+  --surface-secondary: #f2f5f3;
   --text: #293a36;
+  --text-heading: #1d2b28;
   --text-secondary: #64716c;
+  --text-muted: #65736a;
   --muted: #65736a;
+  --danger: #b34558;
   --border: #e9ece6;
   --font-sans: 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-serif: 'Songti SC', 'Noto Serif SC', 'SimSun', serif;
@@ -27,9 +31,13 @@
   --green-light: #1a2d25;
   --canvas: #000;
   --surface: #161b19;
+  --surface-secondary: #1e2623;
   --text: #e2e8e4;
+  --text-heading: #f2f6f4;
   --text-secondary: #acb8b0;
+  --text-muted: #98a59c;
   --muted: #98a59c;
+  --danger: #ffa2b0;
   --border: #2c352e;
   color-scheme: dark;
 }
@@ -184,6 +192,13 @@ h3 {
 .button-pink {
   background: var(--pink-light);
   color: var(--primary-ink);
+}
+
+.button-sm {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 8px;
 }
 
 .text-button {

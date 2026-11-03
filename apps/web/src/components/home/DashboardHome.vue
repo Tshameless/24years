@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useFamily } from '@/composables/useFamily';
-import { pregnancyOutcome, type PregnancyRecord } from '@/domain/family';
+import { pregnancyOutcome, pregnancyProgress, type PregnancyRecord } from '@/domain/family';
+import { getWeeklyGuide } from '@/domain/weeklyGuide';
 import AppIcon from '@/components/AppIcon.vue';
 import JourneyCard from './JourneyCard.vue';
 import GettingStarted from './GettingStarted.vue';
@@ -12,6 +13,10 @@ const { data, today, todayTasks, toggleTask, recordLocked, cloud, familyMode } =
 const { state } = cloud;
 
 const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
+const progress = computed(() =>
+  data.value.profile ? pregnancyProgress(data.value.profile.dueDate, today.value) : null,
+);
+const weeklyGuide = computed(() => (progress.value ? getWeeklyGuide(progress.value.weeks) : null));
 const postpartum = computed(() =>
   data.value.pregnancyRecords.find((item) => item.type === 'postpartum'),
 );
@@ -95,6 +100,43 @@ const dateLabel = computed(() =>
           >
             还没有待办产检，按医生建议安排即可。
           </p>
+        </section>
+        <section
+          v-if="data.profile && !data.profile.quietMode && !outcome && weeklyGuide"
+          class="panel weekly-focus-panel"
+        >
+          <div class="panel-heading">
+            <h2>本周陪伴与关注重点</h2>
+            <span class="tag">{{ weeklyGuide.rangeLabel }}</span>
+          </div>
+          <strong class="weekly-focus-title">{{ weeklyGuide.title }}</strong>
+          <p class="muted weekly-focus-copy">{{ weeklyGuide.fetalMilestone }}</p>
+          <div class="weekly-quick-links">
+            <RouterLink
+              class="text-button"
+              to="/pregnancy?tab=overview"
+            >
+              浏览分孕周指南 →
+            </RouterLink>
+            <RouterLink
+              class="text-button"
+              to="/pregnancy?tab=movements"
+            >
+              记录胎动 →
+            </RouterLink>
+            <RouterLink
+              class="text-button"
+              to="/pregnancy?tab=vitals"
+            >
+              记录体征 →
+            </RouterLink>
+            <RouterLink
+              class="text-button"
+              to="/pregnancy?tab=packing"
+            >
+              整理待产包 →
+            </RouterLink>
+          </div>
         </section>
         <section
           v-if="outcome?.kind === 'birth' && !data.profile?.quietMode"
@@ -223,6 +265,24 @@ const dateLabel = computed(() =>
 
 .quiet-message p {
   margin-top: 15px;
+}
+
+.weekly-focus-title {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.weekly-focus-copy {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.weekly-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 
 @media (max-width: 1200px) {

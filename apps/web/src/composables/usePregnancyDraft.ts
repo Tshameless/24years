@@ -7,13 +7,8 @@ import { sameValue, validPregnancyRecord, type PregnancyRecord } from '@/domain/
 export function usePregnancyDraft<
   R extends PregnancyRecord,
   T extends Record<string, string | number | boolean>,
->(options: {
-  type: R['type'];
-  defaults: () => T;
-  fields: (record: R) => T;
-  initial?: R | null;
-}) {
-  const { data, identity, cloud } = useFamily();
+>(options: { type: R['type']; defaults: () => T; fields: (record: R) => T; initial?: R | null }) {
+  const { data, privateCareRecords, identity, cloud } = useFamily();
   const form = reactive({
     ...options.defaults(),
     ...(options.initial ? options.fields(options.initial) : {}),
@@ -43,7 +38,7 @@ export function usePregnancyDraft<
       return true;
     }
 
-    const records = data.value.pregnancyRecords;
+    const records = [...data.value.pregnancyRecords, ...(privateCareRecords?.value ?? [])];
     const original = before.value;
     const fixedId =
       options.type === 'medical'

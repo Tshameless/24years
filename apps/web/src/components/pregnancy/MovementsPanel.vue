@@ -5,6 +5,7 @@ import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
 import MovementCounter from './MovementCounter.vue';
+import MovementDailySummary from './MovementDailySummary.vue';
 import MovementTimer from './MovementTimer.vue';
 import { useObservationTimer } from '@/composables/useObservationTimer';
 
@@ -90,6 +91,7 @@ async function submit() {
 </script>
 
 <template>
+  <MovementDailySummary :records="records" />
   <div class="pregnancy-columns">
     <section class="panel">
       <div class="panel-heading">

@@ -48,7 +48,6 @@ export function verifyDatabase(path: string) {
       if (owners.count !== 1) {
         throw new Error('家庭管理员数据不完整。');
       }
-
     }
 
     return {

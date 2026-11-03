@@ -51,7 +51,7 @@ test('选择登录或本机使用，未登录备份可迁移到新浏览器', as
     await target.getByRole('button', { name: '暂不登录，使用本机记录' }).click();
     await target.reload();
     await expect(target.getByRole('heading', { name: '要登录后使用吗？' })).toHaveCount(0);
-    expect(await target.evaluate(() => localStorage.getItem('24years.cloud.active'))).not.toBe(
+    expect(await target.evaluate(() => localStorage.getItem('24years.cloud.active.v2'))).not.toBe(
       'true',
     );
   } finally {

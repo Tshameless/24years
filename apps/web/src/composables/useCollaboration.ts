@@ -577,6 +577,7 @@ export function useCollaboration(enabled = true) {
   }
 
   async function endAccountAction(path: string, body: unknown) {
+    const currentUserId = state.value.user?.id;
     const currentFamilyId = state.value.family?.id;
 
     if (!(await run(path, body))) {
@@ -589,6 +590,16 @@ export function useCollaboration(enabled = true) {
 
     if (currentFamilyId) {
       clearFamilyOutbox(currentFamilyId);
+    }
+
+    if (path === 'account/delete' && currentUserId) {
+      try {
+        localStorage.removeItem(
+          `24years.private-care.v2:${encodeURIComponent(`${currentUserId}:${currentFamilyId}`)}`,
+        );
+      } catch {
+        // Ignore storage errors during account cleanup.
+      }
     }
 
     outboxEntries.value = [];

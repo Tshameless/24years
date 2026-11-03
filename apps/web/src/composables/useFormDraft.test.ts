@@ -9,10 +9,7 @@ const router = vi.hoisted(() => ({
 vi.mock('vue-router', () => ({ useRouter: () => router }));
 const wrappers: ReturnType<typeof mount>[] = [];
 
-function setup(
-  scope = shallowRef('local'),
-  baseline?: unknown,
-) {
+function setup(scope = shallowRef('local'), baseline?: unknown) {
   const form = reactive<Record<string, string>>({ title: '', amount: '' });
   let draft!: ReturnType<typeof useFormDraft>;
   const wrapper = mount(

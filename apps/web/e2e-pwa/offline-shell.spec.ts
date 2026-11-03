@@ -67,7 +67,7 @@ test('离线刷新和首次打开其他路由仍可用，缓存不含 API 或版
 test('同步模式离线冷启动显示不可用提示，不冒用本机档案', async ({ page, context }) => {
   await page.goto('/tasks');
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
-  await page.evaluate(() => localStorage.setItem('24years.cloud.active', 'true'));
+  await page.evaluate(() => localStorage.setItem('24years.cloud.active.v2', 'true'));
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole('status').filter({ hasText: '无法连接云端' })).toBeVisible();
@@ -81,6 +81,7 @@ test('已同步云端记录断网后仍可排队保存，恢复连接后自动�
   await page.getByLabel('计划名称').fill('医院待办');
   await page.getByRole('button', { name: '保存计划', exact: true }).click();
   await expect(page.getByText('医院待办', { exact: true })).toBeVisible();
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
 
   await context.setOffline(true);
   await page.reload();

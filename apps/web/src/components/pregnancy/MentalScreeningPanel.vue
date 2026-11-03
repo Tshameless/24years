@@ -284,6 +284,22 @@ async function submit() {
           </label>
           <button class="button button-primary">保存心理自查</button>
         </fieldset>
+        <p
+          v-if="stale"
+          class="form-error"
+          role="alert"
+        >
+          记录已变化，输入仍保留，请点击新建或清除草稿后重新查看。
+        </p>
+        <button
+          v-if="before"
+          type="button"
+          class="button button-secondary"
+          :disabled="disabled"
+          @click="startNew"
+        >
+          取消编辑
+        </button>
       </form>
     </div>
     <p

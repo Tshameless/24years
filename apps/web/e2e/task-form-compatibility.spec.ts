@@ -7,9 +7,7 @@ for (const synced of [false, true]) {
     await page.goto('/family');
 
     if (synced) {
-      await page
-        .getByLabel('同步账号', { exact: true })
-        .fill(`test${Date.now()}`);
+      await page.getByLabel('同步账号', { exact: true }).fill(`test${Date.now()}`);
       await page.getByLabel('成员称呼').fill('测试成员');
       await page.getByLabel('账号密码').fill('test-password-123');
       await page.getByRole('button', { name: '注册并开启同步' }).click();

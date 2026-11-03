@@ -3,9 +3,10 @@ import { computed, reactive, shallowRef, watch } from 'vue';
 import { useFamily } from '@/composables/useFamily';
 import { useFormDraft } from '@/composables/useFormDraft';
 import {
-  pregnancyOutcome,
   dueDateFromGestation,
+  gestationFromLmp,
   localDate,
+  pregnancyOutcome,
   pregnancyProgress,
   sameValue,
 } from '@/domain/family';
@@ -61,10 +62,23 @@ const { dirty, restored, changedSource, storageError } = draft;
 const estimatedDueDate = computed(() =>
   outcome.value
     ? (before.value?.dueDate ?? null)
-    : form.weeks.trim() && /^\d{4}-\d{2}-\d{2}$/.test(form.referenceDate)
+    : String(form.weeks).trim() && /^\d{4}-\d{2}-\d{2}$/.test(form.referenceDate)
       ? dueDateFromGestation(Number(form.weeks), form.days, form.referenceDate)
       : null,
 );
+const lmpEstimate = computed(() =>
+  !outcome.value && form.lmpDate ? gestationFromLmp(form.lmpDate, form.referenceDate) : null,
+);
+
+function applyLmpEstimate() {
+  if (!lmpEstimate.value || profileLocked.value || stale.value) {
+    return;
+  }
+
+  form.weeks = String(lmpEstimate.value.weeks);
+  form.days = lmpEstimate.value.days;
+  saved.value = false;
+}
 
 const error = shallowRef('');
 const saved = shallowRef(false);
@@ -81,8 +95,7 @@ function reloadProfile() {
   const progress = before.value ? pregnancyProgress(before.value.dueDate, referenceDate) : null;
   Object.assign(form, {
     referenceDate,
-    familyMode:
-      state.value.family?.mode ?? before.value?.familyMode ?? '',
+    familyMode: state.value.family?.mode ?? before.value?.familyMode ?? '',
     parentRole: (active.value ? currentMember.value?.familyRole : before.value?.parentRole) ?? '',
     name: before.value?.name ?? '',
     nickname: before.value?.nickname ?? '',
@@ -139,16 +152,17 @@ async function submit() {
     return;
   }
 
-  const prePregnancyWeightKg = form.prePregnancyWeightKg.trim()
+  const prePregnancyWeightKg = String(form.prePregnancyWeightKg).trim()
     ? Number(form.prePregnancyWeightKg)
     : undefined;
-  const heightCm = form.heightCm.trim() ? Number(form.heightCm) : undefined;
+  const heightCm = String(form.heightCm).trim() ? Number(form.heightCm) : undefined;
 
   if (
     (prePregnancyWeightKg !== undefined &&
-      (!Number.isFinite(prePregnancyWeightKg) || prePregnancyWeightKg <= 0 || prePregnancyWeightKg > 500)) ||
-    (heightCm !== undefined &&
-      (!Number.isFinite(heightCm) || heightCm < 50 || heightCm > 250)) ||
+      (!Number.isFinite(prePregnancyWeightKg) ||
+        prePregnancyWeightKg <= 0 ||
+        prePregnancyWeightKg > 500)) ||
+    (heightCm !== undefined && (!Number.isFinite(heightCm) || heightCm < 50 || heightCm > 250)) ||
     (form.lmpDate && !/^\d{4}-\d{2}-\d{2}$/.test(form.lmpDate))
   ) {
     error.value = '请检查末次月经、孕前体重和身高。';
@@ -288,36 +302,48 @@ async function submit() {
         :estimated-due-date="estimatedDueDate"
       />
       <div class="form-row">
-        <label class="field">
-          末次月经第一天（可选）
+        <div class="field">
+          <label for="profile-lmp-date">末次月经第一天（可选）</label>
           <input
+            id="profile-lmp-date"
             v-model="form.lmpDate"
             type="date"
             :max="form.referenceDate"
           />
           <small>用于保留孕周推算依据；预产期仍以医生核准为准。</small>
-        </label>
+          <button
+            v-if="lmpEstimate"
+            type="button"
+            class="text-button lmp-apply-btn"
+            :disabled="profileLocked || stale"
+            @click="applyLmpEstimate"
+          >
+            按末次月经填入孕周（{{ lmpEstimate.weeks }} 周 {{ lmpEstimate.days }} 天）
+          </button>
+        </div>
         <label class="field">
           孕前体重（kg，可选）
           <input
-            v-model="form.prePregnancyWeightKg"
+            :value="form.prePregnancyWeightKg"
             type="number"
             min="1"
             max="500"
             step="0.1"
             inputmode="decimal"
+            @input="form.prePregnancyWeightKg = ($event.target as HTMLInputElement).value"
           />
         </label>
       </div>
       <label class="field">
         身高（cm，可选）
         <input
-          v-model="form.heightCm"
+          :value="form.heightCm"
           type="number"
           min="50"
           max="250"
           step="0.1"
           inputmode="decimal"
+          @input="form.heightCm = ($event.target as HTMLInputElement).value"
         />
       </label>
       <label class="quiet-option">

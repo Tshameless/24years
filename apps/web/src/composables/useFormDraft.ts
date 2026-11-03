@@ -60,8 +60,8 @@ export function useFormDraft<T extends Record<string, string | number | boolean>
         Object.keys(saved.form).some((field) => !fields.includes(field)) ||
         !fields.every(
           (field) =>
-            (typeof saved.form[field] === typeof options.form[field] &&
-              (typeof saved.form[field] !== 'number' || Number.isFinite(saved.form[field]))),
+            typeof saved.form[field] === typeof options.form[field] &&
+            (typeof saved.form[field] !== 'number' || Number.isFinite(saved.form[field])),
         )
       ) {
         throw new Error('Invalid draft');

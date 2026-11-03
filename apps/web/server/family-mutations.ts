@@ -456,11 +456,7 @@ export function createFamilyMutations(options: {
   }
 
   function manage(userId: string, action: string, body: Body) {
-    const member = authorize(
-      userId,
-      body,
-      action === 'leave' ? 'member' : 'owner',
-    );
+    const member = authorize(userId, body, action === 'leave' ? 'member' : 'owner');
     const family = snapshot(userId).family!;
     requireValue(body.revision === family.revision, 409, '家庭状态已更新，请同步后重试。');
 

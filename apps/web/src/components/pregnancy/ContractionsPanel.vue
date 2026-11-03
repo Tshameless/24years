@@ -1,14 +1,31 @@
 <script setup lang="ts">
 import { createId } from '@/domain/id';
-import { computed, onMounted, onUnmounted, shallowRef } from 'vue';
+import { csvText } from '@/domain/csv';
+import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { analyzeContractions } from '@/domain/contractions';
 import type { PregnancyRecord } from '@/domain/family';
 
 type Contraction = Extract<PregnancyRecord, { type: 'contraction' }>;
+const MULTIPAROUS_KEY = '24years.contractions.multiparous';
 const { quietMode, records, disabled, message, error, save, remove } = usePregnancyRecords();
 const now = shallowRef(Date.now());
 const multiparous = shallowRef(false);
+
+try {
+  multiparous.value = sessionStorage.getItem(MULTIPAROUS_KEY) === 'true';
+} catch {
+  // Ignore session storage errors.
+}
+
+watch(multiparous, (next) => {
+  try {
+    sessionStorage.setItem(MULTIPAROUS_KEY, String(next));
+  } catch {
+    // Ignore session storage errors.
+  }
+});
+
 const entries = computed(() =>
   records.value
     .filter((item): item is Contraction => item.type === 'contraction')
@@ -20,11 +37,13 @@ const analysis = computed(() =>
 );
 let draft: Contraction | null = null;
 let interval: ReturnType<typeof setInterval>;
+
 onMounted(() => {
   interval = setInterval(() => {
     now.value = Date.now();
   }, 1000);
 });
+
 onUnmounted(() => clearInterval(interval));
 
 function duration(ms: number) {
@@ -33,8 +52,40 @@ function duration(ms: number) {
   return `${Math.floor(seconds / 60)}分${String(seconds % 60).padStart(2, '0')}秒`;
 }
 
+function exportCsv() {
+  if (!entries.value.length) {
+    return;
+  }
+
+  const header = ['开始时间', '结束时间', '持续时长(秒)', '与上次开始间隔(分钟)']
+    .map(csvText)
+    .join(',');
+  const rows = entries.value.map((item, index) => {
+    const startLabel = new Date(item.startedAt).toLocaleString('zh-CN', { hour12: false });
+    const endLabel =
+      item.endedAt === null
+        ? '进行中'
+        : new Date(item.endedAt).toLocaleString('zh-CN', { hour12: false });
+    const durationSec =
+      item.endedAt === null
+        ? ''
+        : String(Math.max(0, Math.round((item.endedAt - item.startedAt) / 1000)));
+    const prev = entries.value[index + 1];
+    const gapMin = prev ? ((item.startedAt - prev.startedAt) / 60000).toFixed(1) : '';
+
+    return [csvText(startLabel), csvText(endLabel), durationSec, gapMin].join(',');
+  });
+  const csv = '\ufeff' + [header, ...rows].join('\r\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = '24years-contractions.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 async function toggle() {
-  if ('vibrate' in navigator) {
+  if (!quietMode.value && 'vibrate' in navigator) {
     navigator.vibrate(active.value ? [40] : [80, 40, 80]);
   }
 
@@ -168,7 +219,17 @@ async function toggle() {
     <section class="panel">
       <div class="panel-heading">
         <h2>计时历史</h2>
-        <span class="tag">{{ entries.length }} 次</span>
+        <div class="history-heading-actions">
+          <span class="tag">{{ entries.length }} 次</span>
+          <button
+            class="text-button"
+            type="button"
+            :disabled="!entries.length"
+            @click="exportCsv"
+          >
+            导出 CSV
+          </button>
+        </div>
       </div>
       <p
         v-if="!entries.length"
@@ -228,6 +289,13 @@ async function toggle() {
 
 .timer-note {
   margin-top: 24px;
+}
+
+.history-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .contraction-options {

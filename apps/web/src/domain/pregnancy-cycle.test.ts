@@ -52,8 +52,12 @@ const handoff: PregnancyRecord = {
 const base = (): FamilyData => ({
   ...emptyFamily(),
   profile: {
-    name: '家', nickname: '我', dueDate: '2026-01-05', quietMode: false,
-    familyMode: 'single', parentRole: 'single_parent',
+    name: '家',
+    nickname: '我',
+    dueDate: '2026-01-05',
+    quietMode: false,
+    familyMode: 'single',
+    parentRole: 'single_parent',
   },
 });
 const save = (data: FamilyData, value: PregnancyRecord, before: PregnancyRecord | null = null) =>

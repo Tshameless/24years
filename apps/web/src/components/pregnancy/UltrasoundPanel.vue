@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
-import { localDate, validPregnancyRecord, type PregnancyRecord } from '@/domain/family';
+import { csvText } from '@/domain/csv';
+import {
+  localDate,
+  pregnancyProgress,
+  validPregnancyRecord,
+  type PregnancyRecord,
+} from '@/domain/family';
+import { useFamily } from '@/composables/useFamily';
 import { usePregnancyRecords } from '@/composables/usePregnancyRecords';
 import { usePregnancyDraft } from '@/composables/usePregnancyDraft';
 import FormDraftNotice from '@/components/FormDraftNotice.vue';
 
 type Ultrasound = Extract<PregnancyRecord, { type: 'ultrasound' }>;
+const { data, today } = useFamily();
 const { records, disabled, error, message, reportError, save, remove } = usePregnancyRecords();
 const entries = computed(() =>
   records.value
@@ -18,9 +26,11 @@ const chartEntries = computed(() =>
   entries.value
     .filter((item) => item[chartMetric.value] !== undefined)
     .slice()
-    .sort((a, b) =>
-      (a.gestationWeeks * 7 + (a.gestationDays ?? 0)) -
-      (b.gestationWeeks * 7 + (b.gestationDays ?? 0)),
+    .sort(
+      (a, b) =>
+        a.gestationWeeks * 7 +
+        (a.gestationDays ?? 0) -
+        (b.gestationWeeks * 7 + (b.gestationDays ?? 0)),
     ),
 );
 const chart = computed(() => {
@@ -51,23 +61,39 @@ const chart = computed(() => {
     })),
   };
 });
+
+function defaultGestation() {
+  const progress = data.value.profile
+    ? pregnancyProgress(data.value.profile.dueDate, today.value)
+    : null;
+
+  return {
+    weeks: progress ? String(Math.min(42, progress.weeks)) : '20',
+    days: progress ? progress.days : 0,
+  };
+}
+
 const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
   type: 'ultrasound',
-  defaults: () => ({
-    date: localDate(),
-    gestationWeeks: '20',
-    gestationDays: 0,
-    bpd: '',
-    fl: '',
-    ac: '',
-    hc: '',
-    afi: '',
-    umbilicalSd: '',
-    efw: '',
-    fhr: '',
-    presentation: '',
-    notes: '',
-  }),
+  defaults: () => {
+    const gestation = defaultGestation();
+
+    return {
+      date: localDate(),
+      gestationWeeks: gestation.weeks,
+      gestationDays: gestation.days,
+      bpd: '',
+      fl: '',
+      ac: '',
+      hc: '',
+      afi: '',
+      umbilicalSd: '',
+      efw: '',
+      fhr: '',
+      presentation: '',
+      notes: '',
+    };
+  },
   fields: (item: Ultrasound) => ({
     date: item.date,
     gestationWeeks: String(item.gestationWeeks),
@@ -85,11 +111,8 @@ const { form, before, stale, draft, reset, edit, cancel } = usePregnancyDraft({
   }),
 });
 
-function csvCell(value: string | number | undefined) {
-  const text = value === undefined ? '' : String(value);
-  const safe = /^[=+@\-\t\r]/.test(text) ? `'${text}` : text;
-
-  return `"${safe.replace(/"/g, '""')}"`;
+function cell(value: string | number | undefined): string {
+  return csvText(value === undefined ? '' : String(value));
 }
 
 function exportCsv() {
@@ -114,8 +137,7 @@ function exportCsv() {
     ],
     ...entries.value.map((item) => [
       item.date,
-      item.gestationWeeks,
-      item.gestationDays,
+      `${item.gestationWeeks}+${item.gestationDays ?? 0}`,
       item.bpd,
       item.fl,
       item.ac,
@@ -128,7 +150,7 @@ function exportCsv() {
       item.notes,
     ]),
   ];
-  const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
+  const csv = `\uFEFF${rows.map((row) => row.map(cell).join(',')).join('\r\n')}`;
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = url;
@@ -137,12 +159,21 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
-function optional(value: string) {
-  return value.trim() ? Number(value) : undefined;
+function optional(value: string | number) {
+  const text = String(value).trim();
+
+  return text ? Number(text) : undefined;
 }
 
 async function submit() {
   reportError('');
+
+  if (disabled.value || stale.value || !String(form.gestationWeeks).trim()) {
+    reportError('请填写有效日期、孕周和数值。');
+
+    return;
+  }
+
   const value: Ultrasound = {
     id: before.value?.id ?? draft.id.value,
     type: 'ultrasound',
@@ -165,7 +196,7 @@ async function submit() {
     notes: form.notes.trim(),
   } as Ultrasound;
 
-  if (disabled.value || stale.value || !validPregnancyRecord(value) || value.date > localDate()) {
+  if (!validPregnancyRecord(value) || value.date > localDate()) {
     reportError('请填写有效日期、孕周和数值。');
 
     return;
@@ -221,16 +252,46 @@ async function submit() {
           role="img"
           :aria-label="`${chartLabels[chartMetric]} 随孕周变化趋势图`"
         >
-          <line x1="55" y1="30" x2="55" y2="160" class="axis" />
-          <line x1="55" y1="160" x2="545" y2="160" class="axis" />
-          <text x="5" y="34">{{ chart.max.toFixed(1) }}</text>
-          <text x="5" y="160">{{ chart.min.toFixed(1) }}</text>
+          <line
+            x1="55"
+            y1="30"
+            x2="55"
+            y2="160"
+            class="axis"
+          />
+          <line
+            x1="55"
+            y1="160"
+            x2="545"
+            y2="160"
+            class="axis"
+          />
+          <text
+            x="5"
+            y="34"
+          >
+            {{ chart.max.toFixed(1) }}
+          </text>
+          <text
+            x="5"
+            y="160"
+          >
+            {{ chart.min.toFixed(1) }}
+          </text>
           <polyline
             :points="chart.points.map((point) => `${point.x},${point.y}`).join(' ')"
             class="ultrasound-line"
           />
-          <g v-for="point in chart.points" :key="point.id">
-            <circle :cx="point.x" :cy="point.y" r="3" class="ultrasound-point">
+          <g
+            v-for="point in chart.points"
+            :key="point.id"
+          >
+            <circle
+              :cx="point.x"
+              :cy="point.y"
+              r="3.5"
+              class="ultrasound-point"
+            >
               <title>{{ point.week }} 周 · {{ point.value }}</title>
             </circle>
           </g>
@@ -327,29 +388,36 @@ async function submit() {
           class="record-fields"
           :disabled="disabled || stale"
         >
+          <label class="field">
+            检查日期
+            <input
+              v-model="form.date"
+              type="date"
+              :max="localDate()"
+            />
+          </label>
           <div class="form-row">
-            <label class="field">
-              检查日期
-              <input
-                v-model="form.date"
-                type="date"
-                :max="localDate()"
-              />
-            </label>
             <label class="field">
               孕周（周）
               <input
-                v-model="form.gestationWeeks"
+                :value="form.gestationWeeks"
                 type="number"
                 min="0"
                 max="42"
                 step="1"
+                @input="form.gestationWeeks = ($event.target as HTMLInputElement).value"
               />
             </label>
             <label class="field">
               天数（天）
               <select v-model.number="form.gestationDays">
-                <option v-for="day in 7" :key="day" :value="day - 1">{{ day - 1 }} 天</option>
+                <option
+                  v-for="day in 7"
+                  :key="day"
+                  :value="day - 1"
+                >
+                  {{ day - 1 }} 天
+                </option>
               </select>
             </label>
           </div>
@@ -357,53 +425,73 @@ async function submit() {
             <label class="field">
               BPD（mm）
               <input
-                v-model="form.bpd"
+                :value="form.bpd"
                 type="number"
                 min="0"
                 step="any"
+                @input="form.bpd = ($event.target as HTMLInputElement).value"
               />
             </label>
             <label class="field">
               FL（mm）
               <input
-                v-model="form.fl"
+                :value="form.fl"
                 type="number"
                 min="0"
                 step="any"
+                @input="form.fl = ($event.target as HTMLInputElement).value"
               />
             </label>
           </div>
           <div class="form-row">
             <label class="field">
               胎儿预估体重 EFW（g，可选）
-              <input v-model="form.efw" type="number" min="0" step="any" />
+              <input
+                :value="form.efw"
+                type="number"
+                min="0"
+                step="any"
+                @input="form.efw = ($event.target as HTMLInputElement).value"
+              />
             </label>
             <label class="field">
               胎心率 FHR（次/分，可选）
-              <input v-model="form.fhr" type="number" min="0" step="1" />
+              <input
+                :value="form.fhr"
+                type="number"
+                min="0"
+                step="1"
+                @input="form.fhr = ($event.target as HTMLInputElement).value"
+              />
             </label>
           </div>
           <label class="field">
             胎位（可选）
-            <input v-model="form.presentation" maxlength="40" placeholder="例如：头位" />
+            <input
+              v-model="form.presentation"
+              maxlength="40"
+              placeholder="例如：头位"
+            />
           </label>
           <div class="form-row">
             <label class="field">
               AC（mm）
               <input
-                v-model="form.ac"
+                :value="form.ac"
                 type="number"
                 min="0"
                 step="any"
+                @input="form.ac = ($event.target as HTMLInputElement).value"
               />
             </label>
             <label class="field">
               HC（mm）
               <input
-                v-model="form.hc"
+                :value="form.hc"
                 type="number"
                 min="0"
                 step="any"
+                @input="form.hc = ($event.target as HTMLInputElement).value"
               />
             </label>
           </div>
@@ -411,19 +499,21 @@ async function submit() {
             <label class="field">
               AFI（cm）
               <input
-                v-model="form.afi"
+                :value="form.afi"
                 type="number"
                 min="0"
                 step="any"
+                @input="form.afi = ($event.target as HTMLInputElement).value"
               />
             </label>
             <label class="field">
               脐动脉 S/D
               <input
-                v-model="form.umbilicalSd"
+                :value="form.umbilicalSd"
                 type="number"
                 min="0"
                 step="any"
+                @input="form.umbilicalSd = ($event.target as HTMLInputElement).value"
               />
             </label>
           </div>
@@ -438,6 +528,22 @@ async function submit() {
           </label>
           <button class="button button-primary">保存超声指标</button>
         </fieldset>
+        <p
+          v-if="stale"
+          class="form-error"
+          role="alert"
+        >
+          记录已变化，输入仍保留，请取消后重新编辑最新记录。
+        </p>
+        <button
+          v-if="before"
+          type="button"
+          class="button button-secondary"
+          :disabled="disabled"
+          @click="cancel"
+        >
+          取消编辑
+        </button>
       </form>
       <p
         v-if="error"
@@ -463,6 +569,52 @@ async function submit() {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.ultrasound-chart-tools {
+  margin: 14px 0 8px;
+}
+
+.ultrasound-chart {
+  margin-bottom: 18px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--canvas);
+}
+
+.ultrasound-chart svg {
+  width: 100%;
+  max-height: 240px;
+  display: block;
+}
+
+.ultrasound-chart text {
+  fill: var(--text-secondary);
+  font-size: 12px;
+}
+
+.ultrasound-chart small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.axis {
+  stroke: var(--border);
+}
+
+.ultrasound-line {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ultrasound-point {
+  fill: var(--green);
 }
 
 .trend-table-wrap {

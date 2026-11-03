@@ -5,9 +5,11 @@ import {
   decodeFamily,
   dueDateFromGestation,
   emptyFamily,
+  gestationFromLmp,
   isDate,
   parseMoney,
   pregnancyProgress,
+  prePregnancyBmi,
   sameValue,
   summarizeExpenses,
   taskIsDue,
@@ -17,8 +19,12 @@ import {
 
 it('家庭档案要求显式设置家庭类型与身份', () => {
   const profile = {
-    name: '家', nickname: '家长', dueDate: '2027-01-26', quietMode: false,
-    familyMode: 'single' as const, parentRole: 'single_parent' as const,
+    name: '家',
+    nickname: '家长',
+    dueDate: '2027-01-26',
+    quietMode: false,
+    familyMode: 'single' as const,
+    parentRole: 'single_parent' as const,
   };
   expect(decodeFamily(JSON.stringify({ ...emptyFamily(), profile })).profile).toEqual(profile);
   expect(validProfile({ ...profile, familyMode: undefined, parentRole: undefined })).toBe(false);
@@ -53,6 +59,21 @@ describe('日历与每日计划', () => {
     }
 
     expect(dueDateFromGestation(24, 3, '2026-02-30')).toBeNull();
+  });
+
+  it('支持从末次月经推算孕周和预产期，并客观计算孕前 BMI', () => {
+    const lmpResult = gestationFromLmp('2026-04-21', '2026-10-09');
+    expect(lmpResult).toEqual({
+      weeks: 24,
+      days: 3,
+      dueDate: '2027-01-26',
+    });
+    expect(gestationFromLmp('2026-10-10', '2026-10-09')).toBeNull();
+    expect(gestationFromLmp('invalid', '2026-10-09')).toBeNull();
+
+    expect(prePregnancyBmi(56, 165)).toBe(20.6);
+    expect(prePregnancyBmi(undefined, 165)).toBeNull();
+    expect(prePregnancyBmi(56, 49)).toBeNull();
   });
 
   it('按日历计算孕周，支持闰年和预产期当天/之后', () => {
@@ -167,7 +188,10 @@ describe('存档校验', () => {
     }
 
     const profile = {
-      name: '家', nickname: '家长', dueDate: '2027-01-26', quietMode: false,
+      name: '家',
+      nickname: '家长',
+      dueDate: '2027-01-26',
+      quietMode: false,
     };
     expect(() => decodeFamily(JSON.stringify({ ...family, profile }))).toThrow();
   });

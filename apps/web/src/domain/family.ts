@@ -23,7 +23,9 @@ export {
 } from './primitives.ts';
 export {
   dueDateFromGestation,
+  gestationFromLmp,
   pregnancyProgress,
+  prePregnancyBmi,
   validProfile,
   type FamilyProfile,
 } from './profile.ts';

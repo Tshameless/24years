@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
+import { csvText } from '@/domain/csv';
+import { prePregnancyBmi } from '@/domain/family';
 import { useFamily } from '@/composables/useFamily';
 import { selectVitals, vitalPlot, vitalLabels, type Vital } from '@/domain/vitalTrends';
 
@@ -74,27 +76,75 @@ const glucoseSummary = computed(() => {
   };
 });
 
-function csvCell(value: string | number | undefined) {
-  const text = value === undefined ? '' : String(value);
-  const safe = /^[=+@\-\t\r]/.test(text) ? `'${text}` : text;
+const weightBaseline = computed(() => {
+  const preWeight = data.value.profile?.prePregnancyWeightKg;
 
-  return `"${safe.replace(/"/g, '""')}"`;
+  if (metric.value !== 'weight' || preWeight === undefined) {
+    return null;
+  }
+
+  const bmi = prePregnancyBmi(preWeight, data.value.profile?.heightCm);
+  const latest = entries.value[entries.value.length - 1];
+  const delta = latest ? Math.round((latest.value - preWeight) * 10) / 10 : null;
+
+  return {
+    preWeight,
+    bmi,
+    delta,
+    deltaLabel: delta === null ? null : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} kg`,
+  };
+});
+
+function cell(value: string | number | undefined): string {
+  return csvText(value === undefined ? '' : String(value));
 }
 
-function exportGlucoseCsv() {
-  if (metric.value !== 'glucose' || !entries.value.length || invalid.value) {
+function exportCurrentCsv() {
+  if (!entries.value.length || invalid.value) {
     return;
   }
 
-  const rows = [
-    ['日期', '时间', '测量场景', '血糖 (mmol/L)', '备注'],
-    ...entries.value.map((item) => [item.date, item.time, item.context, item.value, item.notes]),
-  ];
-  const content = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
+  const rows =
+    metric.value === 'bloodPressure'
+      ? [
+          ['日期', '时间', '测量场景', '收缩压 (mmHg)', '舒张压 (mmHg)', '脉搏 (次/分)', '备注'],
+          ...entries.value.map((item) => [
+            item.date,
+            item.time,
+            item.context,
+            item.value,
+            item.secondary ?? '',
+            item.pulse,
+            item.notes,
+          ]),
+        ]
+      : [
+          [
+            '日期',
+            '时间',
+            '测量场景',
+            metric.value === 'weight' ? '体重 (kg)' : '血糖 (mmol/L)',
+            '备注',
+          ],
+          ...entries.value.map((item) => [
+            item.date,
+            item.time,
+            item.context,
+            item.value,
+            item.notes,
+          ]),
+        ];
+  const filename =
+    metric.value === 'glucose'
+      ? '24years-glucose-records.csv'
+      : metric.value === 'bloodPressure'
+        ? '24years-blood-pressure-records.csv'
+        : '24years-weight-records.csv';
+  const content = `\uFEFF${rows.map((row) => row.map(cell).join(',')).join('\r\n')}`;
   const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = '24years-glucose-records.csv';
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -121,6 +171,7 @@ const alertY = computed(() => {
 const diastolicAlertY = computed(() =>
   metric.value === 'bloodPressure' && plot.value ? guidelineY(90) : null,
 );
+
 function guidelineY(value: number) {
   if (!plot.value || value < plot.value.low || value > plot.value.high) {
     return null;
@@ -135,7 +186,18 @@ function guidelineY(value: number) {
     class="panel vital-trends"
     aria-label="体征趋势"
   >
-    <h2>体征趋势</h2>
+    <div class="panel-heading trend-heading">
+      <h2>体征趋势</h2>
+      <button
+        v-if="metric !== 'glucose'"
+        class="text-button"
+        type="button"
+        :disabled="!entries.length || invalid"
+        @click="exportCurrentCsv"
+      >
+        导出当前筛选 CSV
+      </button>
+    </div>
     <div class="trend-filters">
       <label class="field">
         趋势指标
@@ -183,6 +245,16 @@ function guidelineY(value: number) {
       只展示已保存的原始测量值，不作诊断。填写测量时间后，同日记录会按时间展开；未记录时间按当天起点绘制。血糖趋势可按测量场景筛选。
     </p>
     <div
+      v-if="weightBaseline"
+      class="glucose-summary"
+    >
+      <strong>孕前基础对照</strong>
+      <span>孕前体重 {{ weightBaseline.preWeight }} kg</span>
+      <span v-if="weightBaseline.bmi !== null">孕前 BMI {{ weightBaseline.bmi }}</span>
+      <span v-if="weightBaseline.deltaLabel">较孕前变化 {{ weightBaseline.deltaLabel }}</span>
+      <small>基于家庭档案中填写的孕前数据客观换算，仅作产检整理对照，不设增重评判。</small>
+    </div>
+    <div
       v-if="glucoseSummary"
       class="glucose-summary"
     >
@@ -194,7 +266,7 @@ function guidelineY(value: number) {
         class="text-button export-button"
         type="button"
         :disabled="!entries.length || invalid"
-        @click="exportGlucoseCsv"
+        @click="exportCurrentCsv"
       >
         导出当前筛选 CSV
       </button>
@@ -350,11 +422,15 @@ function guidelineY(value: number) {
   margin-bottom: 22px;
 }
 
+.trend-heading {
+  margin-bottom: 8px;
+}
+
 .trend-filters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 16px;
+  margin-top: 8px;
 }
 
 .glucose-summary {

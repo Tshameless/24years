@@ -81,7 +81,6 @@ export function initRelationalSchema(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS family_changes_lookup ON family_changes(family_id, revision, seq);
     CREATE INDEX IF NOT EXISTS family_changes_created_at ON family_changes(created_at);
   `);
-
 }
 
 export function decodeFamilyRecords(db: DatabaseSync, familyId: string, raw: string): FamilyData {

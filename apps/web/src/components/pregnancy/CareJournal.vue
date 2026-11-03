@@ -89,9 +89,7 @@ async function submit() {
         <h2>{{ labels[kind] }}</h2>
         <span class="tag">{{ entries.length }} 条记录</span>
       </div>
-      <p class="muted">
-        心情日记可设为仅自己可见；陪伴记录在家庭同步后对家庭成员可见。
-      </p>
+      <p class="muted">心情日记可设为仅自己可见；陪伴记录在家庭同步后对家庭成员可见。</p>
       <p
         v-if="kind === 'mood' && form.visibility === 'private'"
         class="privacy-notice"
@@ -125,6 +123,12 @@ async function submit() {
               class="tag"
             >
               {{ item.minutes }} 分钟
+            </span>
+            <span
+              v-else
+              class="tag"
+            >
+              {{ item.visibility === 'private' ? '仅自己可见' : '家庭共享' }}
             </span>
           </div>
           <p class="muted">{{ item.date }}</p>

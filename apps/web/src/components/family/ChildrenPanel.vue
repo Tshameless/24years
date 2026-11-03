@@ -438,12 +438,13 @@ const genderLabels: Record<string, string> = {
           <label class="field">
             出生孕周（周，可选）
             <input
-              v-model="form.birthGestationalWeeks"
+              :value="form.birthGestationalWeeks"
               type="number"
               step="1"
               min="20"
               max="45"
               placeholder="仅作出生资料记录"
+              @input="form.birthGestationalWeeks = ($event.target as HTMLInputElement).value"
             />
           </label>
 
@@ -473,34 +474,37 @@ const genderLabels: Record<string, string> = {
             <label class="field">
               出生体重（克）
               <input
-                v-model="form.birthWeightGrams"
+                :value="form.birthWeightGrams"
                 type="number"
                 step="1"
                 min="100"
                 max="10000"
                 placeholder="例如：3350"
+                @input="form.birthWeightGrams = ($event.target as HTMLInputElement).value"
               />
             </label>
             <label class="field">
               出生身长（厘米）
               <input
-                v-model="form.birthLengthCm"
+                :value="form.birthLengthCm"
                 type="number"
                 step="0.1"
                 min="10"
                 max="100"
                 placeholder="例如：50.0"
+                @input="form.birthLengthCm = ($event.target as HTMLInputElement).value"
               />
             </label>
             <label class="field">
               出生头围（厘米）
               <input
-                v-model="form.headCircumferenceCm"
+                :value="form.headCircumferenceCm"
                 type="number"
                 step="0.1"
                 min="10"
                 max="70"
                 placeholder="例如：34.5"
+                @input="form.headCircumferenceCm = ($event.target as HTMLInputElement).value"
               />
             </label>
           </div>

@@ -46,14 +46,15 @@ const UltrasoundPanel = defineAsyncComponent(
 const SymptomsPanel = defineAsyncComponent(
   () => import('@/components/pregnancy/SymptomsPanel.vue'),
 );
+const BabyNamesPanel = defineAsyncComponent(
+  () => import('@/components/pregnancy/BabyNamesPanel.vue'),
+);
 
-const { data, recordLocked, cloud } = useFamily();
+const { data, today, recordLocked, cloud } = useFamily();
 const route = useRoute();
 const outcome = computed(() => pregnancyOutcome(data.value.pregnancyRecords));
 const progress = computed(() =>
-  data.value.profile
-    ? pregnancyProgress(data.value.profile.dueDate, new Date().toISOString().slice(0, 10))
-    : null,
+  data.value.profile ? pregnancyProgress(data.value.profile.dueDate, today.value) : null,
 );
 
 const tabGroups = [
@@ -73,6 +74,7 @@ const tabGroups = [
     description: '记录今天的感受与身体变化。',
     tabs: [
       { id: 'bonding', label: '胎教陪伴', component: BondingPanel },
+      { id: 'names', label: '起名与寄语', component: BabyNamesPanel },
       { id: 'mood', label: '心情日记', component: CareJournal },
       { id: 'nutrition', label: '营养与补剂', component: NutritionPanel },
       { id: 'mental', label: '心理自查', component: MentalScreeningPanel },
@@ -190,7 +192,16 @@ const selected = computed(
         }}
       </p>
       <p
-        v-if="outcome"
+        v-if="outcome?.kind === 'ended'"
+        class="muted"
+        role="status"
+      >
+        本次孕期已于
+        {{ outcome.date }}
+        归档，历史记录均已妥善保留。可在“分娩与孕期结束”查看或更正状态。
+      </p>
+      <p
+        v-else-if="outcome"
         class="muted"
         role="status"
       >
@@ -200,13 +211,13 @@ const selected = computed(
         可在“分娩与孕期结束”更正状态。
       </p>
       <nav
-        v-if="quickTabs.length"
+        v-if="quickTabs.length && !data.profile.quietMode && outcome?.kind !== 'ended'"
         class="pregnancy-quick-nav"
         aria-label="当前阶段常用入口"
       >
         <span class="quick-nav-label">
           当前阶段常用
-          <small v-if="progress">孕 {{ progress.weeks }}+{{ progress.days }}</small>
+          <small v-if="progress && !outcome">孕 {{ progress.weeks }}+{{ progress.days }}</small>
         </span>
         <RouterLink
           v-for="item in quickTabs"

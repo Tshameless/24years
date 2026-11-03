@@ -30,6 +30,18 @@ export type PregnancyRecord =
   | { id: string; type: 'bonding'; date: string; title: string; minutes: number; notes: string }
   | {
       id: string;
+      type: 'babyName';
+      date: string;
+      name: string;
+      pronunciation?: string;
+      meaning: string;
+      likedByMother: boolean;
+      likedByFather: boolean;
+      likedBySingle: boolean;
+      notes: string;
+    }
+  | {
+      id: string;
       type: 'mood';
       date: string;
       title: string;
@@ -213,6 +225,18 @@ export function validPregnancyRecord(value: unknown): value is PregnancyRecord {
         note(value.notes) &&
         Number.isInteger(value.minutes) &&
         positive(value.minutes, 1440)
+      );
+    case 'babyName':
+      return (
+        isDate(value.date) &&
+        shortText(value.name, 40) &&
+        (value.pronunciation === undefined || shortText(value.pronunciation, 60)) &&
+        typeof value.meaning === 'string' &&
+        value.meaning.length <= 500 &&
+        typeof value.likedByMother === 'boolean' &&
+        typeof value.likedByFather === 'boolean' &&
+        typeof value.likedBySingle === 'boolean' &&
+        note(value.notes)
       );
     case 'mood':
       return (
@@ -516,10 +540,7 @@ export function applyPregnancyChange(data: FamilyData, change: PregnancyChange):
     }
 
     if (childValue) {
-      updatedChildren = [
-        ...data.children.filter((item) => item.id !== childId),
-        childValue,
-      ];
+      updatedChildren = [...data.children.filter((item) => item.id !== childId), childValue];
     } else {
       updatedChildren = data.children.filter((item) => item.id !== childId);
     }

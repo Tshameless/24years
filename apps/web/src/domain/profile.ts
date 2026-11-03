@@ -1,4 +1,4 @@
-import { addDays, dayDifference, isDate, isObject, shortText } from './primitives.ts';
+import { addDays, dayDifference, isDate, isObject, localDate, shortText } from './primitives.ts';
 
 export interface FamilyProfile {
   name: string;
@@ -32,6 +32,47 @@ export function dueDateFromGestation(
   }
 
   return addDays(referenceDate, 280 - (weeks * 7 + days));
+}
+
+// Calendar estimate from LMP date; clinical ultrasound dating remains authoritative.
+export function gestationFromLmp(
+  lmpDate: string,
+  referenceDate = localDate(),
+): { weeks: number; days: number; dueDate: string } | null {
+  if (!isDate(lmpDate) || !isDate(referenceDate)) {
+    return null;
+  }
+
+  const elapsed = dayDifference(referenceDate, lmpDate);
+
+  if (elapsed < 0 || elapsed > 300) {
+    return null;
+  }
+
+  return {
+    weeks: Math.floor(elapsed / 7),
+    days: elapsed % 7,
+    dueDate: addDays(lmpDate, 280),
+  };
+}
+
+export function prePregnancyBmi(weightKg?: number, heightCm?: number): number | null {
+  if (
+    typeof weightKg !== 'number' ||
+    !Number.isFinite(weightKg) ||
+    weightKg <= 0 ||
+    weightKg > 500 ||
+    typeof heightCm !== 'number' ||
+    !Number.isFinite(heightCm) ||
+    heightCm < 50 ||
+    heightCm > 250
+  ) {
+    return null;
+  }
+
+  const meters = heightCm / 100;
+
+  return Math.round((weightKg / (meters * meters)) * 10) / 10;
 }
 
 // Display estimate only; the persisted clinical anchors remain independent profile fields.

@@ -34,7 +34,8 @@ const navigation = computed(() => [
   { to: '/', label: '今日陪伴', icon: 'home' },
   { to: '/tasks', label: '日常计划', icon: 'calendar' },
   { to: '/pregnancy', label: '孕期记录', icon: 'heart' },
-  ...(pregnancyOutcome(data.value.pregnancyRecords)?.kind === 'birth'
+  ...(pregnancyOutcome(data.value.pregnancyRecords)?.kind === 'birth' ||
+  data.value.children.length > 0
     ? [{ to: '/children', label: '成长档案', icon: 'baby' }]
     : []),
   { to: '/ledger', label: '家庭账本', icon: 'wallet' },

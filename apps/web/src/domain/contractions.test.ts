@@ -54,4 +54,26 @@ describe('contractions domain', () => {
     expect(analysis.avgIntervalMinutes).toBeLessThanOrEqual(5.0);
     expect(analysis.avgDurationSeconds).toBeGreaterThanOrEqual(50);
   });
+
+  it('uses 4-1-1 threshold and copy when multiparous option is enabled', () => {
+    const base = Date.now();
+    const fourMinRecords: Contraction[] = [];
+
+    for (let i = 0; i < 10; i++) {
+      const start = base - i * 3.8 * 60 * 1000;
+      fourMinRecords.push({
+        id: `m-${i}`,
+        type: 'contraction',
+        startedAt: start,
+        endedAt: start + 56 * 1000,
+      });
+    }
+
+    const analysis = analyzeContractions(fourMinRecords, base, { multiparous: true });
+    expect(analysis.matches511).toBe(true);
+    expect(analysis.status).toBe('active_labor_511');
+    expect(analysis.badge).toBe('4-1-1 规律临产');
+    expect(analysis.title).toContain('4-1-1');
+    expect(analysis.advice).toContain('约 4 分钟');
+  });
 });

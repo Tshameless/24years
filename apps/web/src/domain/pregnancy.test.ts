@@ -124,8 +124,12 @@ describe('孕期记录和原子入账', () => {
     const data = {
       ...emptyFamily(),
       profile: {
-        name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: false,
-        familyMode: 'single' as const, parentRole: 'single_parent' as const,
+        name: '家',
+        nickname: '我',
+        dueDate: '2027-01-01',
+        quietMode: false,
+        familyMode: 'single' as const,
+        parentRole: 'single_parent' as const,
       },
       pregnancyRecords: [birth],
       children: [child],
@@ -172,8 +176,12 @@ describe('孕期记录和原子入账', () => {
     const data = {
       ...emptyFamily(),
       profile: {
-        name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: false,
-        familyMode: 'single' as const, parentRole: 'single_parent' as const,
+        name: '家',
+        nickname: '我',
+        dueDate: '2027-01-01',
+        quietMode: false,
+        familyMode: 'single' as const,
+        parentRole: 'single_parent' as const,
       },
       pregnancyRecords: [birth],
       children: [child],
@@ -204,8 +212,12 @@ describe('孕期记录和原子入账', () => {
     const data = {
       ...emptyFamily(),
       profile: {
-        name: '家', nickname: '我', dueDate: '2026-01-01', quietMode: false,
-        familyMode: 'single' as const, parentRole: 'single_parent' as const,
+        name: '家',
+        nickname: '我',
+        dueDate: '2026-01-01',
+        quietMode: false,
+        familyMode: 'single' as const,
+        parentRole: 'single_parent' as const,
       },
       pregnancyRecords: [birth],
     };
@@ -323,8 +335,12 @@ describe('孕期记录和原子入账', () => {
     const quiet = {
       ...data,
       profile: {
-        name: '家', nickname: '我', dueDate: '2027-01-01', quietMode: true,
-        familyMode: 'single' as const, parentRole: 'single_parent' as const,
+        name: '家',
+        nickname: '我',
+        dueDate: '2027-01-01',
+        quietMode: true,
+        familyMode: 'single' as const,
+        parentRole: 'single_parent' as const,
       },
     };
     expect(() =>
@@ -344,5 +360,39 @@ describe('孕期记录和原子入账', () => {
       applyPregnancyChange(stopped, { type: 'pregnancy', before: null, value: second })
         .pregnancyRecords,
     ).toHaveLength(2);
+  });
+
+  it('支持候选名字与寄语记录保存、心动状态更新及 JSON 备份往返校验', () => {
+    const candidate: PregnancyRecord = {
+      id: 'name-1',
+      type: 'babyName',
+      date: '2026-10-21',
+      name: '知夏',
+      pronunciation: 'zhī xià',
+      meaning: '连雨不知春去，一晴方觉夏深',
+      likedByMother: true,
+      likedByFather: false,
+      likedBySingle: false,
+      notes: '明亮温暖的名字',
+    };
+
+    expect(validPregnancyRecord(candidate)).toBe(true);
+    expect(validPregnancyRecord({ ...candidate, name: '' })).toBe(false);
+
+    const created = applyPregnancyChange(emptyFamily(), {
+      type: 'pregnancy',
+      before: null,
+      value: candidate,
+    });
+    const consensus = applyPregnancyChange(created, {
+      type: 'pregnancy',
+      before: candidate,
+      value: { ...candidate, likedByFather: true },
+    });
+
+    expect(consensus.pregnancyRecords).toEqual([{ ...candidate, likedByFather: true }]);
+    expect(decodeFamily(JSON.stringify(consensus)).pregnancyRecords).toEqual([
+      { ...candidate, likedByFather: true },
+    ]);
   });
 });

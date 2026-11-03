@@ -212,6 +212,22 @@ async function submit() {
           </label>
           <button class="button button-primary">保存症状记录</button>
         </fieldset>
+        <p
+          v-if="stale"
+          class="form-error"
+          role="alert"
+        >
+          记录已变化，输入仍保留，请取消后重新编辑最新记录。
+        </p>
+        <button
+          v-if="before"
+          type="button"
+          class="button button-secondary"
+          :disabled="disabled"
+          @click="cancel"
+        >
+          取消编辑
+        </button>
       </form>
       <p
         v-if="error"
